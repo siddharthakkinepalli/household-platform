@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply transition-colors duration-200;
+}
+
+body {
+  @apply bg-dark-bg text-dark-text font-sans;
+}
+
+/* Card component */
+.card {
+  @apply bg-dark-card rounded-card p-4 border border-dark-border;
+}
+
+.card-hover {
+  @apply card hover:border-primary hover:shadow-lg cursor-pointer transition-all duration-300;
+}
+
+/* Button variants */
+.btn {
+  @apply px-4 py-2 rounded-card font-medium text-sm transition-all duration-300;
+}
+
+.btn-primary {
+  @apply btn bg-primary text-white hover:bg-primaryDark;
+}
+
+.btn-secondary {
+  @apply btn bg-dark-border text-dark-text hover:bg-dark-border/80;
+}
+
+.btn-ghost {
+  @apply btn bg-transparent border border-dark-border text-dark-text hover:bg-dark-border/20;
+}
+
+/* Badge variants */
+.badge {
+  @apply inline-block px-3 py-1 rounded-pill text-xs font-medium;
+}
+
+.badge-success {
+  @apply badge bg-green-500/20 text-green-400;
+}
+
+.badge-warning {
+  @apply badge bg-yellow-500/20 text-yellow-400;
+}
+
+.badge-error {
+  @apply badge bg-red-500/20 text-red-400;
+}
+
+.badge-info {
+  @apply badge bg-primary/20 text-primary;
+}
+
+/* Animation */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeUp {
+  animation: fadeUp 0.3s ease-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-dark-card;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-dark-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-dark-border/80;
+}

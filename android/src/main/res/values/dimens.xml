@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="nav_rail_width">84dp</dimen>
+    <dimen name="nav_rail_width_collapsed">54dp</dimen>
+    <dimen name="nav_rail_margin_start">4dp</dimen>
+    <dimen name="nav_rail_margin_vertical">8dp</dimen>
+    <dimen name="nav_rail_padding_vertical">8dp</dimen>
+    <dimen name="nav_rail_item_min_height">62dp</dimen>
+    <dimen name="nav_content_margin_start">6dp</dimen>
+    <dimen name="nav_rail_toggle_width">24dp</dimen>
+    <dimen name="nav_rail_toggle_height">52dp</dimen>
+    <dimen name="nav_rail_toggle_margin_start">4dp</dimen>
+</resources>

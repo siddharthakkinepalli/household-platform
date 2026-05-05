@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Orange accent chip — used for "time" on the next-action card -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/orange_soft" />
+    <corners android:radius="100dp" />
+</shape>

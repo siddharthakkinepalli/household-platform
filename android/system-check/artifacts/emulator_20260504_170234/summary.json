@@ -1,0 +1,47 @@
+﻿{
+    "timestamp":  "2026-05-04T17:02:44",
+    "appId":  "com.jugaad.home",
+    "device":  "emulator-5554",
+    "checks":  {
+                   "iconsVisibleClickable":  [
+                                                 {
+                                                     "tab":  "Today",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[24,255][288,462]"
+                                                 },
+                                                 {
+                                                     "tab":  "Meals",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[24,462][288,669]"
+                                                 },
+                                                 {
+                                                     "tab":  "Wallet",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[24,669][288,876]"
+                                                 },
+                                                 {
+                                                     "tab":  "Health",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[24,876][288,1083]"
+                                                 },
+                                                 {
+                                                     "tab":  "Documents",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[24,1083][288,1290]"
+                                                 }
+                                             ],
+                   "tabWorkflows":  [
+
+                                    ],
+                   "overallWorkflow":  [
+
+                                       ]
+               },
+    "status":  "FAIL",
+    "reason":  "Cannot tap tab \u0027Today\u0027 during workflow run."
+}

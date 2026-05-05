@@ -1,0 +1,5 @@
+﻿JUGAAD phone smoke test
+Timestamp: 2026-04-30T13:54:57
+Result: BLOCKED
+Reason: Phone appears locked (keyguard showing). Unlock and rerun.
+Artifacts dir: C:\Projects\household-platform\android\system-check\artifacts\smoke_20260430_135439

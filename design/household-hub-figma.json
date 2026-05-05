@@ -1,0 +1,112 @@
+{
+  "document": {
+    "type": "FRAME",
+    "name": "Household Hub App",
+    "children": [
+      {
+        "type": "FRAME",
+        "name": "Home Screen",
+        "layoutMode": "VERTICAL",
+        "padding": 16,
+        "itemSpacing": 16,
+        "backgroundColor": "#F5F7FA",
+        "children": [
+          {
+            "type": "TEXT",
+            "name": "Header",
+            "characters": "Household Hub\\nGood Morning 👋",
+            "style": {
+              "fontSize": 20,
+              "fontWeight": 600,
+              "color": "#1C1C1E"
+            }
+          },
+          {
+            "type": "FRAME",
+            "name": "Today Card",
+            "cornerRadius": 16,
+            "padding": 16,
+            "backgroundColor": "#FFFFFF",
+            "children": [
+              {
+                "type": "TEXT",
+                "characters": "Today",
+                "style": { "fontSize": 16, "fontWeight": 600 }
+              },
+              {
+                "type": "TEXT",
+                "characters": "• School Annual Day – 3 PM\\n• Grocery Pickup – 6 PM\\n• Dinner: Paneer Curry",
+                "style": { "fontSize": 14 }
+              }
+            ]
+          },
+          {
+            "type": "FRAME",
+            "name": "Alerts Card",
+            "cornerRadius": 16,
+            "padding": 16,
+            "backgroundColor": "#FFFFFF",
+            "children": [
+              {
+                "type": "TEXT",
+                "characters": "⚠ Alerts",
+                "style": { "fontSize": 16, "fontWeight": 600 }
+              },
+              {
+                "type": "TEXT",
+                "characters": "• Rent due tomorrow\\n• Milk running low\\n• Passport renewal in 3 days",
+                "style": { "fontSize": 14 }
+              }
+            ]
+          },
+          {
+            "type": "FRAME",
+            "name": "Quick Actions",
+            "layoutMode": "HORIZONTAL",
+            "itemSpacing": 12,
+            "children": [
+              { "type": "RECTANGLE", "name": "+ Event", "fill": "#4F8EF7", "cornerRadius": 12 },
+              { "type": "RECTANGLE", "name": "Scan", "fill": "#34C759", "cornerRadius": 12 },
+              { "type": "RECTANGLE", "name": "Voice", "fill": "#FF9F0A", "cornerRadius": 12 }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "FRAME",
+        "name": "Timeline Screen",
+        "layoutMode": "VERTICAL",
+        "padding": 16,
+        "itemSpacing": 12,
+        "backgroundColor": "#F5F7FA",
+        "children": [
+          {
+            "type": "TEXT",
+            "characters": "Today",
+            "style": { "fontSize": 18, "fontWeight": 600 }
+          },
+          {
+            "type": "TEXT",
+            "characters": "3:00 PM – School Annual Day\\n5:00 PM – Grocery Pickup\\n8:00 PM – Dinner Plan",
+            "style": { "fontSize": 14 }
+          },
+          {
+            "type": "TEXT",
+            "characters": "Tomorrow\\nRent Payment Due",
+            "style": { "fontSize": 14 }
+          }
+        ]
+      }
+    ]
+  },
+  "styles": {
+    "color": {
+      "primary": "#4F8EF7",
+      "accent": "#34C759",
+      "background": "#F5F7FA",
+      "card": "#FFFFFF",
+      "textPrimary": "#1C1C1E",
+      "textSecondary": "#6B7280"
+    }
+  }
+}

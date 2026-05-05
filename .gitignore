@@ -1,0 +1,16 @@
+# Keystore — NEVER commit these
+jugaad-release.jks
+jugaad-release.jks.old
+android/keystore.properties
+release-secrets.properties
+play-service-account.json
+
+# Gradle build outputs
+.gradle/
+build/
+*/build/
+
+# Android Studio
+*.iml
+.idea/
+local.properties

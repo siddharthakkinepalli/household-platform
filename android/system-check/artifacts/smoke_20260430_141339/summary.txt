@@ -1,0 +1,5 @@
+﻿JUGAAD phone smoke test
+Timestamp: 2026-04-30T14:13:52
+Result: FAIL
+Reason: Gradle task ':android:installDebug' failed (exit code 1).
+Artifacts dir: C:\Projects\household-platform\android\system-check\artifacts\smoke_20260430_141339

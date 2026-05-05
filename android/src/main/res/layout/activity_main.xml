@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@color/bg_base">
+
+    <FrameLayout
+        android:id="@+id/side_navigation_container"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginStart="@dimen/nav_rail_margin_start"
+        android:layout_marginTop="@dimen/nav_rail_margin_vertical"
+        android:layout_marginBottom="@dimen/nav_rail_margin_vertical">
+
+        <com.google.android.material.navigationrail.NavigationRailView
+            android:id="@+id/side_navigation"
+            android:layout_width="@dimen/nav_rail_width"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_side_nav"
+            android:elevation="6dp"
+            android:paddingTop="@dimen/nav_rail_padding_vertical"
+            android:paddingBottom="@dimen/nav_rail_padding_vertical"
+            app:itemIconSize="24dp"
+            app:itemActiveIndicatorStyle="@style/Widget.Household.NavigationRail.ActiveIndicator"
+            app:itemIconTint="@color/nav_item_color"
+            app:itemMinHeight="@dimen/nav_rail_item_min_height"
+            app:itemTextColor="@color/nav_item_color"
+            app:itemTextAppearanceActive="@style/TextAppearance.Household.NavRailActive"
+            app:itemTextAppearanceInactive="@style/TextAppearance.Household.NavRailInactive"
+            app:itemRippleColor="@color/nav_ripple"
+            app:labelVisibilityMode="labeled"
+            app:menu="@menu/bottom_nav_menu" />
+
+    </FrameLayout>
+
+    <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/button_toggle_side_nav"
+        android:layout_width="@dimen/nav_rail_toggle_width"
+        android:layout_height="@dimen/nav_rail_toggle_height"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="@dimen/nav_rail_toggle_margin_start"
+        android:background="@drawable/bg_chip"
+        android:padding="6dp"
+        android:scaleType="centerInside"
+        android:tint="@color/white"
+        app:srcCompat="@drawable/ic_nav_chevron_left" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/nav_host_fragment"
+        android:name="androidx.navigation.fragment.NavHostFragment"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:layout_marginStart="@dimen/nav_content_margin_start"
+        app:defaultNavHost="true"
+        app:navGraph="@navigation/nav_graph" />
+
+</LinearLayout>

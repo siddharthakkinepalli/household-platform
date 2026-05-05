@@ -1,0 +1,119 @@
+﻿{
+    "timestamp":  "2026-05-04T12:08:31",
+    "appId":  "com.jugaad.home",
+    "device":  "emulator-5554",
+    "checks":  {
+                   "iconsVisibleClickable":  [
+                                                 {
+                                                     "tab":  "Today",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[48,2728][298,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "Plan",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[298,2728][548,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "Wallet",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[548,2728][798,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "Health",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[798,2728][1047,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "More",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[1047,2728][1296,2842]"
+                                                 }
+                                             ],
+                   "tabWorkflows":  [
+                                        {
+                                            "tab":  "Today",
+                                            "expectedMarkers":  [
+                                                                    "Life Hub",
+                                                                    "Today\u0027s plan",
+                                                                    "Next focus"
+                                                                ],
+                                            "markerMatched":  true,
+                                            "foregroundStable":  true
+                                        },
+                                        {
+                                            "tab":  "Plan",
+                                            "expectedMarkers":  [
+                                                                    "Meals \u0026 Groceries",
+                                                                    "Upcoming meals",
+                                                                    "Smart grocery list"
+                                                                ],
+                                            "markerMatched":  true,
+                                            "foregroundStable":  true
+                                        },
+                                        {
+                                            "tab":  "Wallet",
+                                            "expectedMarkers":  [
+                                                                    "Life Hub Â· Wallet",
+                                                                    "Finances",
+                                                                    "Monthly budget"
+                                                                ],
+                                            "markerMatched":  true,
+                                            "foregroundStable":  true
+                                        },
+                                        {
+                                            "tab":  "Health",
+                                            "expectedMarkers":  [
+                                                                    "Life Hub Â· Health",
+                                                                    "Health \u0026 Weight",
+                                                                    "Health tracking coming soon"
+                                                                ],
+                                            "markerMatched":  true,
+                                            "foregroundStable":  true
+                                        },
+                                        {
+                                            "tab":  "More",
+                                            "expectedMarkers":  [
+                                                                    "Life Hub Â· More",
+                                                                    "More",
+                                                                    "Tools"
+                                                                ],
+                                            "markerMatched":  true,
+                                            "foregroundStable":  true
+                                        }
+                                    ],
+                   "overallWorkflow":  [
+                                           {
+                                               "step":  "Today",
+                                               "ok":  true
+                                           },
+                                           {
+                                               "step":  "Plan",
+                                               "ok":  true
+                                           },
+                                           {
+                                               "step":  "Wallet",
+                                               "ok":  true
+                                           },
+                                           {
+                                               "step":  "Health",
+                                               "ok":  true
+                                           },
+                                           {
+                                               "step":  "More",
+                                               "ok":  true
+                                           },
+                                           {
+                                               "step":  "Today",
+                                               "ok":  true
+                                           }
+                                       ]
+               },
+    "status":  "FAIL",
+    "reason":  "Fatal/runtime errors detected in logcat. See C:\\Projects\\household-platform\\android\\system-check\\artifacts\\emulator_20260504_120822\\logcat_tail.txt"
+}

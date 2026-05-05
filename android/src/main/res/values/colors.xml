@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base surfaces -->
+    <color name="bg_base">#F6F3EE</color>
+    <color name="surface">#FFFAF6</color>
+    <color name="surface_2">#FFFFFF</color>
+    <color name="line">#E7DED4</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Text -->
+    <color name="text_primary">#241F1A</color>
+    <color name="text_secondary">#7A7065</color>
+    <color name="text_muted">#9A8E82</color>
+
+    <!-- Today / Green -->
+    <color name="green">#4CAF63</color>
+    <color name="green_soft">#DFF3DF</color>
+    <color name="green_header_start">#57BB62</color>
+    <color name="green_header_end">#43A955</color>
+    <color name="green_dark">#2D7A3D</color>
+
+    <!-- Plan / Orange -->
+    <color name="orange">#EF6421</color>
+    <color name="orange_soft">#FFE5D7</color>
+    <color name="orange_header_start">#F06A24</color>
+    <color name="orange_header_end">#F48D1B</color>
+
+    <!-- Wallet / Purple -->
+    <color name="purple">#6F3DF0</color>
+    <color name="purple_soft">#EFE8FF</color>
+    <color name="purple_budget_start">#7A32F4</color>
+    <color name="purple_budget_end">#5E2BD4</color>
+
+    <!-- Wallet dark surfaces -->
+    <color name="navy">#11162B</color>
+    <color name="navy_card">#151C37</color>
+    <color name="navy_field">#121936</color>
+    <color name="navy_header_start">#151932</color>
+    <color name="navy_header_end">#10162B</color>
+    <color name="nav_rail_start">#10172E</color>
+    <color name="nav_rail_end">#182343</color>
+    <color name="nav_active_indicator">#243A32</color>
+    <color name="nav_active">#77E08A</color>
+    <color name="nav_inactive">#7F879B</color>
+    <color name="nav_inactive_text">#A59B90</color>
+    <color name="nav_ripple">#334D43</color>
+
+    <!-- Wallet data colors -->
+    <color name="chart_green">#B8EA7D</color>
+    <color name="amount_red">#FF767B</color>
+
+    <!-- Health -->
+    <color name="health_start">#F06A24</color>
+    <color name="health_end">#F48D1B</color>
+
+    <!-- Legacy aliases -->
+    <color name="primary_blue">#6F3DF0</color>
+    <color name="accent_green">#4CAF63</color>
+    <color name="card_white">#FFFFFF</color>
+    <color name="background_gray">#F6F3EE</color>
+    <color name="light_gray">#F6F3EE</color>
+    <color name="dark_gray">#241F1A</color>
+</resources>

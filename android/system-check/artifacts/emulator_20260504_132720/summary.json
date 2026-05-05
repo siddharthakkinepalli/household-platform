@@ -1,0 +1,56 @@
+﻿{
+    "timestamp":  "2026-05-04T13:27:36",
+    "appId":  "com.jugaad.home",
+    "device":  "emulator-5554",
+    "checks":  {
+                   "iconsVisibleClickable":  [
+                                                 {
+                                                     "tab":  "Today",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[48,2728][298,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "Meals",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[298,2728][548,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "Wallet",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[548,2728][798,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "Health",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[798,2728][1047,2842]"
+                                                 },
+                                                 {
+                                                     "tab":  "Documents",
+                                                     "visible":  true,
+                                                     "clickable":  true,
+                                                     "bounds":  "[1047,2728][1296,2842]"
+                                                 }
+                                             ],
+                   "tabWorkflows":  [
+                                        {
+                                            "tab":  "Today",
+                                            "expectedMarkers":  [
+                                                                    "Life Hub",
+                                                                    "Today\u0027s plan",
+                                                                    "Next focus"
+                                                                ],
+                                            "markerMatched":  true,
+                                            "foregroundStable":  true
+                                        }
+                                    ],
+                   "overallWorkflow":  [
+
+                                       ]
+               },
+    "status":  "FAIL",
+    "reason":  "Tab \u0027Meals\u0027 opened but expected markers not found: Meals \u0026 Groceries, Upcoming meals, Smart grocery list"
+}

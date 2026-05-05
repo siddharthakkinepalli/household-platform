@@ -1,0 +1,30 @@
+{
+  "tabs": [
+    {
+      "name": "today",
+      "navLabel": "Today",
+      "expectedTexts": ["Life Hub", "Today's plan", "Next focus"]
+    },
+    {
+      "name": "meals",
+      "navLabel": "Meals",
+      "expectedTexts": ["Meals & Groceries", "Upcoming meals", "Smart grocery list"]
+    },
+    {
+      "name": "wallet",
+      "navLabel": "Wallet",
+      "expectedTexts": ["Life Hub · Wallet", "Finances", "Salary-cycle spend"]
+    },
+    {
+      "name": "health",
+      "navLabel": "Health",
+      "expectedTexts": ["Life Hub · Health", "Health & Family", "Family setup"]
+    },
+    {
+      "name": "documents",
+      "navLabel": "Documents",
+      "expectedTexts": ["Life Hub · Documents", "Uploaded documents", "Upcoming renewals"]
+    }
+  ],
+  "overallWorkflow": ["Today", "Meals", "Wallet", "Health", "Documents", "Today"]
+}

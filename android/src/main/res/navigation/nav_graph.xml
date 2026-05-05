@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.household.app.ui.fragments.TodayFragment"
+        android:label="Today" />
+
+    <fragment
+        android:id="@+id/mealsFragment"
+        android:name="com.household.app.ui.fragments.MealsFragment"
+        android:label="Meals" />
+
+    <fragment
+        android:id="@+id/groceriesFragment"
+        android:name="com.household.app.ui.fragments.GroceriesFragment"
+        android:label="Groceries" />
+
+    <fragment
+        android:id="@+id/expensesFragment"
+        android:name="com.household.app.ui.fragments.WalletFragment"
+        android:label="Wallet" />
+
+    <fragment
+        android:id="@+id/healthFragment"
+        android:name="com.household.app.ui.fragments.HealthFragment"
+        android:label="Health" />
+
+    <fragment
+        android:id="@+id/documentsFragment"
+        android:name="com.household.app.ui.fragments.DocumentsFragment"
+        android:label="Documents" />
+
+    <fragment
+        android:id="@+id/familyFragment"
+        android:name="com.household.app.ui.fragments.FamilyFragment"
+        android:label="Family" />
+
+    <fragment
+        android:id="@+id/timelineFragment"
+        android:name="com.household.app.ui.fragments.TimelineFragment"
+        android:label="Timeline" />
+
+    <fragment
+        android:id="@+id/importCsvFragment"
+        android:name="com.household.app.ui.fragments.ImportCsvFragment"
+        android:label="Import" />
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.household.app.ui.fragments.SettingsFragment"
+        android:label="Settings" />
+
+</navigation>

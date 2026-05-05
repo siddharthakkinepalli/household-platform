@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wallet dark chip filter -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/navy_field" />
+    <corners android:radius="100dp" />
+</shape>
