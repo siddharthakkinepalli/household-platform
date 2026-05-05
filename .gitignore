@@ -9,6 +9,7 @@ play-service-account.json
 .gradle/
 build/
 */build/
+android/system-check/artifacts/
 
 # Android Studio
 *.iml
