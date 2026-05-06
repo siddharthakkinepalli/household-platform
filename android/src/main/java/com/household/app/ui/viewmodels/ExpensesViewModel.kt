@@ -36,6 +36,12 @@ class ExpensesViewModel : ViewModel() {
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> = _errorMessage
 
+    private val _selectedCategory = MutableLiveData("All")
+    val selectedCategory: LiveData<String> = _selectedCategory
+
+    private val _selectedTimeFilter = MutableLiveData("This Month")
+    val selectedTimeFilter: LiveData<String> = _selectedTimeFilter
+
     init {
         refreshTransactions()
     }
@@ -51,6 +57,14 @@ class ExpensesViewModel : ViewModel() {
                 _errorMessage.value = "Failed to load expenses: ${e.message}"
             }
         }
+    }
+
+    fun filterByCategory(category: String) {
+        _selectedCategory.value = if (category.isBlank()) "All" else category
+    }
+
+    fun selectTimeFilter(filter: String) {
+        _selectedTimeFilter.value = filter
     }
 
     private fun fetchTransactions(): List<Transaction> {
