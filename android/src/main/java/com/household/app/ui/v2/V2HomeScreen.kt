@@ -75,9 +75,9 @@ fun V2HomeScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "Household OS",
                     style = MaterialTheme.typography.headlineMedium,
@@ -115,8 +115,8 @@ fun V2HomeScreen(
             }
 
             EliteGlassCard(modifier = Modifier.fillMaxWidth(), glowColor = LumePurple) {
-                Text("Total this month", color = TextMuted, style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(10.dp))
+                Text("Total this month", color = TextMuted, style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.height(16.dp))
                 if (state.loading) {
                     Box(
                         modifier = Modifier
@@ -129,11 +129,11 @@ fun V2HomeScreen(
                 } else {
                     Text(
                         text = state.balanceFormatted,
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.ExtraBold,
                         color = TextMain
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
                     DeltaChip(deltaPercent = state.deltaPercent)
                 }
             }

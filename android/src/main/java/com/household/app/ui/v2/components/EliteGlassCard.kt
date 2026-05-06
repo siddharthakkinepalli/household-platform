@@ -30,16 +30,19 @@ fun EliteGlassCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(32.dp))
+            .blur(radius = 8.dp)
             .background(
                 Brush.verticalGradient(
-                    listOf(Color.White.copy(0.05f), Color.Transparent)
+                    listOf(Color.White.copy(0.08f), Color.Transparent)
                 )
             )
-            .background(SurfaceNavy.copy(alpha = 0.8f))
+            .background(SurfaceNavy.copy(alpha = 0.6f))
             .border(
-                width = 1.dp,
+                width = 1.5.dp,
                 brush = Brush.linearGradient(
-                    listOf(GlassStroke, Color.Transparent)
+                    colors = listOf(Color.White.copy(alpha = 0.20f), Color.Transparent),
+                    start = Offset(0f, 0f),
+                    end = Offset(200f, 200f)
                 ),
                 shape = RoundedCornerShape(32.dp)
             )

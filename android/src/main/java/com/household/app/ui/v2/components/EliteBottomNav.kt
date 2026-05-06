@@ -2,6 +2,7 @@ package com.household.app.ui.v2.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,17 +29,22 @@ fun EliteBottomNav(
     navController: NavHostController,
     currentRoute: String?
 ) {
-    Surface(
+    Box(
         modifier = Modifier
-            .padding(horizontal = 24.dp, vertical = 16.dp)
-            .height(72.dp)
             .fillMaxWidth()
-            .blur(0.4.dp),
-        color = SurfaceNavy.copy(alpha = 0.9f),
-        shape = RoundedCornerShape(36.dp),
-        border = BorderStroke(1.dp, EliteGlassBorder),
-        tonalElevation = 8.dp
+            .padding(horizontal = 16.dp, vertical = 20.dp),
+        contentAlignment = Alignment.BottomCenter
     ) {
+        Surface(
+            modifier = Modifier
+                .height(72.dp)
+                .fillMaxWidth()
+                .blur(0.4.dp),
+            color = SurfaceNavy.copy(alpha = 0.85f),
+            shape = RoundedCornerShape(40.dp),
+            border = BorderStroke(1.2.dp, EliteGlassBorder),
+            tonalElevation = 12.dp
+        ) {
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -69,5 +75,6 @@ fun EliteBottomNav(
                 )
             }
         }
+    }
     }
 }
