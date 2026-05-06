@@ -44,8 +44,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -113,12 +118,20 @@ fun V2FinanceScreen(
                     ),
                     center = Offset(size.width * 0.78f, size.height * 0.16f)
                 )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(LumePurple.copy(alpha = 0.30f), Color.Transparent),
+                        center = Offset(size.width * 0.82f, size.height * 0.18f),
+                        radius = size.width * 0.34f
+                    ),
+                    center = Offset(size.width * 0.82f, size.height * 0.18f)
+                )
             }
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 100.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
                 Column {
@@ -166,31 +179,49 @@ fun V2FinanceScreen(
 
 @Composable
 private fun WalletHeroCard(totalBudgetLeft: Double, sparklineValues: List<Float>) {
-    EliteGlassCard(glowColor = LumePurple, modifier = Modifier.fillMaxWidth()) {
+    EliteGlassCard(glowColor = LumePurple.copy(alpha = 0.40f), modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(188.dp)
+                .height(194.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.height(58.dp))
+                Spacer(Modifier.height(54.dp))
                 Text(
                     "BUDGET OVERVIEW",
                     style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 1.sp,
+                    letterSpacing = 2.sp,
                     color = TextMain.copy(alpha = 0.62f)
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    "EUR ${"%.2f".format(totalBudgetLeft)}",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = TextMain
+                    text = buildAnnotatedString {
+                        withStyle(
+                            SpanStyle(
+                                color = TextMain.copy(alpha = 0.72f),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            append("EUR ")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                color = TextMain,
+                                fontSize = MaterialTheme.typography.displayLarge.fontSize,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        ) {
+                            append("${"%.2f".format(totalBudgetLeft)}")
+                        }
+                    },
+                    lineHeight = MaterialTheme.typography.displayLarge.lineHeight
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "TOTAL BUDGET LEFT",
                     style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 2.sp,
                     color = TextMain.copy(alpha = 0.40f)
                 )
             }
@@ -218,8 +249,8 @@ private fun WalletHeroCard(totalBudgetLeft: Double, sparklineValues: List<Float>
             ) {
                 LumeSparkline(
                     values = sparklineValues,
-                    glowColor = LumePurple.copy(alpha = 0.22f),
-                    lineColor = TextMain.copy(alpha = 0.72f),
+                    glowColor = LumePurple.copy(alpha = 0.30f),
+                    lineColor = Color.White,
                     modifier = Modifier
                         .width(120.dp)
                         .height(60.dp)
@@ -272,12 +303,21 @@ private fun CategoryGridItem(
                 shape = RoundedCornerShape(24.dp)
             )
             .border(
-                width = 1.dp,
-                color = if (active) data.color.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.10f),
+                width = if (active) 2.dp else 1.dp,
+                brush = if (active) {
+                    Brush.linearGradient(
+                        listOf(
+                            data.color,
+                            data.color.copy(alpha = 0.20f)
+                        )
+                    )
+                } else {
+                    SolidColor(Color.White.copy(alpha = 0.10f))
+                },
                 shape = RoundedCornerShape(24.dp)
             )
             .clickable(onClick = onClick)
-            .padding(16.dp)
+            .padding(14.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Icon(
@@ -341,7 +381,7 @@ private fun TransactionsPanel(groupedTransactions: Map<String, List<Transaction>
         Text(
             text = "TRANSACTIONS",
             style = MaterialTheme.typography.labelSmall,
-            letterSpacing = 1.sp,
+            letterSpacing = 2.sp,
             color = TextMain.copy(alpha = 0.58f)
         )
         Spacer(Modifier.height(8.dp))
@@ -423,12 +463,12 @@ private fun LumeSparkline(
         drawPath(
             path = path,
             color = glowColor,
-            style = Stroke(width = 9f, pathEffect = PathEffect.cornerPathEffect(12f))
+            style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.cornerPathEffect(12f))
         )
         drawPath(
             path = path,
             color = lineColor,
-            style = Stroke(width = 2.6f, pathEffect = PathEffect.cornerPathEffect(12f))
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.cornerPathEffect(12f))
         )
     }
 }
