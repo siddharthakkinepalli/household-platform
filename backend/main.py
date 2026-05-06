@@ -31,6 +31,8 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from household_models import Base, HouseholdProfile, HouseholdMember, HouseholdExpense, HouseholdBackup
 from household_models import HouseholdEvent, AutomationLog
+from sync_models import DeviceRegistration, SyncChangelog, SyncAck
+from sync_routes import register_sync_routes
 from ai_pipeline import (
     extract_structured_data,
     normalize_payload,

@@ -77,6 +77,12 @@ android {
         // Keep compiler extension aligned with project Kotlin (1.9.21).
         kotlinCompilerExtensionVersion = "1.5.7"
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/DEPENDENCIES"
+        }
+    }
 }
 
 dependencies {
@@ -116,9 +122,14 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.runtime:runtime-livedata")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+    // Google Drive integration
+    implementation("com.google.android.gms:play-services-auth:21.1.1")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20240123-2.0.0")
 
     // Compose Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")

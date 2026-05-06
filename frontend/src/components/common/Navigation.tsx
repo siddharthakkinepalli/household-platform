@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
+import { JugaadIcon } from '@components/jugaad'
 
 interface NavigationProps {
   open: boolean
@@ -37,7 +38,13 @@ const Navigation: React.FC<NavigationProps> = ({ open, onClose }) => {
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        {/* Header */}
+        {/* Branding — visible on desktop */}
+        <div className="hidden md:flex items-center gap-3 h-16 px-4 border-b border-dark-border">
+          <JugaadIcon size={32} animated={false} showSatellites={false} className="shrink-0" />
+          <span className="font-bold text-base">Jugaad Household</span>
+        </div>
+
+        {/* Header — mobile only */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-dark-border md:hidden">
           <span className="font-bold text-lg">Menu</span>
           <button onClick={onClose} className="p-2 hover:bg-dark-border rounded-lg">
@@ -70,8 +77,8 @@ const Navigation: React.FC<NavigationProps> = ({ open, onClose }) => {
         {/* Footer */}
         <div className="border-t border-dark-border p-4">
           <div className="text-xs text-dark-text/60">
-            <p>Household v1.0</p>
-            <p className="mt-1">© 2024</p>
+            <p>Jugaad Household v1.0</p>
+            <p className="mt-1">© 2026</p>
           </div>
         </div>
       </nav>

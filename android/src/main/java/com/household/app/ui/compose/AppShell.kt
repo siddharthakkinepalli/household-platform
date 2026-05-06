@@ -18,6 +18,7 @@ import com.household.app.ui.compose.components.NavigationRailComposable
 import com.household.app.ui.compose.components.edgeSwipeRail
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.theme.JugaadTheme
+import com.household.app.ui.v2.V2AppShell
 
 /**
  * AppShell — root Composable set as the content of MainActivity.
@@ -39,6 +40,17 @@ import com.household.app.ui.compose.theme.JugaadTheme
  */
 @Composable
 fun AppShell(
+    fragmentManager: FragmentManager,
+    onFinish: () -> Unit
+) {
+    V2AppShell(
+        fragmentManager = fragmentManager,
+        onFinish = onFinish
+    )
+}
+
+@Composable
+fun AppShellLegacy(
     fragmentManager: FragmentManager,
     onFinish: () -> Unit
 ) {

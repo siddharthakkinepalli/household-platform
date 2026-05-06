@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { JugaadIcon } from '@components/jugaad'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -22,8 +23,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </svg>
             </button>
             <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-              <span className="text-primary text-2xl">🏠</span>
-              <span className="hidden sm:inline">Household</span>
+              <JugaadIcon size={30} animated={false} showSatellites={false} className="shrink-0" />
+              <span className="hidden sm:inline">Jugaad Household</span>
             </Link>
           </div>
 

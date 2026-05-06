@@ -1,8 +1,16 @@
-"""Build and upload household-platform Android AAB to Google Play Internal testing.
+"""Build and upload household-platform Android AAB to Google Play Internal testing track.
+
+Automatically bumps version, builds the release bundle, and uploads to the internal track
+with status "completed" (released, not draft).
 
 Usage (from household-platform root):
   C:/Projects/.venv/Scripts/python.exe scripts/publish_play_internal.py
   publish_internal.bat
+  
+Options:
+  --bump {patch|minor|major|none}   Version bump strategy (default: patch)
+  --track {internal|alpha|beta}     Override Play track (default: internal)
+  --notes "Release notes text"      Custom release notes
 """
 
 from __future__ import annotations
@@ -142,13 +150,19 @@ def upload_to_play(package_name: str, track: str, release_name: str, notes: str,
         service.edits().commit(packageName=package_name, editId=edit_id).execute()
         return version_code
 
-    try:
+    # For internal track, always use "completed" to mark as released (not draft).
+    # For production, this would need to be "draft" first, then promoted separately.
+    if track == "internal":
+        print(f"Publishing to internal track with status 'completed' (released, not draft)...")
         return run_edit_with_status("completed")
-    except Exception as exc:
-        if "Only releases with status draft may be created on draft app" not in str(exc):
-            raise
-        print("Play app is in draft mode; retrying with release status 'draft'.")
-        return run_edit_with_status("draft")
+    else:
+        try:
+            return run_edit_with_status("completed")
+        except Exception as exc:
+            if "Only releases with status draft may be created on draft app" not in str(exc):
+                raise
+            print(f"Publishing to {track} track: app is in draft mode, using 'draft' status.")
+            return run_edit_with_status("draft")
 
 
 def main() -> int:
@@ -191,7 +205,9 @@ def main() -> int:
         notes=args.notes,
         sa_json_path=sa_json_path,
     )
-    print(f"Uploaded versionCode {uploaded_version_code} to track '{track}'.")
+    print(f"✓ Uploaded and released versionCode {uploaded_version_code} to track '{track}'.")
+    if track == "internal":
+        print(f"✓ Status: RELEASED (not draft). Testers can now download from Play Console.")
     return 0
 
 

@@ -8,6 +8,42 @@ Canonical handoff file: LATEST_STATUS.md
 Enable reliable Backup/Restore testing in the Android emulator for JUGAAD (Household Platform) and keep this file as the single resume point for future sessions.
 
 ## What Changed In This Session
+- Left rail collapse UX updated to maximize content space:
+  - Added a small collapse icon at the top-right edge of the left bar.
+  - Single tap now hides the left bar completely (not partial width collapse).
+  - Existing floating restore button (`button_show_side_nav`) still restores the bar.
+  - Files updated:
+    - `android/src/main/res/layout/activity_main.xml`
+    - `android/src/main/java/com/household/app/MainActivity.kt`
+  - Verification: `:android:assembleDebug` BUILD SUCCESSFUL.
+
+- Restored branded JUGAAD launcher icon (purple gradient + white J) for Android app package `com.jugaad.home`.
+- Root cause: module icon resources had regressed to generic gray ring vectors (`mipmap-hdpi/mdpi/ic_launcher*.xml`).
+- Added adaptive icon resources:
+  - `android/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
+  - `android/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
+  - `android/src/main/res/drawable/ic_launcher_background.xml`
+  - `android/src/main/res/drawable/ic_launcher_foreground.xml`
+- Updated legacy fallback launcher resources to the same purple J branding:
+  - `android/src/main/res/mipmap-mdpi/ic_launcher.xml`
+  - `android/src/main/res/mipmap-mdpi/ic_launcher_round.xml`
+  - `android/src/main/res/mipmap-hdpi/ic_launcher.xml`
+  - `android/src/main/res/mipmap-hdpi/ic_launcher_round.xml`
+- Verification:
+  - `:android:assembleDebug` completed successfully.
+  - Emulator reconnect restored (`adb devices` showed `emulator-5554`).
+  - Clean uninstall + install of `com.jugaad.home` succeeded.
+
+- Optimized sidebar/content spacing in main layout:
+  - Moved the side-nav toggle button from a dedicated middle column into an overlay anchored on the rail edge.
+  - Added `clipChildren=false` and `clipToPadding=false` on the side-nav container to allow edge overlay rendering.
+  - Result: reclaimed horizontal content space previously consumed by the in-between toggle strip.
+- File changed:
+  - `android/src/main/res/layout/activity_main.xml`
+- Verification status:
+  - `:android:assembleDebug` showed BUILD SUCCESSFUL.
+  - Emulator process starts, but ADB currently reports no connected devices in this environment (`No connected devices` / connection reset), so install/launch verification is pending reconnection.
+
 - Resumed work after VS Code crash using repo memory and project state files.
 - Diagnosed app crash on emulator: Room generated implementation missing at runtime (`AppDatabase_Impl does not exist`).
 - Root cause and environment constraint:

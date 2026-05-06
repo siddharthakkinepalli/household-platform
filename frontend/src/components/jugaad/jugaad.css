@@ -1,0 +1,64 @@
+/* Imported from Emergent_Experiments: icon animation styles */
+.jugaad-icon-wrap {
+  display: inline-block;
+  position: relative;
+  line-height: 0;
+  filter: drop-shadow(0 30px 60px rgba(76, 29, 149, 0.45)) drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+}
+
+.jugaad-icon-wrap svg {
+  display: block;
+}
+
+.is-animated .jg-orbit {
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+  animation: jg-orbit 26s linear infinite;
+}
+
+.is-animated .jg-sat {
+  opacity: 0;
+  animation: jg-fade 0.9s ease-out forwards;
+}
+
+.is-animated .jg-ring {
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+  animation: jg-ring-spin 80s linear infinite reverse;
+}
+
+.is-animated .jg-letter {
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+  animation: jg-pulse 4.6s ease-in-out infinite;
+}
+
+@keyframes jg-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes jg-ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes jg-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes jg-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-animated .jg-orbit,
+  .is-animated .jg-ring,
+  .is-animated .jg-letter,
+  .is-animated .jg-sat {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
