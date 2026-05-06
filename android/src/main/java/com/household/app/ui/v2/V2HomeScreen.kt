@@ -1,8 +1,11 @@
 package com.household.app.ui.v2
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,14 +27,17 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.household.app.ui.compose.state.HomeViewModel
@@ -74,14 +80,15 @@ fun V2HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 20.dp, vertical = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Header Section
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = "Household OS",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
                     color = TextMain
                 )
                 Row(
@@ -89,8 +96,8 @@ fun V2HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Premium home control layer", color = TextSecondary)
-                    Text(todayDate, color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                    Text("Premium for luminescent Glass", color = TextSecondary, style = MaterialTheme.typography.bodyLarge)
+                    Text(todayDate, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
@@ -114,9 +121,21 @@ fun V2HomeScreen(
                 }
             }
 
-            EliteGlassCard(modifier = Modifier.fillMaxWidth(), glowColor = LumePurple) {
-                Text("Total this month", color = TextMuted, style = MaterialTheme.typography.labelSmall)
+            EliteGlassCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.2.dp,
+                        brush = Brush.linearGradient(
+                            listOf(Color(0xFF8B5CF6).copy(0.3f), Color.Transparent)
+                        ),
+                        shape = RoundedCornerShape(28.dp)
+                    )
+            ) {
+                Text("FINANCE", color = Color(0xFF8B5CF6), style = MaterialTheme.typography.labelSmall, letterSpacing = 0.5.sp)
+                Text("TOTAL SPEND", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(16.dp))
+                
                 if (state.loading) {
                     Box(
                         modifier = Modifier
@@ -127,14 +146,44 @@ fun V2HomeScreen(
                         CircularProgressIndicator(color = LumeEmerald)
                     }
                 } else {
-                    Text(
-                        text = state.balanceFormatted,
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextMain
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = state.balanceFormatted,
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextMain
+                        )
+                        Icon(
+                            imageVector = Icons.Rounded.ShowChart,
+                            contentDescription = null,
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(72.dp)
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
-                    DeltaChip(deltaPercent = state.deltaPercent)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("May", "Eat out", "Travel").forEach { tag ->
+                            Surface(
+                                color = Color.White.copy(0.08f),
+                                shape = CircleShape,
+                                border = BorderStroke(1.dp, Color.White.copy(0.1f)),
+                                modifier = Modifier
+                            ) {
+                                Text(
+                                    tag,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

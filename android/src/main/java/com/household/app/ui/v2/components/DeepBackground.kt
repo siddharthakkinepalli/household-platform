@@ -3,14 +3,12 @@ package com.household.app.ui.v2.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 
 @Composable
 fun DeepBackground(
@@ -19,36 +17,35 @@ fun DeepBackground(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF07111F),
-                        Color(0xFF0F172A),
-                        Color(0xFF111827)
-                    )
+            .background(Color(0xFF07090D))
+            .drawBehind {
+                // Top-left green glow (Teal)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF14B8A6).copy(alpha = 0.15f), Color.Transparent),
+                        center = Offset(0f, 0f),
+                        radius = size.width * 1.5f
+                    ),
+                    center = Offset(0f, 0f)
                 )
-            )
-    ) {
-        Box(
-            modifier = Modifier
-                .offset(x = (-48).dp, y = (-24).dp)
-                .size(220.dp)
-                .blur(72.dp)
-                .background(Color(0xFF22C55E).copy(alpha = 0.20f))
-        )
-        Box(
-            modifier = Modifier
-                .offset(x = 220.dp, y = 96.dp)
-                .size(180.dp)
-                .blur(72.dp)
-                .background(Color(0xFF60A5FA).copy(alpha = 0.18f))
-        )
-        Box(
-            modifier = Modifier
-                .offset(x = 80.dp, y = 420.dp)
-                .size(240.dp)
-                .blur(84.dp)
-                .background(Color(0xFFF97316).copy(alpha = 0.14f))
-        )
-    }
+                // Middle-right purple glow
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF8B5CF6).copy(alpha = 0.12f), Color.Transparent),
+                        center = Offset(size.width, size.height * 0.4f),
+                        radius = size.width * 1.2f
+                    ),
+                    center = Offset(size.width, size.height * 0.4f)
+                )
+                // Bottom-center amber glow (subtle)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFFF59E0B).copy(alpha = 0.08f), Color.Transparent),
+                        center = Offset(size.width * 0.5f, size.height),
+                        radius = size.width * 0.8f
+                    ),
+                    center = Offset(size.width * 0.5f, size.height)
+                )
+            }
+    )
 }
