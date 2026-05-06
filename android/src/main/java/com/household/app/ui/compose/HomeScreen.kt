@@ -16,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,7 +61,7 @@ import java.time.format.DateTimeFormatter
  *   FAB overlaid at bottom-right via Box
  *
  * Data: collected from HomeViewModel via StateFlow (lifecycle-aware).
- * Phase 2: mock balance + mock insight from ViewModel.
+ * Phase 2: placeholder balance + public-repo notice from ViewModel.
  */
 @Composable
 fun HomeScreen(
@@ -70,16 +72,16 @@ fun HomeScreen(
     val todayDate = LocalDate.now()
         .format(DateTimeFormatter.ofPattern("EEE, d MMM"))
 
-    // Phase 2 mock data for Today + Alerts sections
+    // Public repo placeholder data for Today + Alerts sections
     val todayItems = listOf(
-        TodayItem("Grocery run",      "10:00 AM"),
-        TodayItem("Dinner with kids", "7:00 PM"),
-        TodayItem("Dentist (Priya)",  "9:30 AM")
+        TodayItem("Add household task", "10:00 AM"),
+        TodayItem("Review meal plan",   "7:00 PM"),
+        TodayItem("Archive receipt",    "9:30 AM")
     )
     val alertItems = listOf(
-        AlertItem("Rent due in 3 days",       isUrgent = true),
-        AlertItem("Netflix renewal tomorrow", isUrgent = true),
-        AlertItem("Grocery budget 80% used",  isUrgent = false)
+        AlertItem("Connect your own wallet data source", isUrgent = true),
+        AlertItem("Review repository usage notice",      isUrgent = true),
+        AlertItem("Replace placeholders before release", isUrgent = false)
     )
 
     Box(
@@ -160,6 +162,10 @@ fun HomeScreen(
                 modifier     = Modifier.fillMaxWidth()
             )
 
+            Spacer(Modifier.height(24.dp))
+
+            PublicRepoNoticeCard(modifier = Modifier.fillMaxWidth())
+
             // Bottom padding so last card isn't covered by FAB
             Spacer(Modifier.height(88.dp))
         }
@@ -168,6 +174,35 @@ fun HomeScreen(
         QuickCaptureFab(
             modifier = Modifier.fillMaxSize()
         )
+    }
+}
+
+@Composable
+private fun PublicRepoNoticeCard(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        color = Color.White,
+        tonalElevation = 1.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5E7EB))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Public Repository Notice",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFF0F172A)
+            )
+            Text(
+                text = "This build contains placeholder content only. JUGAAD branding, bundled assets, and application content are copyrighted reference material and are not licensed for reuse or republishing in other apps.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+        }
     }
 }
 

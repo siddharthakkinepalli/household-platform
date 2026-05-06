@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 /**
  * HomeViewModel — MVI pattern.
  *
- * Phase 2: insights are hardcoded mocks so the UI can be validated.
+ * Phase 2: insights are generic placeholders so the public repo does not ship household data.
  * Phase 3: replace loadInsights() with a real InsightRepository call to GET /api/v1/insights.
  */
 class HomeViewModel : ViewModel() {
@@ -31,10 +31,10 @@ class HomeViewModel : ViewModel() {
 
     // ── Static module definitions ─────────────────────────────────────────
     val modules: List<Module> = listOf(
-        Module("wallet",  "Wallet",    Icons.Rounded.AccountBalanceWallet, WalletColor, "€0.00 spent",  Screen.Wallet.route),
-        Module("meals",   "Meals",     Icons.Rounded.Restaurant,           MealsColor,  "2 planned",    Screen.Meals.route),
-        Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,   "0 files",      Screen.Docs.route),
-        Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor, "1 member",     Screen.Family.route)
+        Module("wallet",  "Wallet",    Icons.Rounded.AccountBalanceWallet, WalletColor, "Placeholder data", Screen.Wallet.route),
+        Module("meals",   "Meals",     Icons.Rounded.Restaurant,           MealsColor,  "Template plan",   Screen.Meals.route),
+        Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,   "Starter docs",    Screen.Docs.route),
+        Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor, "Private by design", Screen.Family.route)
     )
 
     init {
@@ -53,23 +53,24 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             loadInsights()
-            // Phase 3: load balance from WalletRepository
-            _state.update { it.copy(balanceFormatted = "€1,240.00", deltaPercent = -12f, loading = false) }
+            // Phase 3: load balance from WalletRepository.
+            // Public builds use placeholders instead of real household totals.
+            _state.update { it.copy(balanceFormatted = "€0.00", deltaPercent = 0f, loading = false) }
         }
     }
 
     private fun loadInsights() {
         viewModelScope.launch {
-            // Phase 2: hardcoded mock insight.
+            // Phase 2: generic placeholder insight.
             // Phase 3: replace with: insightRepository.getInsights().fold(...)
             val mockInsights = listOf(
                 Insight(
                     id       = "mock_1",
-                    type     = InsightType.WARNING,
-                    category = "SUBSCRIPTION",
-                    title    = "Subscription detected",
-                    message  = "2 subscriptions renewing this week — review in Wallet",
-                    action   = Screen.Wallet.route
+                    type     = InsightType.INFO,
+                    category = "NOTICE",
+                    title    = "Public repository notice",
+                    message  = "This public build ships placeholder content only. JUGAAD assets and app content are copyrighted and are not licensed for republishing in other apps.",
+                    action   = ""
                 )
             )
             _state.update { it.copy(insights = mockInsights) }

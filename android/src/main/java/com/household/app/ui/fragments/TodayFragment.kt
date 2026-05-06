@@ -84,42 +84,42 @@ class TodayFragment : Fragment() {
 
     private val knownSubscriptionRules = listOf(
         SubscriptionRule(
-            label = "School fees",
-            keywords = listOf("school fee", "school fees", "ess fee", "esses fee", "mss -")
+            label = "Education",
+            keywords = listOf("school fee", "school fees", "tuition", "education")
         ),
         SubscriptionRule(
-            label = "Rent",
-            keywords = listOf("rent", "miete", "lindner", "immobilien", "apartment"),
+            label = "Housing",
+            keywords = listOf("rent", "miete", "housing", "apartment"),
             cadence = BillingCadence.AFTER_SALARY
         ),
         SubscriptionRule(
-            label = "Conficar",
-            keywords = listOf("conficar", "confitech")
+            label = "Transport",
+            keywords = listOf("transport", "mobility", "car share")
         ),
         SubscriptionRule(
-            label = "DB Deutschlandticket",
-            keywords = listOf("deutschlandticket", "deutschland ticket", "db vertri", "deutsche bahn", " db ")
+            label = "Transit pass",
+            keywords = listOf("transit pass", "rail", "bus pass", "ticket")
         ),
         SubscriptionRule(
-            label = "India transfer (Wise)",
-            keywords = listOf("transferwise", "wise", "india transfer", "chithra", "siddharth"),
+            label = "Transfer",
+            keywords = listOf("transferwise", "wise", "bank transfer", "remittance"),
             cadence = BillingCadence.AFTER_SALARY
         ),
         SubscriptionRule(
-            label = "Dance fees",
-            keywords = listOf("rashmi bijegatte", "dance fee")
+            label = "Activities",
+            keywords = listOf("activity fee", "club fee", "dance fee")
         ),
         SubscriptionRule(
-            label = "Lycamobile",
-            keywords = listOf("lycamobile", "lyca")
+            label = "Mobile",
+            keywords = listOf("mobile", "carrier", "sim")
         ),
         SubscriptionRule(
-            label = "Claude / Google",
-            keywords = listOf("claude", "anthropic", "google subscription", "google one", "google")
+            label = "Software",
+            keywords = listOf("software", "cloud storage", "ai tool", "workspace")
         ),
         SubscriptionRule(
             label = "Internet / Electricity",
-            keywords = listOf("telekom", "internet", "lekker", "electricity", "strom")
+            keywords = listOf("internet", "electricity", "utilities", "power")
         )
     )
 

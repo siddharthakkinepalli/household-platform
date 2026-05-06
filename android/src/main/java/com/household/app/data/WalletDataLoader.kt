@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Loads wallet data from embedded wallet_data.json resource.
- * This JSON is exported from the Expenses app database.
+ * The public repository only ships placeholder content, not personal finance exports.
  */
 class WalletDataLoader(private val context: Context) {
 
@@ -31,7 +31,7 @@ class WalletDataLoader(private val context: Context) {
     )
 
     /**
-     * Load all transactions from wallet_data.json resource.
+     * Load placeholder transactions from wallet_data.json resource.
      */
     fun loadTransactions(): List<WalletTransaction> {
         return try {
@@ -75,7 +75,7 @@ class WalletDataLoader(private val context: Context) {
     }
 
     /**
-     * Load all trips from wallet_data.json resource.
+     * Load placeholder trips from wallet_data.json resource.
      */
     fun loadTrips(): List<WalletTrip> {
         return try {

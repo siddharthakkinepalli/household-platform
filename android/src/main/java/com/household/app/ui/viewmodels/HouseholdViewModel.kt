@@ -47,9 +47,9 @@ class HouseholdViewModel : ViewModel() {
         )
         timelineStore.addAll(
             listOf(
-            "3 PM - School event",
-            "6 PM - Grocery pickup",
-            "Tomorrow - Rent payment reminder"
+            "3 PM - Add your first household event",
+            "6 PM - Review local-only setup",
+            "Tomorrow - Connect your own reminders"
             )
         )
         _timelineLines.value = timelineStore.take(3)
@@ -85,10 +85,10 @@ class HouseholdViewModel : ViewModel() {
 
     private fun sampleTextForSource(source: String): String {
         return when (source.lowercase()) {
-            "scan" -> "School Annual Day on 3rd June 2026 at 3 PM"
-            "voice" -> "Add PTA meeting next Thursday at 5 PM"
-            "email" -> "Rent payment due tomorrow"
-            else -> "Family event tomorrow at 6 PM"
+            "scan" -> "Scanned item saved as a private placeholder"
+            "voice" -> "Voice note saved as a private placeholder"
+            "email" -> "Email summary saved as a private placeholder"
+            else -> "Household item saved as a private placeholder"
         }
     }
 }

@@ -2,8 +2,8 @@ package com.household.app.ui.compose
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -50,7 +50,6 @@ fun AppShell(
             derivedStateOf { navController.currentBackStackEntry?.destination?.route }
         }
 
-        // rememberSaveable: persists rail state on config change / process recreation
         var expanded by rememberSaveable { mutableStateOf(false) }
 
         // BackHandler: pop back stack, fall through to finish
@@ -62,31 +61,29 @@ fun AppShell(
             modifier = Modifier
                 .fillMaxSize()
                 .edgeSwipeRail(
-                    expanded    = expanded,
-                    onExpand    = { expanded = true },
-                    onCollapse  = { expanded = false }
+                    expanded = expanded,
+                    onExpand = { expanded = true },
+                    onCollapse = { expanded = false }
                 )
         ) {
-            // ── Left: Navigation Rail ──────────────────────────────────────
             NavigationRailComposable(
                 currentRoute = currentRoute,
-                expanded     = expanded,
-                onToggle     = { expanded = !expanded },
-                onNavigate   = { route ->
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+                onNavigate = { route ->
                     navController.navigate(route) {
                         popUpTo(Screen.Home.route) { saveState = true }
                         launchSingleTop = true
-                        restoreState    = true
+                        restoreState = true
                     }
                 },
                 modifier = Modifier.fillMaxHeight()
             )
 
-            // ── Right: Content area (NavHost) ──────────────────────────────
             AppNavHost(
-                navController   = navController,
+                navController = navController,
                 fragmentManager = fragmentManager,
-                modifier        = Modifier
+                modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
             )

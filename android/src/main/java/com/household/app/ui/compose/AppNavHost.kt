@@ -59,6 +59,7 @@ fun AppNavHost(
         // Home — Compose composable
         composable(route = Screen.Home.route) {
             HomeScreen()
+            // Switch to com.household.app.ui.v2.V2HomeScreen() once the v2 screen is approved.
         }
 
         // Legacy Fragment destinations — inline deep-link scaffold for future use

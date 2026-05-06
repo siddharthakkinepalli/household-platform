@@ -588,15 +588,15 @@ class WalletFragment : Fragment() {
     private fun recurringLabel(txn: WalletTxn, allTxns: List<WalletTxn>): String {
         val titleLower = txn.title.lowercase(Locale.getDefault())
         val knownSubscriptionKeywords = listOf(
-            "school fee", "school fees", "ess fee", "esses fee",
-            "rent", "miete", "lindner", "immobilien",
-            "conficar", "confitech",
-            "deutschlandticket", "deutschland ticket", "db vertri", "deutsche bahn",
-            "transferwise", "wise", "india transfer", "chithra", "siddharth",
-            "rashmi bijegatte", "dance fee",
-            "lycamobile", "lyca",
-            "claude", "anthropic", "google subscription", "google one",
-            "telekom", "lekker", "electricity", "strom"
+            "school fee", "school fees", "tuition", "education",
+            "rent", "miete", "housing", "apartment",
+            "transport", "mobility", "car share",
+            "transit pass", "rail", "bus pass", "ticket",
+            "transferwise", "wise", "bank transfer", "remittance",
+            "activity fee", "club fee", "dance fee",
+            "mobile", "carrier", "sim",
+            "software", "cloud storage", "ai tool", "workspace",
+            "internet", "utilities", "electricity", "power"
         )
         if (knownSubscriptionKeywords.any { titleLower.contains(it) }) {
             return "Subscription"
