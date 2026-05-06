@@ -2,6 +2,7 @@ package com.household.app.ui.v2
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
@@ -50,8 +51,8 @@ import com.household.app.ui.compose.theme.Red
 import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.compose.theme.TextSecondary
-import com.household.app.ui.v2.components.DeepBackground
 import com.household.app.ui.v2.components.EliteGlassCard
+import androidx.compose.ui.geometry.Offset
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
@@ -73,8 +74,37 @@ fun V2HomeScreen(
         AlertEntry("Meals plan still using placeholders", false)
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        DeepBackground()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF07090D))
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF14B8A6).copy(alpha = 0.24f), Color.Transparent),
+                    center = Offset(0f, 0f),
+                    radius = size.width * 1.25f
+                ),
+                center = Offset(0f, 0f)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF8B5CF6).copy(alpha = 0.16f), Color.Transparent),
+                    center = Offset(size.width, size.height),
+                    radius = size.width * 1.5f
+                ),
+                center = Offset(size.width, size.height)
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFF59E0B).copy(alpha = 0.09f), Color.Transparent),
+                    center = Offset(size.width * 0.5f, size.height),
+                    radius = size.width * 1.0f
+                ),
+                center = Offset(size.width * 0.5f, size.height)
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -126,7 +156,7 @@ fun V2HomeScreen(
                 glowColor = Color(0xFF8B5CF6),
                 borderAlpha = 0.30f
             ) {
-                Text("FINANCE", color = Color(0xFF8B5CF6), style = MaterialTheme.typography.labelSmall, letterSpacing = 0.5.sp)
+                Text("FINANCE", color = Color(0xFF8B5CF6), style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
                 Text("TOTAL SPEND", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium)
                 Spacer(Modifier.height(16.dp))
                 
@@ -197,7 +227,7 @@ fun V2HomeScreen(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("Modules", color = TextMuted, style = MaterialTheme.typography.labelMedium)
+                Text("MODULES", color = TextMuted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
                 viewModel.modules.chunked(2).forEach { rowModules ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -250,7 +280,7 @@ private fun DeltaChip(deltaPercent: Float) {
 @Composable
 private fun TodayCard(todayItems: List<TimelineItem>, modifier: Modifier = Modifier) {
     EliteGlassCard(modifier = modifier, glowColor = LumeEmerald) {
-        Text("TODAY", color = TextMuted, style = MaterialTheme.typography.labelMedium)
+        Text("TODAY", color = TextMuted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
         Spacer(Modifier.height(10.dp))
         todayItems.take(2).forEach { item ->
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -274,7 +304,7 @@ private fun TodayCard(todayItems: List<TimelineItem>, modifier: Modifier = Modif
 @Composable
 private fun AlertsCard(alerts: List<AlertEntry>, modifier: Modifier = Modifier) {
     EliteGlassCard(modifier = modifier, glowColor = LumeAmber) {
-        Text("Alerts", color = TextMuted, style = MaterialTheme.typography.labelMedium)
+        Text("ALERTS", color = TextMuted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
         Spacer(Modifier.height(10.dp))
         alerts.forEach { alert ->
             Row(

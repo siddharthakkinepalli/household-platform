@@ -73,38 +73,30 @@ fun EliteBottomNav(
                     icon = {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(48.dp)
                                 .drawWithCache {
                                     val glowBrush = Brush.radialGradient(
-                                        colors = listOf(LumeEmerald.copy(alpha = 0.55f), LumeEmerald.copy(alpha = 0.20f), Color.Transparent),
+                                        colors = listOf(LumeEmerald.copy(alpha = 0.32f), Color.Transparent),
                                         center = Offset(size.width * 0.5f, size.height * 0.5f),
-                                        radius = size.maxDimension * 1.15f
+                                        radius = size.width * 0.85f
                                     )
                                     onDrawBehind {
                                         if (selected) {
                                             drawCircle(
                                                 brush = glowBrush,
                                                 center = Offset(size.width * 0.5f, size.height * 0.5f),
-                                                radius = size.maxDimension * 1.15f
+                                                radius = size.width * 0.85f
                                             )
                                         }
                                     }
-                                }
-                                .background(
-                                    color = if (selected) Color.White.copy(alpha = 0.09f) else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                                .border(
-                                    width = if (selected) 1.2.dp else 0.dp,
-                                    color = if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent,
-                                    shape = CircleShape
-                                ),
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = screen.icon,
                                 contentDescription = screen.label,
-                                tint = if (selected) LumeEmerald else TextMain.copy(alpha = 0.58f)
+                                tint = if (selected) LumeEmerald else TextMain.copy(alpha = 0.58f),
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     },
