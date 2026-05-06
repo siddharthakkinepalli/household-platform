@@ -21,9 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -60,7 +57,7 @@ fun EliteBottomNav(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Screen.all.forEach { screen ->
-                val selected = currentRoute == screen.route
+                val selected = currentRoute == screen.route || currentRoute?.startsWith(screen.route) == true
                 NavigationBarItem(
                     selected = selected,
                     onClick = {
@@ -73,25 +70,27 @@ fun EliteBottomNav(
                     icon = {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
-                                .drawWithCache {
-                                    val glowBrush = Brush.radialGradient(
-                                        colors = listOf(LumeEmerald.copy(alpha = 0.32f), Color.Transparent),
-                                        center = Offset(size.width * 0.5f, size.height * 0.5f),
-                                        radius = size.width * 0.85f
-                                    )
-                                    onDrawBehind {
-                                        if (selected) {
-                                            drawCircle(
-                                                brush = glowBrush,
-                                                center = Offset(size.width * 0.5f, size.height * 0.5f),
-                                                radius = size.width * 0.85f
-                                            )
-                                        }
-                                    }
-                                },
+                                .size(56.dp),
                             contentAlignment = Alignment.Center
                         ) {
+                            if (selected) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .blur(10.dp)
+                                        .background(LumeEmerald.copy(alpha = 0.62f), CircleShape)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(LumeEmerald.copy(alpha = 0.25f), CircleShape)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .border(1.4.dp, LumeEmerald.copy(alpha = 0.95f), CircleShape)
+                                )
+                            }
                             Icon(
                                 imageVector = screen.icon,
                                 contentDescription = screen.label,
