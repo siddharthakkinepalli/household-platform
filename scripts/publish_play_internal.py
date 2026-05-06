@@ -1,7 +1,7 @@
-"""Build and upload household-platform Android AAB to Google Play Internal testing track.
+"""Build and upload household-platform Android AAB to Google Play track as draft.
 
-Automatically bumps version, builds the release bundle, and uploads to the internal track
-with status "completed" (released, not draft).
+Automatically bumps version, builds the release bundle, and uploads with status "draft"
+so release promotion can be done manually from Play Console.
 
 Usage (from household-platform root):
   C:/Projects/.venv/Scripts/python.exe scripts/publish_play_internal.py
@@ -150,19 +150,9 @@ def upload_to_play(package_name: str, track: str, release_name: str, notes: str,
         service.edits().commit(packageName=package_name, editId=edit_id).execute()
         return version_code
 
-    # For internal track, always use "completed" to mark as released (not draft).
-    # For production, this would need to be "draft" first, then promoted separately.
-    if track == "internal":
-        print(f"Publishing to internal track with status 'completed' (released, not draft)...")
-        return run_edit_with_status("completed")
-    else:
-        try:
-            return run_edit_with_status("completed")
-        except Exception as exc:
-            if "Only releases with status draft may be created on draft app" not in str(exc):
-                raise
-            print(f"Publishing to {track} track: app is in draft mode, using 'draft' status.")
-            return run_edit_with_status("draft")
+    # Manual-release workflow: always create draft releases.
+    print(f"Publishing to {track} track with status 'draft'...")
+    return run_edit_with_status("draft")
 
 
 def main() -> int:
@@ -205,9 +195,8 @@ def main() -> int:
         notes=args.notes,
         sa_json_path=sa_json_path,
     )
-    print(f"✓ Uploaded and released versionCode {uploaded_version_code} to track '{track}'.")
-    if track == "internal":
-        print(f"✓ Status: RELEASED (not draft). Testers can now download from Play Console.")
+    print(f"✓ Uploaded versionCode {uploaded_version_code} to track '{track}' as DRAFT.")
+    print("✓ Next step: Promote/release manually in Play Console.")
     return 0
 
 
