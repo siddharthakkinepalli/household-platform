@@ -1,6 +1,8 @@
 package com.household.app.ui.v2.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -8,9 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Surface
@@ -18,11 +21,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.theme.EliteGlassBorder
+import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.SurfaceNavy
+import com.household.app.ui.compose.theme.TextMain
 
 @Composable
 fun EliteBottomNav(
@@ -62,15 +71,47 @@ fun EliteBottomNav(
                         }
                     },
                     icon = {
-                        Icon(
-                            imageVector = screen.icon,
-                            contentDescription = screen.label
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .drawWithCache {
+                                    val glowBrush = Brush.radialGradient(
+                                        colors = listOf(LumeEmerald.copy(alpha = 0.55f), LumeEmerald.copy(alpha = 0.20f), Color.Transparent),
+                                        center = Offset(size.width * 0.5f, size.height * 0.5f),
+                                        radius = size.maxDimension * 1.15f
+                                    )
+                                    onDrawBehind {
+                                        if (selected) {
+                                            drawCircle(
+                                                brush = glowBrush,
+                                                center = Offset(size.width * 0.5f, size.height * 0.5f),
+                                                radius = size.maxDimension * 1.15f
+                                            )
+                                        }
+                                    }
+                                }
+                                .background(
+                                    color = if (selected) Color.White.copy(alpha = 0.09f) else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    width = if (selected) 1.2.dp else 0.dp,
+                                    color = if (selected) Color.White.copy(alpha = 0.25f) else Color.Transparent,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = screen.icon,
+                                contentDescription = screen.label,
+                                tint = if (selected) LumeEmerald else TextMain.copy(alpha = 0.58f)
+                            )
+                        }
                     },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        indicatorColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                        selectedIconColor = LumeEmerald,
+                        unselectedIconColor = TextMain.copy(alpha = 0.58f),
+                        indicatorColor = Color.Transparent
                     )
                 )
             }
