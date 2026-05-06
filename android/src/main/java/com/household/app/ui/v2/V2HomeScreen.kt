@@ -2,7 +2,6 @@ package com.household.app.ui.v2
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.material.icons.rounded.ShowChart
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
@@ -21,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ShowChart
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -80,11 +80,11 @@ fun V2HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+                .padding(horizontal = 22.dp, vertical = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             // Header Section
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = "Household OS",
                     style = MaterialTheme.typography.displaySmall,
@@ -122,15 +122,9 @@ fun V2HomeScreen(
             }
 
             EliteGlassCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.2.dp,
-                        brush = Brush.linearGradient(
-                            listOf(Color(0xFF8B5CF6).copy(0.3f), Color.Transparent)
-                        ),
-                        shape = RoundedCornerShape(28.dp)
-                    )
+                modifier = Modifier.fillMaxWidth(),
+                glowColor = Color(0xFF8B5CF6),
+                borderAlpha = 0.30f
             ) {
                 Text("FINANCE", color = Color(0xFF8B5CF6), style = MaterialTheme.typography.labelSmall, letterSpacing = 0.5.sp)
                 Text("TOTAL SPEND", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium)
@@ -158,7 +152,7 @@ fun V2HomeScreen(
                             color = TextMain
                         )
                         Icon(
-                            imageVector = Icons.Rounded.ShowChart,
+                            imageVector = Icons.AutoMirrored.Rounded.ShowChart,
                             contentDescription = null,
                             tint = Color(0xFF8B5CF6),
                             modifier = Modifier.size(72.dp)
@@ -190,24 +184,24 @@ fun V2HomeScreen(
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val wide = maxWidth > 600.dp
                 if (wide) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         TodayCard(todayItems = todayItems, modifier = Modifier.weight(1f))
                         AlertsCard(alerts = alerts, modifier = Modifier.weight(1f))
                     }
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         TodayCard(todayItems = todayItems, modifier = Modifier.fillMaxWidth())
                         AlertsCard(alerts = alerts, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("Modules", color = TextMuted, style = MaterialTheme.typography.labelMedium)
                 viewModel.modules.chunked(2).forEach { rowModules ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         rowModules.forEach { module ->
                             ModuleCard(module = module, modifier = Modifier.weight(1f))
@@ -229,7 +223,7 @@ fun V2HomeScreen(
                 )
             }
 
-            Spacer(Modifier.height(92.dp))
+            Spacer(Modifier.height(108.dp))
         }
     }
 }

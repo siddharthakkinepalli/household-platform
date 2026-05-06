@@ -29,7 +29,7 @@ fun EliteGlassCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(30.dp))
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
@@ -41,7 +41,7 @@ fun EliteGlassCard(
                     start = Offset(0f, 0f),
                     end = Offset.Infinite
                 ),
-                shape = RoundedCornerShape(28.dp)
+                shape = RoundedCornerShape(30.dp)
             ),
         color = Color.White.copy(alpha = 0.03f),
         tonalElevation = 0.dp
@@ -62,7 +62,7 @@ fun EliteGlassCard(
             }
 
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(22.dp),
                 content = content
             )
         }
