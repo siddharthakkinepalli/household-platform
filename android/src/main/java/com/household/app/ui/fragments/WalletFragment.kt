@@ -1,6 +1,7 @@
 package com.household.app.ui.fragments
 
 import android.app.AlertDialog
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -13,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -58,7 +60,7 @@ class WalletFragment : Fragment() {
     private lateinit var tripsContainer: LinearLayout
     private lateinit var transactionsContainer: LinearLayout
 
-    private var selectedCategoryFilter: String = "All"
+    private var selectedCategoryFilter: String = "Grocery"
     private var selectedCycleYearMonth: YearMonth = YearMonth.now()
     private var isCycleSelectorReady: Boolean = false
     private var searchQuery: String = ""
@@ -67,12 +69,8 @@ class WalletFragment : Fragment() {
     private val cycleBudget = 2400.0
     private lateinit var dataLoader: WalletDataLoader
     private lateinit var categorizer: TransactionCategorizer
-    private val webFilterCategories by lazy {
-        categorizer.getAllCategories().filter { it != "All" && it != "Excluded" }
-    }
-    private val webCategorySet by lazy {
-        categorizer.getAllCategories().filter { it != "All" && it != "Excluded" }.toSet()
-    }
+    private val walletCategories by lazy { categorizer.getAllCategories() }
+    private val filterButtons = linkedMapOf<String, TextView>()
 
     private val trips = mutableListOf<Trip>()
     private val transactions = mutableListOf<WalletTxn>()
@@ -122,7 +120,7 @@ class WalletFragment : Fragment() {
 
     private suspend fun applyQuickFilterFromToday() {
         val quickFilter = DashboardPrefs.consumeWalletQuickFilter(requireContext()) ?: return
-        selectedCategoryFilter = quickFilter.category
+        selectedCategoryFilter = if (quickFilter.category in walletCategories) quickFilter.category else "Grocery"
         searchQuery = quickFilter.query.lowercase(Locale.getDefault())
         editTransactionSearch.setText(quickFilter.query)
     }
@@ -211,19 +209,17 @@ class WalletFragment : Fragment() {
     private fun setupCategoryFilterButtons(root: View) {
         val categoryFilterRow = root.findViewById<LinearLayout>(R.id.category_filter_row)
         categoryFilterRow.removeAllViews()
+        filterButtons.clear()
 
-        // Use canonical Expenses web categories for consistent filtering behavior.
-        val allCategories = buildList {
-            add("All")
-            addAll(webFilterCategories)
-            if (!contains("Other")) add("Other")
-            add("Excluded")
-        }
-
-        allCategories.forEach { category ->
-            val button = Button(requireContext()).apply {
+        walletCategories.forEach { category ->
+            val button = TextView(requireContext()).apply {
                 text = category
-                setBackgroundResource(android.R.drawable.btn_default)
+                textSize = 12f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                gravity = Gravity.CENTER
+                compoundDrawablePadding = 8
+                setPadding(18, 10, 18, 10)
+                setCompoundDrawablesWithIntrinsicBounds(resolveFilterIcon(category), 0, 0, 0)
                 setOnClickListener {
                     selectedCategoryFilter = category
                     refreshWalletView()
@@ -235,12 +231,14 @@ class WalletFragment : Fragment() {
                 params.marginEnd = 8
                 layoutParams = params
             }
+            filterButtons[category] = button
             categoryFilterRow.addView(button)
         }
+        updateFilterButtonStates()
     }
 
     private fun showAddExpenseBottomSheet() {
-        val categories = webFilterCategories.filter { it != "Excluded" }
+        val categories = walletCategories
         val tripOptions = listOf("No trip") + trips.map { it.name }
 
         val bottomSheet = AddExpenseBottomSheetFragment(
@@ -353,12 +351,7 @@ class WalletFragment : Fragment() {
         val filtered = transactions.filter { txn ->
             val inCycle = !txn.date.isBefore(cycleRange.first) && !txn.date.isAfter(cycleRange.second)
             val filterCategory = toFilterCategory(txn)
-            val inCategory = when (selectedCategoryFilter) {
-                "All" -> !txn.excluded
-                "Excluded" -> txn.excluded
-                "Other" -> filterCategory == "Other" && !txn.excluded
-                else -> filterCategory.equals(selectedCategoryFilter, ignoreCase = true) && !txn.excluded
-            }
+            val inCategory = filterCategory.equals(selectedCategoryFilter, ignoreCase = true) && !txn.excluded
             val normalized = normalizeMerchant(txn.title).lowercase(Locale.getDefault())
             val searchTokens = searchQuery.split(" ").map { it.trim() }.filter { it.isNotBlank() }
             val inSearch = searchTokens.isEmpty() || searchTokens.any { token ->
@@ -373,6 +366,7 @@ class WalletFragment : Fragment() {
         val queryText = if (searchQuery.isBlank()) "none" else searchQuery
         val cycleLabel = selectedCycleYearMonth.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault()))
         textActiveFilters.text = "Filter: $cycleLabel · $selectedCategoryFilter · Search: $queryText"
+        updateFilterButtonStates()
 
         val spend = filtered.filter { it.amount < 0 }.sumOf { abs(it.amount) }
         textSpent.text = "€ ${"%.2f".format(spend)}"
@@ -505,7 +499,7 @@ class WalletFragment : Fragment() {
     }
 
     private fun showMoveCategoryDialog(txn: WalletTxn) {
-        val categories = webFilterCategories.filter { it != "Excluded" }
+        val categories = walletCategories
 
         AlertDialog.Builder(requireContext())
             .setTitle("Move to category")
@@ -522,33 +516,36 @@ class WalletFragment : Fragment() {
     }
 
     private fun toFilterCategory(txn: WalletTxn): String {
-        val raw = txn.category.trim()
-        if (raw.isBlank()) {
-            return categorizer.classifyCategory(txn.title, "")
-        }
+        return categorizer.normalizeCategory(txn.category)
+            ?: categorizer.classifyCategory(txn.title, txn.category)
+    }
 
-        if (raw in webCategorySet) {
-            return raw
+    private fun updateFilterButtonStates() {
+        if (!this::dataLoader.isInitialized) return
+        filterButtons.forEach { (category, button) ->
+            val isActive = category == selectedCategoryFilter
+            button.setBackgroundResource(if (isActive) R.drawable.bg_wallet_filter_active else R.drawable.bg_wallet_filter)
+            button.setTextColor(
+                ContextCompat.getColor(
+                    requireContext(),
+                    if (isActive) R.color.white else R.color.nav_inactive_text
+                )
+            )
+            button.compoundDrawableTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(
+                    requireContext(),
+                    if (isActive) R.color.white else R.color.nav_inactive
+                )
+            )
         }
+    }
 
-        val lowered = raw.lowercase(Locale.getDefault())
-        return when {
-            lowered.contains("food") || lowered.contains("dining") || lowered.contains("grocery") -> "Food & Dining"
-            lowered.contains("travel") || lowered.contains("transport") -> "Transportation"
-            lowered.contains("utility") || lowered.contains("bill") -> "Utilities"
-            lowered.contains("entertain") || lowered.contains("movie") || lowered.contains("music") -> "Entertainment"
-            lowered.contains("shop") || lowered.contains("fashion") -> "Shopping"
-            lowered.contains("health") || lowered.contains("fit") || lowered.contains("medical") -> "Health & Fitness"
-            lowered.contains("salary") || lowered.contains("income") -> "Salary/Income"
-            lowered.contains("housing") || lowered.contains("property") || lowered.contains("rent") -> "Housing & Property"
-            lowered.contains("transfer") || lowered.contains("wise") || lowered.contains("revolut") -> "Transfers"
-            lowered.contains("cash") || lowered.contains("atm") -> "Cash"
-            lowered.contains("government") || lowered.contains("benefit") || lowered.contains("tax") -> "Government & Benefits"
-            lowered.contains("bank") || lowered.contains("fee") || lowered.contains("gebu") || lowered.contains("provision") -> "Banking & Fees"
-            else -> {
-                val byKeywords = categorizer.classifyCategory(txn.title, "")
-                if (byKeywords == "Other" || byKeywords.isBlank()) "Other" else byKeywords
-            }
+    private fun resolveFilterIcon(category: String): Int {
+        return when (category) {
+            "Grocery" -> R.drawable.ic_tab_groceries
+            "Eat out" -> R.drawable.ic_tab_meals
+            "Travel" -> R.drawable.ic_filter_travel
+            else -> R.drawable.ic_filter_shopping
         }
     }
 

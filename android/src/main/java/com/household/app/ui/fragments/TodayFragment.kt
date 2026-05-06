@@ -167,7 +167,7 @@ class TodayFragment : Fragment() {
     private fun setupNavigationActions(root: View) {
         val toWallet = View.OnClickListener {
             lifecycleScope.launch {
-                DashboardPrefs.setWalletQuickFilter(requireContext(), "All", "")
+                DashboardPrefs.setWalletQuickFilter(requireContext(), "Grocery", "")
                 findNavController().navigate(R.id.expensesFragment)
             }
         }
@@ -191,16 +191,16 @@ class TodayFragment : Fragment() {
         root.findViewById<Button>(R.id.button_quick_health).setOnClickListener(toHealth)
 
         root.findViewById<View>(R.id.card_category_grocery).setOnClickListener {
-            openWalletWithFilter("Food & Dining", "rewe aldi lidl edeka grocery")
+            openWalletWithFilter("Grocery", "")
         }
         root.findViewById<View>(R.id.card_category_travel).setOnClickListener {
-            openWalletWithFilter("Transportation", "bahn train uber taxi")
+            openWalletWithFilter("Travel", "")
         }
         root.findViewById<View>(R.id.card_category_shopping).setOnClickListener {
             openWalletWithFilter("Shopping", "")
         }
         root.findViewById<View>(R.id.card_category_dining).setOnClickListener {
-            openWalletWithFilter("Food & Dining", "restaurant cafe pizza burger")
+            openWalletWithFilter("Eat out", "")
         }
     }
 
@@ -307,7 +307,7 @@ class TodayFragment : Fragment() {
         root.findViewById<TextView>(R.id.text_cat_grocery).text = currency.format(summary.categoryBlocks["Grocery"] ?: 0.0)
         root.findViewById<TextView>(R.id.text_cat_travel).text = currency.format(summary.categoryBlocks["Travel"] ?: 0.0)
         root.findViewById<TextView>(R.id.text_cat_shopping).text = currency.format(summary.categoryBlocks["Shopping"] ?: 0.0)
-        root.findViewById<TextView>(R.id.text_cat_dining).text = currency.format(summary.categoryBlocks["Dining"] ?: 0.0)
+        root.findViewById<TextView>(R.id.text_cat_dining).text = currency.format(summary.categoryBlocks["Eat out"] ?: 0.0)
 
         renderCategoryRows(root.findViewById(R.id.expense_category_rows_container), summary.categoryTotals, currency)
         renderRecentRows(root.findViewById(R.id.expense_recent_rows_container), summary.recentTransactions, currency)
@@ -374,7 +374,7 @@ class TodayFragment : Fragment() {
             "Grocery" to currentMonthExpenses.filter { isGrocery(it) }.sumOf { abs(it.amount) },
             "Travel" to currentMonthExpenses.filter { isTravel(it) }.sumOf { abs(it.amount) },
             "Shopping" to currentMonthExpenses.filter { isShopping(it) }.sumOf { abs(it.amount) },
-            "Dining" to currentMonthExpenses.filter { isDining(it) }.sumOf { abs(it.amount) }
+            "Eat out" to currentMonthExpenses.filter { isEatOut(it) }.sumOf { abs(it.amount) }
         )
 
         val dueWindowEnd = today.plusDays(21)
@@ -737,23 +737,20 @@ class TodayFragment : Fragment() {
         }
     }
 
-    private fun isDining(txn: WalletDataLoader.WalletTransaction): Boolean {
-        val low = txn.title.lowercase(Locale.getDefault())
-        return txn.category.lowercase(Locale.getDefault()).contains("food") &&
-            listOf("restaurant", "cafe", "lieferando", "pizza", "burger", "sushi", "doener", "mcdonald", "kfc").any { low.contains(it) }
+    private fun isEatOut(txn: WalletDataLoader.WalletTransaction): Boolean {
+        return txn.category.equals("Eat out", ignoreCase = true)
     }
 
     private fun isGrocery(txn: WalletDataLoader.WalletTransaction): Boolean {
-        return txn.category.lowercase(Locale.getDefault()).contains("food") && !isDining(txn)
+        return txn.category.equals("Grocery", ignoreCase = true)
     }
 
     private fun isTravel(txn: WalletDataLoader.WalletTransaction): Boolean {
-        val c = txn.category.lowercase(Locale.getDefault())
-        return c.contains("transport") || c.contains("travel")
+        return txn.category.equals("Travel", ignoreCase = true)
     }
 
     private fun isShopping(txn: WalletDataLoader.WalletTransaction): Boolean {
-        return txn.category.lowercase(Locale.getDefault()).contains("shopping")
+        return txn.category.equals("Shopping", ignoreCase = true)
     }
 
     private fun isTransferCategory(category: String): Boolean {
