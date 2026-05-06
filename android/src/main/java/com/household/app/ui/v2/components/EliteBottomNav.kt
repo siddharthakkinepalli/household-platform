@@ -21,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -70,21 +72,26 @@ fun EliteBottomNav(
                     icon = {
                         Box(
                             modifier = Modifier
-                                .size(56.dp),
+                                .size(56.dp)
+                                .drawBehind {
+                                    if (selected) {
+                                        drawCircle(
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(
+                                                    LumeEmerald.copy(alpha = 0.52f),
+                                                    LumeEmerald.copy(alpha = 0.22f),
+                                                    Color.Transparent
+                                                ),
+                                                center = center,
+                                                radius = size.minDimension * 0.48f
+                                            ),
+                                            radius = size.minDimension * 0.48f
+                                        )
+                                    }
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             if (selected) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .blur(10.dp)
-                                        .background(LumeEmerald.copy(alpha = 0.62f), CircleShape)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .background(LumeEmerald.copy(alpha = 0.25f), CircleShape)
-                                )
                                 Box(
                                     modifier = Modifier
                                         .size(34.dp)
