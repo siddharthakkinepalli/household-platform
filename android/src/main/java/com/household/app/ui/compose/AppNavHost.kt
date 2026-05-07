@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.motion.Motion
+import com.household.app.ui.compose.theme.HouseholdPlatformTheme
 import com.household.app.ui.v2.V2ConfigHubScreen
 import com.household.app.ui.v2.V2DocumentVaultScreen
 import com.household.app.ui.v2.V2FamilyScreen
@@ -81,10 +82,10 @@ fun AppNavHost(
             )
         }
 
-        composable(route = Screen.Wallet.route) { V2FinanceScreen() }
-        composable(route = Screen.Meals.route) { V2MealsScreen() }
-        composable(route = Screen.Family.route) { V2FamilyScreen() }
-        composable(route = Screen.Config.route) { V2ConfigHubScreen() }
+        composable(route = Screen.Wallet.route) { HouseholdPlatformTheme { V2FinanceScreen() } }
+        composable(route = Screen.Meals.route) { HouseholdPlatformTheme { V2MealsScreen() } }
+        composable(route = Screen.Family.route) { HouseholdPlatformTheme { V2FamilyScreen() } }
+        composable(route = Screen.Config.route) { HouseholdPlatformTheme { V2ConfigHubScreen() } }
 
         composable(
             route = Screen.Docs.route,
@@ -92,7 +93,7 @@ fun AppNavHost(
                 androidx.navigation.navDeepLink { uriPattern = "jugaad://${Screen.Docs.route}" }
             )
         ) {
-            V2DocumentVaultScreen()
+            HouseholdPlatformTheme { V2DocumentVaultScreen() }
         }
     }
 }
