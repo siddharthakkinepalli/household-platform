@@ -107,7 +107,14 @@ def build_bundle() -> None:
         raise FileNotFoundError(f"AAB not found at {AAB_PATH}")
 
 
-def upload_to_play(package_name: str, track: str, release_name: str, notes: str, sa_json_path: Path) -> str:
+def upload_to_play(
+    package_name: str,
+    track: str,
+    release_name: str,
+    notes: str,
+    sa_json_path: Path,
+    release_status: str,
+) -> str:
     try:
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
@@ -150,9 +157,8 @@ def upload_to_play(package_name: str, track: str, release_name: str, notes: str,
         service.edits().commit(packageName=package_name, editId=edit_id).execute()
         return version_code
 
-    # Manual-release workflow: always create draft releases.
-    print(f"Publishing to {track} track with status 'draft'...")
-    return run_edit_with_status("draft")
+    print(f"Publishing to {track} track with status '{release_status}'...")
+    return run_edit_with_status(release_status)
 
 
 def main() -> int:
@@ -160,6 +166,7 @@ def main() -> int:
     parser.add_argument("--track", default=None, help="Play track (default from properties, else internal)")
     parser.add_argument("--bump", choices=["patch", "minor", "major", "none"], default="patch")
     parser.add_argument("--notes", default="Automated internal release")
+    parser.add_argument("--status", choices=["draft", "completed"], default="draft")
     args = parser.parse_args()
 
     props = read_properties(SECRETS_FILE)
@@ -194,9 +201,13 @@ def main() -> int:
         release_name=release_name,
         notes=args.notes,
         sa_json_path=sa_json_path,
+        release_status=args.status,
     )
-    print(f"✓ Uploaded versionCode {uploaded_version_code} to track '{track}' as DRAFT.")
-    print("✓ Next step: Promote/release manually in Play Console.")
+    print(f"✓ Uploaded versionCode {uploaded_version_code} to track '{track}' as {args.status.upper()}.")
+    if args.status == "draft":
+        print("✓ Next step: Promote/release manually in Play Console.")
+    else:
+        print("✓ Release is live to testers on selected track.")
     return 0
 
 
