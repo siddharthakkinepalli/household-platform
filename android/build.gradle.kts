@@ -131,6 +131,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.1.1")
     implementation("com.google.apis:google-api-services-drive:v3-rev20240123-2.0.0")
 
+    // ML Kit OCR bridge (AndroidVisionPipe handshake input)
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+
     // Compose Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 

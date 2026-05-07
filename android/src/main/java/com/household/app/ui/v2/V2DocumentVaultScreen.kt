@@ -16,34 +16,57 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material3.Icon
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.household.app.domain.services.VisionTextPayload
 import com.household.app.ui.compose.theme.EliteNavy
 import com.household.app.ui.compose.theme.LumeAmber
 import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.v2.components.EliteGlassCard
 import com.household.app.ui.v2.components.EliteHeader
+import com.household.app.ui.v2.components.ScanResultSheet
+import com.household.app.ui.viewmodels.VaultUiState
+import com.household.app.ui.viewmodels.VaultViewModel
 import com.household.app.vault.RenewalHintDetector
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun V2DocumentVaultScreen(
     onUploadClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val viewModel: VaultViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer {
+                VaultViewModel(context.applicationContext as android.app.Application)
+            }
+        }
+    )
+    val vaultUiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     var showRenewalPrompt by remember { mutableStateOf(false) }
     val sampleOcrText = "Insurance policy renews on 15/12/2026"
+
     val docs = listOf(
         DocumentAsset("Contract_2026.pdf", "1.2 MB"),
         DocumentAsset("Insurance_Policy.pdf", "882 KB"),
@@ -66,6 +89,18 @@ fun V2DocumentVaultScreen(
                 .height(180.dp)
                 .clickable {
                     onUploadClick()
+
+                    // Placeholder payload until VisionPipe is wired into camera capture.
+                    val simulatedVisionText = VisionTextPayload(
+                        lines = listOf(
+                            "LIDL FILIALE BERLIN",
+                            "12.99 EUR",
+                            "Summe 12,99",
+                            "07/05/2026"
+                        )
+                    )
+                    viewModel.processScanResult(simulatedVisionText)
+
                     if (RenewalHintDetector.shouldSuggestRenewal(sampleOcrText)) {
                         showRenewalPrompt = true
                     }
@@ -114,6 +149,25 @@ fun V2DocumentVaultScreen(
         ) {
             items(docs, key = { it.name }) { doc ->
                 DocumentAssetCard(doc.name, doc.size)
+            }
+        }
+
+        if (vaultUiState is VaultUiState.ConfirmScan) {
+            val confirmState = vaultUiState as VaultUiState.ConfirmScan
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.dismissConfirmation() }
+            ) {
+                ScanResultSheet(
+                    result = confirmState.refinedScan,
+                    candidates = confirmState.candidates,
+                    onLinkConfirmed = { _ ->
+                        // The linking flow is manual by design (no auto-linking).
+                        viewModel.dismissConfirmation()
+                    },
+                    onSaveOnly = {
+                        viewModel.dismissConfirmation()
+                    }
+                )
             }
         }
     }
