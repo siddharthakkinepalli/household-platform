@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -32,6 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.household.app.ui.compose.motion.Motion
+import com.household.app.ui.compose.motion.pressEffect
 import com.household.app.ui.compose.state.Insight
 import com.household.app.ui.compose.state.InsightType
 import com.household.app.ui.compose.theme.Orange
@@ -48,6 +54,7 @@ import com.household.app.ui.compose.theme.Purple
 fun InsightCard(
     insight: Insight,
     onDismiss: () -> Unit,
+    onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val color: Color = when (insight.type) {
@@ -55,9 +62,18 @@ fun InsightCard(
         InsightType.INFO    -> Purple
         InsightType.SUCCESS -> Green
     }
+    val icon = when (insight.type) {
+        InsightType.WARNING -> Icons.Rounded.WarningAmber
+        InsightType.INFO -> Icons.Rounded.Info
+        InsightType.SUCCESS -> Icons.Rounded.CheckCircle
+    }
 
     Card(
-        modifier = modifier,
+        modifier = if (onTap != null) {
+            modifier.pressEffect().clickable(onClick = onTap)
+        } else {
+            modifier
+        },
         shape  = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.08f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.2f))
@@ -74,6 +90,13 @@ fun InsightCard(
                     .background(color, RoundedCornerShape(2.dp))
             )
             Spacer(Modifier.width(12.dp))
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.width(16.dp)
+            )
+            Spacer(Modifier.width(10.dp))
             Text(
                 text     = insight.message,
                 color    = color,
@@ -104,7 +127,7 @@ fun InsightCard(
 fun StaggeredMiniFab(
     visible: Boolean,
     index: Int,
-    staggerMs: Long = 80L,
+    staggerMs: Long = Motion.FAB_STAGGER_MS,
     content: @Composable () -> Unit
 ) {
     var show by remember { mutableStateOf(false) }
@@ -120,8 +143,8 @@ fun StaggeredMiniFab(
 
     AnimatedVisibility(
         visible = show,
-        enter   = fadeIn() + slideInVertically { it / 2 },
-        exit    = fadeOut() + slideOutVertically()
+        enter   = fadeIn(Motion.FadeIn) + slideInVertically(animationSpec = Motion.Slide) { it / 2 },
+        exit    = fadeOut(Motion.FadeOut) + slideOutVertically(animationSpec = Motion.Slide)
     ) {
         content()
     }

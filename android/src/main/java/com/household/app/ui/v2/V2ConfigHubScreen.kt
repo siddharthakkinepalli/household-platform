@@ -239,6 +239,13 @@ private fun CsvIngestCard(
     onPickFile: () -> Unit,
     onIntent: (ConfigIntent) -> Unit
 ) {
+    val glowColor = when (uiState.importWorkflow) {
+        is ImportWorkflow.NeedsReview -> ConfigAccent
+        ImportWorkflow.DuplicateDetected -> Color(0xFFF59E0B)
+        is ImportWorkflow.Success -> Color(0xFF22C55E)
+        is ImportWorkflow.Failed -> CriticalRed
+        else -> ConfigAccent.copy(alpha = 0.72f)
+    }
     val clickable = when (uiState.importWorkflow) {
         is ImportWorkflow.Hashing,
         is ImportWorkflow.Parsing,
@@ -247,7 +254,7 @@ private fun CsvIngestCard(
         else -> true
     }
 
-    EliteGlassCard(glowColor = ConfigAccent, borderAlpha = 0.18f) {
+    EliteGlassCard(glowColor = glowColor, borderAlpha = 0.18f) {
         Column {
             Text(
                 text = "BANK DATA INTAKE",
@@ -260,7 +267,11 @@ private fun CsvIngestCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 120.dp)
-                    .border(1.dp, ConfigPanelStroke, RoundedCornerShape(20.dp))
+                    .border(
+                        1.dp,
+                        if (uiState.importWorkflow is ImportWorkflow.Idle) ConfigPanelStroke else glowColor.copy(alpha = 0.45f),
+                        RoundedCornerShape(20.dp)
+                    )
                     .background(LumeWhite.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
                     .clickable(enabled = clickable, onClick = onPickFile)
                     .padding(vertical = 20.dp)
@@ -285,11 +296,18 @@ private fun CsvIngestCard(
 @Composable
 private fun UploadIdleState() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Rounded.CloudUpload, null, tint = LumeWhite.copy(alpha = 0.68f), modifier = Modifier.size(32.dp))
+        Icon(Icons.Rounded.CloudUpload, null, tint = ConfigAccent.copy(alpha = 0.82f), modifier = Modifier.size(34.dp))
         Text(
             text = "Tap to upload bank CSV",
-            color = LumeWhite.copy(alpha = 0.52f),
-            modifier = Modifier.padding(top = 12.dp)
+            color = LumeWhite.copy(alpha = 0.72f),
+            modifier = Modifier.padding(top = 12.dp),
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = "Import, review, then commit to Wallet",
+            color = TextMuted,
+            modifier = Modifier.padding(top = 6.dp),
+            style = MaterialTheme.typography.bodySmall
         )
     }
 }
@@ -305,21 +323,14 @@ private fun LoadingState(progress: Float, stage: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
     ) {
-        if (progress <= 0f) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth().height(6.dp),
-                color = ConfigAccent,
-                trackColor = LumeWhite.copy(alpha = 0.1f)
-            )
-        } else {
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier.fillMaxWidth().height(6.dp),
-                color = ConfigAccent,
-                trackColor = LumeWhite.copy(alpha = 0.1f)
-            )
-        }
-        Spacer(Modifier.height(16.dp))
+        CircularProgressIndicator(
+            progress = { if (progress <= 0f) 0.08f else animatedProgress.coerceIn(0.08f, 1f) },
+            color = ConfigAccent,
+            trackColor = LumeWhite.copy(alpha = 0.1f),
+            modifier = Modifier.size(48.dp),
+            strokeWidth = 4.dp
+        )
+        Spacer(Modifier.height(14.dp))
         Text(
             text = stage.ifBlank { "Processing…" },
             color = LumeWhite,
@@ -327,10 +338,17 @@ private fun LoadingState(progress: Float, stage: String) {
             textAlign = TextAlign.Center
         )
         Text(
-            text = if (progress > 0f) "${(progress * 100).toInt()}%" else "",
+            text = if (progress > 0f) "${(progress * 100).toInt()}% complete" else "Preparing…",
             color = ConfigAccent,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(top = 4.dp)
+        )
+        Spacer(Modifier.height(14.dp))
+        LinearProgressIndicator(
+            progress = { if (progress <= 0f) 0.08f else animatedProgress.coerceIn(0.08f, 1f) },
+            modifier = Modifier.fillMaxWidth().height(6.dp),
+            color = ConfigAccent,
+            trackColor = LumeWhite.copy(alpha = 0.1f)
         )
     }
 }
@@ -379,17 +397,31 @@ private fun ReviewState(summary: ImportSummary, salaryAnchor: Int, onIntent: (Co
 
 @Composable
 private fun WarningState(text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Rounded.WarningAmber, null, tint = CriticalRed)
-        Text(text, color = LumeWhite, modifier = Modifier.padding(start = 12.dp))
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Icon(Icons.Rounded.WarningAmber, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(32.dp))
+        Text(text, color = LumeWhite, modifier = Modifier.padding(top = 12.dp), textAlign = TextAlign.Center)
+        Text(
+            text = "This file already exists in the import audit trail.",
+            color = TextMuted,
+            modifier = Modifier.padding(top = 6.dp),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
 @Composable
 private fun SuccessState(text: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Icon(Icons.Rounded.CheckCircle, null, tint = ConfigAccent, modifier = Modifier.size(48.dp))
-        Text(text, color = ConfigAccent, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp), textAlign = TextAlign.Center)
+        Icon(Icons.Rounded.CheckCircle, null, tint = Color(0xFF22C55E), modifier = Modifier.size(48.dp))
+        Text(text, color = Color(0xFF22C55E), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp), textAlign = TextAlign.Center)
+        Text(
+            text = "Wallet refresh will pick these up automatically.",
+            color = TextMuted,
+            modifier = Modifier.padding(top = 6.dp),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

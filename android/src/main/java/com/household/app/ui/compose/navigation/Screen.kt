@@ -31,7 +31,7 @@ sealed class Screen(
     object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
 
     companion object {
-        /** Ordered list used to build nav rail items and NavHost destinations. */
-        val all: List<Screen> = listOf(Home, Wallet, Meals, Docs, Family, Config)
+        /** Ordered list used to build primary rail items and NavHost destinations. */
+        val all: List<Screen> = listOf(Home, Wallet, Meals, Docs, Family)
     }
 }

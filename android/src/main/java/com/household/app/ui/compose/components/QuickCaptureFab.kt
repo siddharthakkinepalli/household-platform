@@ -1,7 +1,6 @@
 package com.household.app.ui.compose.components
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.FloatingActionButton
@@ -30,13 +30,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.household.app.ui.compose.motion.Motion
+import com.household.app.ui.compose.motion.pressEffect
 import com.household.app.ui.compose.theme.Green
 import com.household.app.ui.compose.theme.NavBg
 import com.household.app.ui.compose.theme.TextOnColor
@@ -80,8 +80,7 @@ fun QuickCaptureFab(
     val items = listOf(
         SpeedDialItem(Icons.Rounded.Inbox, "Parse inbox",   onParse),
         SpeedDialItem(Icons.Rounded.Mic,   "Voice note",    onSpeak),
-        // Note: DocumentScanner not in default icons — using a text-based workaround
-        SpeedDialItem(Icons.Rounded.Add,   "Scan receipt",  onScan)
+        SpeedDialItem(Icons.Rounded.DocumentScanner, "Scan receipt", onScan)
     )
 
     // BackHandler — collapse FAB before system back
@@ -135,7 +134,7 @@ fun QuickCaptureFab(
                             onClick            = { item.onClick(); expanded = false },
                             containerColor     = Green,
                             contentColor       = TextOnColor,
-                            modifier           = Modifier.size(40.dp)
+                            modifier           = Modifier.size(40.dp).pressEffect()
                         ) {
                             Icon(item.icon, contentDescription = item.label, modifier = Modifier.size(20.dp))
                         }
@@ -150,7 +149,8 @@ fun QuickCaptureFab(
                     expanded = !expanded
                 },
                 containerColor = Green,
-                contentColor   = TextOnColor
+                contentColor   = TextOnColor,
+                modifier       = Modifier.pressEffect()
             ) {
                 Icon(
                     imageVector        = Icons.Rounded.Add,

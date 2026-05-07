@@ -12,6 +12,9 @@ import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Restaurant
+import com.household.app.ui.compose.state.InsightPriority.HIGH
+import com.household.app.ui.compose.state.InsightPriority.LOW
+import com.household.app.ui.compose.state.InsightPriority.MEDIUM
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -53,26 +56,48 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
             loadInsights()
-            // Phase 3: load balance from WalletRepository.
-            // Public builds use placeholders instead of real household totals.
-            _state.update { it.copy(balanceFormatted = "€0.00", deltaPercent = 0f, loading = false) }
+            _state.update {
+                it.copy(
+                    userName = "Siddharth",
+                    balanceFormatted = "€2,480.00",
+                    deltaPercent = 18f,
+                    loading = false
+                )
+            }
         }
     }
 
     private fun loadInsights() {
         viewModelScope.launch {
-            // Phase 2: generic placeholder insight.
-            // Phase 3: replace with: insightRepository.getInsights().fold(...)
             val mockInsights = listOf(
                 Insight(
                     id       = "mock_1",
+                    type     = InsightType.SUCCESS,
+                    category = "BUDGET",
+                    priority = MEDIUM,
+                    title    = "Spending trend improved",
+                    message  = "You're 18% under last month. Review Wallet for the strongest savings categories.",
+                    action   = Screen.Wallet.route
+                ),
+                Insight(
+                    id       = "mock_2",
+                    type     = InsightType.WARNING,
+                    category = "RENEWAL",
+                    priority = HIGH,
+                    title    = "Insurance renewal",
+                    message  = "Insurance renewal is due in 12 days.",
+                    action   = Screen.Docs.route
+                ),
+                Insight(
+                    id       = "mock_3",
                     type     = InsightType.INFO,
-                    category = "NOTICE",
-                    title    = "Public repository notice",
-                    message  = "This public build ships placeholder content only. JUGAAD assets and app content are copyrighted and are not licensed for republishing in other apps.",
-                    action   = ""
+                    category = "MEALS",
+                    priority = LOW,
+                    title    = "Meal planning hint",
+                    message  = "One dinner slot is still unplanned this week.",
+                    action   = Screen.Meals.route
                 )
-            )
+            ).sortedBy { insightPriorityRank(it.priority) }
             _state.update { it.copy(insights = mockInsights) }
         }
     }
@@ -80,6 +105,14 @@ class HomeViewModel : ViewModel() {
     private fun dismissInsight(id: String) {
         _state.update { state ->
             state.copy(insights = state.insights.filterNot { it.id == id })
+        }
+    }
+
+    private fun insightPriorityRank(priority: InsightPriority): Int {
+        return when (priority) {
+            HIGH -> 0
+            MEDIUM -> 1
+            LOW -> 2
         }
     }
 }

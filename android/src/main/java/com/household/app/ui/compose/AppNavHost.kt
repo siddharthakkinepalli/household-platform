@@ -1,18 +1,20 @@
 package com.household.app.ui.compose
 
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.fragment.app.FragmentManager
-import androidx.navigation.NavHostController
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.motion.Motion
+import com.household.app.ui.v2.V2ConfigHubScreen
+import com.household.app.ui.v2.V2DocumentVaultScreen
+import com.household.app.ui.v2.V2FamilyScreen
+import com.household.app.ui.v2.V2FinanceScreen
+import com.household.app.ui.v2.V2MealsScreen
 
 /**
  * AppNavHost — sets up Compose Navigation with global transition defaults.
@@ -25,14 +27,13 @@ import com.household.app.ui.compose.motion.Motion
  * slideIntoContainer is preferred over slideInHorizontally — uses container bounds,
  * not screen width, so travel distance is proportionally correct.
  *
- * Home screen is a Compose composable.
- * All other destinations use LegacyFragmentHost to preserve existing Fragment screens
- * until they are individually migrated to Compose.
+ * Home screen is the active Phase 2 Compose destination.
+ * Other destinations stay on their already-working v2 implementations so the shell
+ * migration does not disturb existing feature workflows.
  */
 @Composable
 fun AppNavHost(
     navController: NavHostController,
-    fragmentManager: FragmentManager,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -40,41 +41,58 @@ fun AppNavHost(
         startDestination = Screen.Home.route,
         modifier        = modifier,
         enterTransition = {
-            fadeIn(tween(Motion.DURATION_ENTER)) +
-            slideInHorizontally(tween(Motion.DURATION_SLIDE)) { it / 8 }
+            fadeIn(Motion.FadeIn) +
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    Motion.Slide
+                )
         },
         exitTransition = {
-            fadeOut(tween(Motion.DURATION_EXIT)) +
-            slideOutHorizontally(tween(Motion.DURATION_SLIDE)) { -it / 8 }
+            fadeOut(Motion.FadeOut) +
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    Motion.Slide
+                )
         },
         popEnterTransition = {
-            fadeIn(tween(Motion.DURATION_ENTER)) +
-            slideInHorizontally(tween(Motion.DURATION_SLIDE)) { -it / 8 }
+            fadeIn(Motion.FadeIn) +
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    Motion.Slide
+                )
         },
         popExitTransition = {
-            fadeOut(tween(Motion.DURATION_EXIT)) +
-            slideOutHorizontally(tween(Motion.DURATION_SLIDE)) { it / 8 }
+            fadeOut(Motion.FadeOut) +
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    Motion.Slide
+                )
         }
     ) {
-        // Home — Compose composable
         composable(route = Screen.Home.route) {
-            HomeScreen()
-            // Switch to com.household.app.ui.v2.V2HomeScreen() once the v2 screen is approved.
+            HomeScreen(
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Screen.Home.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
         }
 
-        // Legacy Fragment destinations — inline deep-link scaffold for future use
-        listOf(Screen.Wallet, Screen.Meals, Screen.Docs, Screen.Family).forEach { screen ->
-            composable(
-                route      = screen.route,
-                deepLinks  = listOf(
-                    androidx.navigation.navDeepLink { uriPattern = "jugaad://${screen.route}" }
-                )
-            ) {
-                LegacyFragmentHost(
-                    route           = screen.route,
-                    fragmentManager = fragmentManager
-                )
-            }
+        composable(route = Screen.Wallet.route) { V2FinanceScreen() }
+        composable(route = Screen.Meals.route) { V2MealsScreen() }
+        composable(route = Screen.Family.route) { V2FamilyScreen() }
+        composable(route = Screen.Config.route) { V2ConfigHubScreen() }
+
+        composable(
+            route = Screen.Docs.route,
+            deepLinks = listOf(
+                androidx.navigation.navDeepLink { uriPattern = "jugaad://${Screen.Docs.route}" }
+            )
+        ) {
+            V2DocumentVaultScreen()
         }
     }
 }

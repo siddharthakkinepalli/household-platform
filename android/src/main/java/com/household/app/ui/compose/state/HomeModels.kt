@@ -6,6 +6,12 @@ import androidx.compose.runtime.Immutable
 
 enum class InsightType { WARNING, INFO, SUCCESS }
 
+enum class InsightPriority {
+    HIGH,
+    MEDIUM,
+    LOW
+}
+
 /**
  * Domain model for a single insight card.
  * Produced by n8n workflows → backend /api/v1/insights → InsightRepositoryImpl.
@@ -16,6 +22,7 @@ data class Insight(
     val id: String,
     val type: InsightType,
     val category: String,
+    val priority: InsightPriority,
     val title: String,
     val message: String,
     /** Maps to a Screen.route value for deep-link navigation on tap. */
@@ -41,6 +48,7 @@ data class Module(
 
 @Immutable
 data class HomeState(
+    val userName: String = "Siddharth",
     val balanceFormatted: String = "€0.00",
     val deltaPercent: Float = 0f,
     val insights: List<Insight> = emptyList(),

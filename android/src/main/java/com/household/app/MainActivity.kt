@@ -21,7 +21,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             AppShell(
-                fragmentManager = supportFragmentManager,
                 onFinish        = { finish() }
             )
         }

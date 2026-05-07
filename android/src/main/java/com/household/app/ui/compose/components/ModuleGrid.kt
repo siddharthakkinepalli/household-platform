@@ -2,38 +2,48 @@ package com.household.app.ui.compose.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.ExperimentalFoundationApi
+import com.household.app.ui.compose.motion.pressEffect
 import com.household.app.ui.compose.state.Module
 import com.household.app.ui.compose.theme.BorderSubtle
-import com.household.app.ui.compose.theme.SurfaceVariant
 import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.compose.theme.TextPrimary
+import com.household.app.ui.compose.theme.TextSecondary
 
 /**
  * ModuleGrid — adaptive grid of module shortcut cards.
@@ -46,6 +56,7 @@ import com.household.app.ui.compose.theme.TextPrimary
  * unbounded height constraints.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun ModuleGrid(
     modules: List<Module>,
     onModuleTap: (route: String) -> Unit,
@@ -53,27 +64,60 @@ fun ModuleGrid(
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val columns = if (screenWidthDp > 600) 3 else 2
-    val rows = modules.chunked(columns)
+    val rowCount = ((modules.size + columns - 1) / columns).coerceAtLeast(1)
+    val gridHeight = (rowCount * 96 + (rowCount - 1) * 12).dp
+    var quickActionsModule by remember { mutableStateOf<Module?>(null) }
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        rows.forEach { rowModules ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                rowModules.forEach { module ->
-                    ModuleCard(
-                        module = module,
-                        onTap = { onModuleTap(module.route) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(gridHeight),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            userScrollEnabled = false
+        ) {
+            items(modules, key = { it.id }) { module ->
+                ModuleCard(
+                    module = module,
+                    onTap = { onModuleTap(module.route) },
+                    onLongPress = { quickActionsModule = module },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
 
-                repeat(columns - rowModules.size) {
-                    Spacer(modifier = Modifier.weight(1f))
+        quickActionsModule?.let { module ->
+            ModalBottomSheet(
+                onDismissRequest = { quickActionsModule = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = module.title,
+                        style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+                    )
+                    Text(
+                        text = "Open ${module.title}",
+                        style = TextStyle(fontSize = 14.sp, color = TextSecondary),
+                        modifier = Modifier.clickable {
+                            quickActionsModule = null
+                            onModuleTap(module.route)
+                        }
+                    )
+                    if (module.subtitle.isNotEmpty()) {
+                        Text(
+                            text = module.subtitle,
+                            style = TextStyle(fontSize = 12.sp, color = TextMuted)
+                        )
+                    }
                 }
             }
         }
@@ -81,28 +125,25 @@ fun ModuleGrid(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun ModuleCard(
     module: Module,
     onTap: () -> Unit,
+    onLongPress: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier  = modifier
             .fillMaxWidth()
-            .clickable(onClick = onTap),
+            .defaultMinSize(minHeight = 88.dp)
+            .pressEffect()
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress),
         shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
+        colors    = CardDefaults.cardColors(containerColor = Color.White),
         border    = BorderStroke(1.dp, BorderSubtle),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.White, SurfaceVariant.copy(alpha = 0.7f))
-                    )
-                )
-        ) {
+        Box(modifier = Modifier.background(Color.White)) {
             Box(
                 modifier = Modifier
                     .offset(x = 22.dp, y = 18.dp)

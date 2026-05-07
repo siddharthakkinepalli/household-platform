@@ -2,10 +2,7 @@ package com.household.app.ui.compose.components
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -33,18 +30,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.household.app.ui.compose.motion.Motion
+import com.household.app.ui.compose.motion.pressEffect
 import com.household.app.ui.compose.navigation.Screen
-import com.household.app.ui.compose.theme.GlassStroke
 import com.household.app.ui.compose.theme.Green
-import com.household.app.ui.compose.theme.RailBottom
-import com.household.app.ui.compose.theme.RailTop
+import com.household.app.ui.compose.theme.NavBg
 import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.compose.theme.TextOnDark
 
@@ -74,20 +70,20 @@ fun NavigationRailComposable(
     // ── Animated dimensions ────────────────────────────────────────────────
     val railWidth by animateDpAsState(
         targetValue  = if (expanded) 180.dp else 72.dp,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium),
+        animationSpec = Motion.SpringDefaultDp,
         label        = "rail_width"
     )
 
     val labelAlpha by animateFloatAsState(
         targetValue   = if (expanded) 1f else 0f,
-        animationSpec = tween(200),
+        animationSpec = Motion.FadeIn,
         label         = "label_alpha"
     )
 
     // Pill Y offset — slides between items
     val pillOffsetY by animateDpAsState(
         targetValue   = (selectedIndex * 56).dp,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium),
+        animationSpec = Motion.SpringDefaultDp,
         label         = "pill_offset_y"
     )
 
@@ -95,23 +91,9 @@ fun NavigationRailComposable(
         modifier = modifier
             .width(railWidth)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(RailTop, RailBottom)
-                )
-            )
-            .border(1.dp, GlassStroke.copy(alpha = 0.08f), RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp))
+            .clip(RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp))
+            .background(NavBg)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.08f), Color.Transparent)
-                    )
-                )
-        )
 
         // ── Pill indicator overlay ─────────────────────────────────────────
         // Rendered behind the icon buttons so icons remain tappable
@@ -121,11 +103,7 @@ fun NavigationRailComposable(
                 .offset(x = 14.dp, y = pillOffsetY + 68.dp)
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Green.copy(alpha = 0.24f), Green.copy(alpha = 0.08f))
-                    )
-                )
+                .background(Green.copy(alpha = 0.15f))
         )
 
         // ── Rail content column ────────────────────────────────────────────
@@ -158,12 +136,9 @@ fun NavigationRailComposable(
                     modifier = Modifier
                         .height(56.dp)
                         .padding(horizontal = 8.dp)
+                        .pressEffect()
                         .clip(RoundedCornerShape(22.dp))
                         .clickable { onNavigate(screen.route) }  // navigation only
-                        .background(
-                            color = if (isSelected) Color.White.copy(alpha = 0.06f) else Color.Transparent,
-                            shape = RoundedCornerShape(22.dp)
-                        )
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -188,6 +163,25 @@ fun NavigationRailComposable(
                         )
                     }
                 }
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.12f))
+            ) {
+                Text(
+                    text = "SA",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextOnDark
+                    )
+                )
             }
         }
     }

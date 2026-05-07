@@ -34,7 +34,7 @@ val BlueSoft      = Color(0xFFEFF6FF)  // Do NOT use in Phase 2 UI
 // ── Text ──────────────────────────────────────────────────────────────────
 val TextPrimary   = Color(0xFF0F172A)
 val TextSecondary = Color(0xFF6B7280)
-val TextMuted     = Color(0xFF94A3B8)
+val TextMuted     = Color(0xFF9CA3AF)
 val TextOnDark    = Color(0xFFF9FAFB)
 val TextOnColor   = Color(0xFFFFFFFF)
 
