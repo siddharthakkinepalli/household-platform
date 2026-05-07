@@ -1,22 +1,44 @@
 package com.household.app.data.refiner
 
 import com.google.mlkit.vision.text.Text
-import com.household.app.domain.services.VisionTextPayload
+import com.household.app.domain.models.vault.TextBlockPayload
+import com.household.app.domain.models.vault.TextLinePayload
+import com.household.app.domain.models.vault.VisionTextPayload
 
 fun Text.toVisionTextPayload(): VisionTextPayload {
-    val extractedLines = textBlocks
-        .flatMap { block -> block.lines.map { line -> line.text } }
-        .map { it.trim() }
-        .filter { it.isNotBlank() }
-
-    if (extractedLines.isNotEmpty()) {
-        return VisionTextPayload(lines = extractedLines)
+    val payloadBlocks = textBlocks.mapNotNull { block ->
+        val lines = block.lines.mapNotNull lineMapper@{ line ->
+            val raw = line.text.trim()
+            if (raw.isBlank()) return@lineMapper null
+            TextLinePayload(
+                text = raw,
+                confidence = 0f,
+                boundingBoxTop = line.boundingBox?.top?.toFloat() ?: 0f,
+                boundingBoxBottom = line.boundingBox?.bottom?.toFloat() ?: 0f
+            )
+        }
+        if (lines.isEmpty()) null else TextBlockPayload(lines = lines)
     }
 
-    val fallback = text
+    if (payloadBlocks.isNotEmpty()) {
+        return VisionTextPayload(blocks = payloadBlocks, fullText = text)
+    }
+
+    val fallbackLines = text
         .split('\n')
         .map { it.trim() }
         .filter { it.isNotBlank() }
+        .map {
+            TextLinePayload(
+                text = it,
+                confidence = 0f,
+                boundingBoxTop = 0f,
+                boundingBoxBottom = 0f
+            )
+        }
 
-    return VisionTextPayload(lines = fallback)
+    return VisionTextPayload(
+        blocks = listOf(TextBlockPayload(lines = fallbackLines)),
+        fullText = text
+    )
 }

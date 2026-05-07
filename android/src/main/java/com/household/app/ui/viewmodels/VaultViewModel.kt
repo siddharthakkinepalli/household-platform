@@ -10,7 +10,7 @@ import com.household.app.data.refiner.WeightedReceiptRefiner
 import com.household.app.data.repository.ExpenseRepositoryImpl
 import com.household.app.domain.models.Expense
 import com.household.app.domain.models.RefinedScan
-import com.household.app.domain.services.VisionTextPayload
+import com.household.app.domain.models.vault.VisionTextPayload
 import com.household.app.domain.usecases.GetPaperclipCandidatesUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -37,7 +37,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.household.app.domain.services.VisionTextPayload
+import com.household.app.domain.models.vault.TextBlockPayload
+import com.household.app.domain.models.vault.TextLinePayload
+import com.household.app.domain.models.vault.VisionTextPayload
 import com.household.app.ui.compose.theme.EliteNavy
 import com.household.app.ui.compose.theme.LumeAmber
 import com.household.app.ui.compose.theme.TextMain
@@ -92,12 +94,16 @@ fun V2DocumentVaultScreen(
 
                     // Placeholder payload until VisionPipe is wired into camera capture.
                     val simulatedVisionText = VisionTextPayload(
-                        lines = listOf(
-                            "LIDL FILIALE BERLIN",
-                            "12.99 EUR",
-                            "Summe 12,99",
-                            "07/05/2026"
-                        )
+                        blocks = listOf(
+                            TextBlockPayload(
+                                lines = listOf(
+                                    TextLinePayload("LIDL FILIALE BERLIN", 0.92f, 8f, 26f),
+                                    TextLinePayload("Summe 12,99", 0.88f, 522f, 540f),
+                                    TextLinePayload("07/05/2026", 0.84f, 560f, 578f)
+                                )
+                            )
+                        ),
+                        fullText = "LIDL FILIALE BERLIN\nSumme 12,99\n07/05/2026"
                     )
                     viewModel.processScanResult(simulatedVisionText)
 
