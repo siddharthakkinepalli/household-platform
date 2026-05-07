@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,7 +55,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -215,11 +219,10 @@ private fun SalaryAnchorCard(
                 color = LumeWhite.copy(alpha = 0.72f),
                 style = MaterialTheme.typography.bodyMedium
             )
-            LumeStepper(
-                currentValue = salaryAnchor.toFloat(),
-                onValueChange = { onIntent(ConfigIntent.UpdateSalaryAnchor(it.toInt())) },
-                valueRange = 1f..28f,
-                stepAmount = 1f
+            SalaryAnchorDial(
+                anchor = salaryAnchor,
+                onIncrement = { onIntent(ConfigIntent.UpdateSalaryAnchor((salaryAnchor + 1).coerceAtMost(28))) },
+                onDecrement = { onIntent(ConfigIntent.UpdateSalaryAnchor((salaryAnchor - 1).coerceAtLeast(1))) }
             )
             Text(
                 text = "Anchor: ${salaryAnchor}th of each month",
@@ -608,5 +611,67 @@ private fun categoryColor(categoryId: String): Color {
         "dining" -> Color(0xFFFB7185)
         "utilities" -> Color(0xFFA78BFA)
         else -> ConfigAccent
+    }
+}
+
+@Composable
+private fun SalaryAnchorDial(
+    anchor: Int,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
+    val normalized = ((anchor - 1).toFloat() / 27f).coerceIn(0f, 1f)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onDecrement()
+        }) {
+            Icon(Icons.Rounded.Remove, null, tint = ConfigAccent)
+        }
+
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(156.dp)) {
+            Canvas(modifier = Modifier.size(156.dp)) {
+                val stroke = 10.dp.toPx()
+                val topLeft = Offset(stroke / 2f, stroke / 2f)
+                val arcSize = size.copy(width = size.width - stroke, height = size.height - stroke)
+
+                drawArc(
+                    color = LumeWhite.copy(alpha = 0.12f),
+                    startAngle = 135f,
+                    sweepAngle = 270f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round)
+                )
+                drawArc(
+                    color = ConfigAccent,
+                    startAngle = 135f,
+                    sweepAngle = 270f * normalized,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round)
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Salary Day", color = LumeWhite.copy(alpha = 0.62f), style = MaterialTheme.typography.labelSmall)
+                Text("${anchor}th", color = TextMain, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        IconButton(onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onIncrement()
+        }) {
+            Icon(Icons.Rounded.Add, null, tint = ConfigAccent)
+        }
     }
 }
