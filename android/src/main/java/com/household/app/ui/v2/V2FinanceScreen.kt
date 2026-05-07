@@ -24,18 +24,29 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CardGiftcard
 import androidx.compose.material.icons.rounded.Flight
 import androidx.compose.material.icons.rounded.LocalGroceryStore
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -80,6 +91,10 @@ fun V2FinanceScreen(
     val categorySummary by viewModel.categorySummary.observeAsState(emptyList())
     val selectedCategory by viewModel.selectedCategory.observeAsState("All")
     val selectedTimeFilter by viewModel.selectedTimeFilter.observeAsState("This Month")
+    var editingTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
+    val editingTransaction = remember(editingTransactionId, transactions) {
+        transactions.firstOrNull { it.id == editingTransactionId }
+    }
 
     val totalSpend = transactions.sumOf { abs(it.amount) }
     val totalBudget = (totalSpend * 1.35).coerceAtLeast(1.0)
@@ -95,10 +110,11 @@ fun V2FinanceScreen(
     }
 
     val filteredTransactions = remember(transactions, selectedCategory) {
+        val visible = transactions.filterNot { it.category.equals("Excluded", ignoreCase = true) }
         if (selectedCategory == "All") {
-            transactions
+            visible
         } else {
-            transactions.filter { canonicalCategory(it.category) == selectedCategory }
+            visible.filter { canonicalCategory(it.category) == selectedCategory }
         }
     }
 
@@ -171,8 +187,27 @@ fun V2FinanceScreen(
             }
 
             item {
-                TransactionsPanel(groupedTransactions = groupedTransactions)
+                TransactionsPanel(
+                    groupedTransactions = groupedTransactions,
+                    onTransactionClick = { editingTransactionId = it.id }
+                )
             }
+        }
+
+        if (editingTransaction != null) {
+            TransactionEditSheet(
+                transaction = editingTransaction,
+                onDismiss = { editingTransactionId = null },
+                onUpdateCategory = { category, applyToFuture ->
+                    viewModel.reclassifyTransaction(
+                        transactionId = editingTransaction.id,
+                        merchantName = editingTransaction.description,
+                        newCategory = category,
+                        applyToHistory = applyToFuture
+                    )
+                    editingTransactionId = null
+                }
+            )
         }
     }
 }
@@ -376,7 +411,10 @@ private fun LumeFilterPill(
 }
 
 @Composable
-private fun TransactionsPanel(groupedTransactions: Map<String, List<Transaction>>) {
+private fun TransactionsPanel(
+    groupedTransactions: Map<String, List<Transaction>>,
+    onTransactionClick: (Transaction) -> Unit
+) {
     EliteGlassCard(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "TRANSACTIONS",
@@ -394,7 +432,7 @@ private fun TransactionsPanel(groupedTransactions: Map<String, List<Transaction>
                 modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
             )
             transactions.forEachIndexed { index, tx ->
-                TransactionStrip(tx = tx)
+                TransactionStrip(tx = tx, onClick = { onTransactionClick(tx) })
                 if (index != transactions.lastIndex) {
                     Box(
                         modifier = Modifier
@@ -409,11 +447,17 @@ private fun TransactionsPanel(groupedTransactions: Map<String, List<Transaction>
 }
 
 @Composable
-private fun TransactionStrip(tx: Transaction) {
+private fun TransactionStrip(
+    tx: Transaction,
+    onClick: () -> Unit
+) {
+    val tint = categoryTint(tx.category)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -428,13 +472,106 @@ private fun TransactionStrip(tx: Transaction) {
                 .weight(1f)
         ) {
             Text(tx.description, color = TextMain, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = canonicalCategory(tx.category),
+                color = tint.copy(alpha = 0.76f),
+                style = MaterialTheme.typography.labelSmall
+            )
             Text(tx.date, color = TextMain.copy(alpha = 0.40f), style = MaterialTheme.typography.bodySmall)
         }
-        Text(
-            text = "-EUR ${"%.2f".format(abs(tx.amount))}",
-            color = TextMain,
-            fontWeight = FontWeight.Bold
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "-EUR ${"%.2f".format(abs(tx.amount))}",
+                color = TextMain,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.MoreVert,
+                contentDescription = null,
+                tint = TextMain.copy(alpha = 0.24f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TransactionEditSheet(
+    transaction: Transaction,
+    onDismiss: () -> Unit,
+    onUpdateCategory: (String, Boolean) -> Unit
+) {
+    var applyToFuture by rememberSaveable(transaction.id) { mutableStateOf(true) }
+    val categories = listOf("Groceries", "Eat Out", "Travel", "Shopping", "Exclude")
+    val selectedCategory = canonicalCategory(transaction.category)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF0A1848),
+        tonalElevation = 0.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.2f)) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+        ) {
+            Text("Edit Transaction", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = TextMain)
+            Text(transaction.description, color = TextMain.copy(alpha = 0.5f), style = MaterialTheme.typography.bodyMedium)
+
+            Spacer(Modifier.height(24.dp))
+            Text("RE-CATEGORIZE", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp, color = TextMain.copy(alpha = 0.6f))
+            Spacer(Modifier.height(12.dp))
+
+            categories.chunked(3).forEach { rowCats ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowCats.forEach { cat ->
+                        val isSelected = selectedCategory.equals(cat, ignoreCase = true)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onUpdateCategory(cat, applyToFuture) },
+                            label = { Text(cat) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = LumePurple.copy(alpha = 0.2f),
+                                selectedLabelColor = LumePurple,
+                                selectedLeadingIconColor = LumePurple
+                            )
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp))
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(
+                    checked = applyToFuture,
+                    onCheckedChange = { applyToFuture = it },
+                    colors = CheckboxDefaults.colors(checkedColor = LumePurple)
+                )
+                Column(modifier = Modifier.padding(start = 8.dp)) {
+                    Text("Create Merchant Rule", fontWeight = FontWeight.Medium, color = TextMain)
+                    Text(
+                        "Always categorize this merchant as selected.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMain.copy(alpha = 0.45f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(32.dp))
+        }
     }
 }
 
@@ -482,11 +619,23 @@ private fun categoryAmountFor(summary: List<CategorySummary>, target: String): D
 private fun canonicalCategory(category: String): String {
     val key = category.lowercase()
     return when {
+        "exclude" in key -> "Excluded"
         "grocery" in key -> "Groceries"
         "eat" in key || "food" in key || "restaurant" in key -> "Eat Out"
         "travel" in key || "transport" in key -> "Travel"
         "shop" in key -> "Shopping"
         else -> "Other"
+    }
+}
+
+private fun categoryTint(category: String): Color {
+    return when (canonicalCategory(category)) {
+        "Groceries" -> Color(0xFF14B8A6)
+        "Eat Out" -> Color(0xFFF59E0B)
+        "Travel" -> Color(0xFF3B82F6)
+        "Shopping" -> Color(0xFFEC4899)
+        "Excluded" -> Color(0xFF94A3B8)
+        else -> TextMain.copy(alpha = 0.7f)
     }
 }
 

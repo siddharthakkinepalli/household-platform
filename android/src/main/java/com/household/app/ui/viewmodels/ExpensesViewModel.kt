@@ -1,10 +1,13 @@
 package com.household.app.ui.viewmodels
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.household.app.BuildConfig
+import com.household.app.data.AppDatabase
+import com.household.app.data.entities.MerchantRuleEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -26,7 +29,9 @@ data class CategorySummary(
     val transactionCount: Int
 )
 
-class ExpensesViewModel : ViewModel() {
+class ExpensesViewModel(application: Application) : AndroidViewModel(application) {
+    private val db by lazy { AppDatabase.getInstance(getApplication()) }
+
     private val _recentTransactions = MutableLiveData<List<Transaction>>()
     val recentTransactions: LiveData<List<Transaction>> = _recentTransactions
 
@@ -49,7 +54,9 @@ class ExpensesViewModel : ViewModel() {
     fun refreshTransactions() {
         viewModelScope.launch {
             try {
-                val txs = withContext(Dispatchers.IO) { fetchTransactions() }
+                val txs = withContext(Dispatchers.IO) {
+                    applyMerchantRules(fetchTransactions())
+                }
                 _recentTransactions.value = txs
                 _categorySummary.value = buildCategorySummary(txs)
                 _errorMessage.value = null
@@ -65,6 +72,51 @@ class ExpensesViewModel : ViewModel() {
 
     fun selectTimeFilter(filter: String) {
         _selectedTimeFilter.value = filter
+    }
+
+    fun reclassifyTransaction(
+        transactionId: String,
+        merchantName: String,
+        newCategory: String,
+        applyToHistory: Boolean
+    ) {
+        viewModelScope.launch {
+            val current = _recentTransactions.value.orEmpty()
+            if (current.isEmpty()) return@launch
+
+            val normalizedMerchant = normalizeMerchant(merchantName)
+            val normalizedCategory = if (newCategory.equals("Exclude", ignoreCase = true)) {
+                "Excluded"
+            } else {
+                newCategory
+            }
+
+            val updated = if (applyToHistory) {
+                withContext(Dispatchers.IO) {
+                    db.merchantRuleDao().upsertRule(
+                        MerchantRuleEntity(
+                            merchantPattern = normalizedMerchant,
+                            targetCategoryId = normalizedCategory,
+                            isExclusion = normalizedCategory == "Excluded"
+                        )
+                    )
+                }
+                current.map { tx ->
+                    if (normalizeMerchant(tx.description) == normalizedMerchant) {
+                        tx.copy(category = normalizedCategory)
+                    } else {
+                        tx
+                    }
+                }
+            } else {
+                current.map { tx ->
+                    if (tx.id == transactionId) tx.copy(category = normalizedCategory) else tx
+                }
+            }
+
+            _recentTransactions.value = updated
+            _categorySummary.value = buildCategorySummary(updated)
+        }
     }
 
     private fun fetchTransactions(): List<Transaction> {
@@ -93,8 +145,25 @@ class ExpensesViewModel : ViewModel() {
         }
     }
 
+    private suspend fun applyMerchantRules(transactions: List<Transaction>): List<Transaction> {
+        val rules = db.merchantRuleDao().getAllRules()
+        if (rules.isEmpty()) return transactions
+
+        val byMerchant = rules.associateBy { normalizeMerchant(it.merchantPattern) }
+        return transactions.map { tx ->
+            val merchant = normalizeMerchant(tx.description)
+            val rule = byMerchant[merchant]
+            if (rule != null) {
+                tx.copy(category = if (rule.isExclusion) "Excluded" else rule.targetCategoryId)
+            } else {
+                tx
+            }
+        }
+    }
+
     private fun buildCategorySummary(transactions: List<Transaction>): List<CategorySummary> {
         return transactions
+            .filterNot { it.category.equals("Excluded", ignoreCase = true) }
             .groupBy { it.category }
             .map { (category, txs) ->
                 CategorySummary(
@@ -104,5 +173,14 @@ class ExpensesViewModel : ViewModel() {
                 )
             }
             .sortedByDescending { kotlin.math.abs(it.totalAmount) }
+    }
+
+    private fun normalizeMerchant(raw: String): String {
+        val cleaned = raw
+            .trim()
+            .lowercase()
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+        return cleaned
     }
 }

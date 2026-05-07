@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.household.app.data.entities.TransactionOverrideEntity
 import com.household.app.data.entities.ExcludedTransactionEntity
+import com.household.app.data.entities.MerchantRuleEntity
 
 @Dao
 interface TransactionOverrideDao {
@@ -52,4 +53,19 @@ interface ExcludedTransactionDao {
 
     @Query("SELECT COUNT(*) FROM excluded_transactions")
     suspend fun getExcludedCount(): Int
+}
+
+@Dao
+interface MerchantRuleDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRule(rule: MerchantRuleEntity)
+
+    @Query("SELECT * FROM merchant_rules")
+    suspend fun getAllRules(): List<MerchantRuleEntity>
+
+    @Query("SELECT * FROM merchant_rules WHERE merchantPattern = :merchantPattern")
+    suspend fun getRule(merchantPattern: String): MerchantRuleEntity?
+
+    @Query("DELETE FROM merchant_rules WHERE merchantPattern = :merchantPattern")
+    suspend fun deleteRule(merchantPattern: String)
 }

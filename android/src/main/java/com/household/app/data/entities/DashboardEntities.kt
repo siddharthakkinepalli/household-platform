@@ -44,3 +44,12 @@ data class DashboardPrefsEntity(
     val walletQuickQuery: String = "",
     val monthlyBudget: Int = 3000
 )
+
+@Entity(tableName = "merchant_rules")
+data class MerchantRuleEntity(
+    @PrimaryKey
+    val merchantPattern: String,
+    val targetCategoryId: String,
+    val isExclusion: Boolean = false,
+    val updatedAt: String = System.currentTimeMillis().toString()
+)
