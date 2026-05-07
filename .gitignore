@@ -10,6 +10,8 @@ play-service-account.json
 build/
 */build/
 android/system-check/artifacts/
+screenshots/
+android/system-check/phone-screenshots/
 
 # Android Studio
 *.iml
