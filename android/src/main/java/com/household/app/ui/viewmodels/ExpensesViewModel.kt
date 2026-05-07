@@ -5,22 +5,28 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.household.app.BuildConfig
 import com.household.app.data.AppDatabase
+import com.household.app.data.DashboardPrefs
+import com.household.app.data.WalletDataLoader
+import com.household.app.data.WalletUserDataStore
+import com.household.app.data.config.RuleEngineService
 import com.household.app.data.entities.MerchantRuleEntity
+import com.household.app.domain.utils.FiscalDateUtils
+import com.household.app.domain.utils.MerchantNameCleaner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import java.net.HttpURLConnection
-import java.net.URL
+import java.time.LocalDate
+import kotlin.math.abs
 
 data class Transaction(
     val id: String,
+    val localId: Int,
     val description: String,
     val amount: Double,
     val category: String,
-    val date: String
+    val date: String,
+    val bookedOn: LocalDate
 )
 
 data class CategorySummary(
@@ -30,7 +36,13 @@ data class CategorySummary(
 )
 
 class ExpensesViewModel(application: Application) : AndroidViewModel(application) {
-    private val db by lazy { AppDatabase.getInstance(getApplication()) }
+    private val appContext = getApplication<Application>()
+    private val db by lazy { AppDatabase.getInstance(appContext) }
+    private val walletDataLoader by lazy { WalletDataLoader(appContext) }
+
+    private var allTransactions: List<Transaction> = emptyList()
+    private var monthlyBudget: Int = 3000
+    private var salaryAnchorDay: Int = 25
 
     private val _recentTransactions = MutableLiveData<List<Transaction>>()
     val recentTransactions: LiveData<List<Transaction>> = _recentTransactions
@@ -44,8 +56,14 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
     private val _selectedCategory = MutableLiveData("All")
     val selectedCategory: LiveData<String> = _selectedCategory
 
-    private val _selectedTimeFilter = MutableLiveData("This Month")
+    private val _selectedTimeFilter = MutableLiveData("Current Cycle")
     val selectedTimeFilter: LiveData<String> = _selectedTimeFilter
+
+    private val _activePeriodLabel = MutableLiveData("")
+    val activePeriodLabel: LiveData<String> = _activePeriodLabel
+
+    private val _budgetLeft = MutableLiveData(0.0)
+    val budgetLeft: LiveData<Double> = _budgetLeft
 
     init {
         refreshTransactions()
@@ -54,14 +72,39 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
     fun refreshTransactions() {
         viewModelScope.launch {
             try {
-                val txs = withContext(Dispatchers.IO) {
-                    applyMerchantRules(fetchTransactions())
+                val rules = withContext(Dispatchers.IO) { db.merchantRuleDao().getEnabledRules() }
+                salaryAnchorDay = withContext(Dispatchers.IO) { DashboardPrefs.getSalaryAnchorDay(appContext) }
+                monthlyBudget = withContext(Dispatchers.IO) { DashboardPrefs.getMonthlyBudget(appContext) }
+
+                val mergedTransactions = withContext(Dispatchers.IO) {
+                    WalletUserDataStore.loadMergedTransactions(appContext, walletDataLoader.loadTransactions())
                 }
-                _recentTransactions.value = txs
-                _categorySummary.value = buildCategorySummary(txs)
+
+                allTransactions = mergedTransactions
+                    .map { transaction ->
+                        val rule = RuleEngineService.pickRule(transaction.title, rules)
+                        val resolvedCategory = when {
+                            transaction.excluded -> "Excluded"
+                            rule?.isExclusion == true -> "Excluded"
+                            rule != null -> rule.targetCategoryId
+                            else -> transaction.category
+                        }
+                        Transaction(
+                            id = transaction.id.toString(),
+                            localId = transaction.id,
+                            description = MerchantNameCleaner.clean(transaction.title),
+                            amount = transaction.amount,
+                            category = resolvedCategory,
+                            date = transaction.date.toString(),
+                            bookedOn = transaction.date
+                        )
+                    }
+                    .sortedByDescending { it.bookedOn }
+
+                publishVisibleState()
                 _errorMessage.value = null
-            } catch (e: Exception) {
-                _errorMessage.value = "Failed to load expenses: ${e.message}"
+            } catch (error: Exception) {
+                _errorMessage.value = "Failed to load wallet data: ${error.message}"
             }
         }
     }
@@ -71,7 +114,11 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun selectTimeFilter(filter: String) {
-        _selectedTimeFilter.value = filter
+        _selectedTimeFilter.value = when (filter) {
+            "This Month" -> "Current Cycle"
+            else -> filter
+        }
+        publishVisibleState()
     }
 
     fun reclassifyTransaction(
@@ -80,83 +127,80 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
         newCategory: String,
         applyToHistory: Boolean
     ) {
+        val localId = transactionId.toIntOrNull() ?: return
+        val normalizedMerchant = normalizeMerchant(merchantName)
+        val normalizedCategory = if (newCategory.equals("Exclude", ignoreCase = true)) {
+            "Excluded"
+        } else {
+            newCategory
+        }
+
         viewModelScope.launch {
-            val current = _recentTransactions.value.orEmpty()
-            if (current.isEmpty()) return@launch
-
-            val normalizedMerchant = normalizeMerchant(merchantName)
-            val normalizedCategory = if (newCategory.equals("Exclude", ignoreCase = true)) {
-                "Excluded"
-            } else {
-                newCategory
-            }
-
-            val updated = if (applyToHistory) {
-                withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
+                if (applyToHistory) {
                     db.merchantRuleDao().upsertRule(
                         MerchantRuleEntity(
                             merchantPattern = normalizedMerchant,
                             targetCategoryId = normalizedCategory,
-                            isExclusion = normalizedCategory == "Excluded"
+                            isExclusion = normalizedCategory == "Excluded",
+                            isEnabled = true,
+                            priority = 100,
+                            updatedAt = System.currentTimeMillis().toString()
                         )
                     )
-                }
-                current.map { tx ->
-                    if (normalizeMerchant(tx.description) == normalizedMerchant) {
-                        tx.copy(category = normalizedCategory)
+                } else {
+                    if (normalizedCategory == "Excluded") {
+                        WalletUserDataStore.setTransactionExcluded(appContext, localId, true)
                     } else {
-                        tx
+                        WalletUserDataStore.setTransactionExcluded(appContext, localId, false)
+                        WalletUserDataStore.setCategoryOverride(appContext, localId, normalizedCategory)
                     }
                 }
-            } else {
-                current.map { tx ->
-                    if (tx.id == transactionId) tx.copy(category = normalizedCategory) else tx
-                }
             }
-
-            _recentTransactions.value = updated
-            _categorySummary.value = buildCategorySummary(updated)
+            refreshTransactions()
         }
     }
 
-    private fun fetchTransactions(): List<Transaction> {
-        val url = URL(
-            "${BuildConfig.BACKEND_BASE_URL}/expenses/transactions?household_id=${BuildConfig.HOUSEHOLD_ID}"
-        )
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 5000
-            readTimeout = 5000
-        }
+    private fun publishVisibleState() {
+        val timeFilteredTransactions = filterByTime(allTransactions)
+        _recentTransactions.value = timeFilteredTransactions
+        _categorySummary.value = buildCategorySummary(timeFilteredTransactions)
+        _activePeriodLabel.value = buildActivePeriodLabel()
 
-        connection.inputStream.bufferedReader().use { reader ->
-            val jsonText = reader.readText()
-            val array = JSONArray(jsonText)
-            return (0 until array.length()).map { i ->
-                val obj = array.getJSONObject(i)
-                Transaction(
-                    id = obj.optString("id", i.toString()),
-                    description = obj.optString("description", ""),
-                    amount = obj.optDouble("amount", 0.0),
-                    category = obj.optString("category", "Uncategorized"),
-                    date = obj.optString("date", "")
-                )
+        // Budget only counts: Groceries, Eat out, Travel, Shopping (NOT Utilities or Transfers)
+        val budgetCategories = setOf("Grocery", "Groceries", "Eat out", "Travel", "Shopping")
+        val spent = timeFilteredTransactions
+            .filter { !it.category.equals("Excluded", ignoreCase = true) && it.amount < 0 && it.category in budgetCategories }
+            .sumOf { abs(it.amount) }
+        _budgetLeft.value = monthlyBudget - spent
+    }
+
+    private fun filterByTime(transactions: List<Transaction>): List<Transaction> {
+        val today = LocalDate.now()
+        return when (_selectedTimeFilter.value ?: "Current Cycle") {
+            "All Time" -> transactions
+            "Previous Cycle" -> {
+                val range = FiscalDateUtils.getPreviousFiscalCycleRange(today, salaryAnchorDay)
+                transactions.filter { !it.bookedOn.isBefore(range.first) && !it.bookedOn.isAfter(range.second) }
+            }
+            else -> {
+                val range = FiscalDateUtils.getFiscalCycleRange(today, salaryAnchorDay)
+                transactions.filter { !it.bookedOn.isBefore(range.first) && !it.bookedOn.isAfter(range.second) }
             }
         }
     }
 
-    private suspend fun applyMerchantRules(transactions: List<Transaction>): List<Transaction> {
-        val rules = db.merchantRuleDao().getAllRules()
-        if (rules.isEmpty()) return transactions
-
-        val byMerchant = rules.associateBy { normalizeMerchant(it.merchantPattern) }
-        return transactions.map { tx ->
-            val merchant = normalizeMerchant(tx.description)
-            val rule = byMerchant[merchant]
-            if (rule != null) {
-                tx.copy(category = if (rule.isExclusion) "Excluded" else rule.targetCategoryId)
-            } else {
-                tx
+    private fun buildActivePeriodLabel(): String {
+        val today = LocalDate.now()
+        return when (_selectedTimeFilter.value ?: "Current Cycle") {
+            "All Time" -> "All imported and baseline wallet activity"
+            "Previous Cycle" -> {
+                val range = FiscalDateUtils.getPreviousFiscalCycleRange(today, salaryAnchorDay)
+                "Previous cycle • ${FiscalDateUtils.formatRangeLabel(range)}"
+            }
+            else -> {
+                val range = FiscalDateUtils.getFiscalCycleRange(today, salaryAnchorDay)
+                "Current cycle • ${FiscalDateUtils.formatRangeLabel(range)}"
             }
         }
     }
@@ -165,22 +209,21 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
         return transactions
             .filterNot { it.category.equals("Excluded", ignoreCase = true) }
             .groupBy { it.category }
-            .map { (category, txs) ->
+            .map { (category, items) ->
                 CategorySummary(
                     category = category,
-                    totalAmount = txs.sumOf { it.amount },
-                    transactionCount = txs.size
+                    totalAmount = items.sumOf { it.amount },
+                    transactionCount = items.size
                 )
             }
-            .sortedByDescending { kotlin.math.abs(it.totalAmount) }
+            .sortedByDescending { abs(it.totalAmount) }
     }
 
     private fun normalizeMerchant(raw: String): String {
-        val cleaned = raw
+        return raw
             .trim()
             .lowercase()
             .replace(Regex("[^a-z0-9 ]"), " ")
             .replace(Regex("\\s+"), " ")
-        return cleaned
     }
 }

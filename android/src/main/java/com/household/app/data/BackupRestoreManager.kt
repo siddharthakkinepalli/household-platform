@@ -295,6 +295,7 @@ class BackupRestoreManager(private val context: Context) {
             put("walletQuickCategory", prefs.walletQuickCategory)
             put("walletQuickQuery", prefs.walletQuickQuery)
             put("monthlyBudget", prefs.monthlyBudget)
+            put("salaryAnchorDay", prefs.salaryAnchorDay)
         }
     }
 
@@ -302,7 +303,8 @@ class BackupRestoreManager(private val context: Context) {
         return DashboardPrefsEntity(
             walletQuickCategory = obj.optString("walletQuickCategory", ""),
             walletQuickQuery = obj.optString("walletQuickQuery", ""),
-            monthlyBudget = obj.optInt("monthlyBudget", 3000)
+            monthlyBudget = obj.optInt("monthlyBudget", 3000),
+            salaryAnchorDay = obj.optInt("salaryAnchorDay", 25)
         )
     }
 

@@ -60,6 +60,19 @@ object DashboardPrefs {
         dao.insertPrefs(existing.copy(monthlyBudget = budget.coerceIn(500, 10000)))
     }
 
+    suspend fun getSalaryAnchorDay(context: Context): Int = withContext(Dispatchers.IO) {
+        val db = AppDatabase.getInstance(context)
+        val dao = db.dashboardPrefsDao()
+        dao.getPrefs()?.salaryAnchorDay ?: 25
+    }
+
+    suspend fun setSalaryAnchorDay(context: Context, anchorDay: Int) = withContext(Dispatchers.IO) {
+        val db = AppDatabase.getInstance(context)
+        val dao = db.dashboardPrefsDao()
+        val existing = dao.getPrefs() ?: DashboardPrefsEntity()
+        dao.insertPrefs(existing.copy(salaryAnchorDay = anchorDay.coerceIn(1, 28)))
+    }
+
     suspend fun setWeightSnapshot(context: Context, currentKg: Double, previousKg: Double?, date: LocalDate) = withContext(Dispatchers.IO) {
         val db = AppDatabase.getInstance(context)
         val dao = db.weightSnapshotDao()

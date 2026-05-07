@@ -42,7 +42,16 @@ data class DashboardPrefsEntity(
     val id: Int = 1,  // Singleton table
     val walletQuickCategory: String = "",
     val walletQuickQuery: String = "",
-    val monthlyBudget: Int = 3000
+    val monthlyBudget: Int = 3000,
+    val salaryAnchorDay: Int = 25
+)
+
+@Entity(tableName = "category_thresholds")
+data class CategoryThresholdEntity(
+    @PrimaryKey
+    val categoryId: String,
+    val limitAmount: Float,
+    val updatedAt: String = System.currentTimeMillis().toString()
 )
 
 @Entity(tableName = "merchant_rules")
@@ -51,5 +60,23 @@ data class MerchantRuleEntity(
     val merchantPattern: String,
     val targetCategoryId: String,
     val isExclusion: Boolean = false,
+    val isEnabled: Boolean = true,
+    val priority: Int = 0,
     val updatedAt: String = System.currentTimeMillis().toString()
+)
+
+@Entity(tableName = "import_audits")
+data class ImportAuditEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val timestamp: Long,
+    val fileName: String,
+    val fileHash: String,
+    val rowCount: Int,
+    val skippedCount: Int,
+    val detectedBank: String,
+    val delimiter: String,
+    val warningCount: Int,
+    val salaryAnchorDate: Int,
+    val parserVersion: Int = 1
 )

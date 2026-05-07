@@ -6,6 +6,8 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.household.app.data.entities.CategoryThresholdEntity
+import com.household.app.data.entities.ImportAuditEntity
 import com.household.app.data.entities.TransactionOverrideEntity
 import com.household.app.data.entities.ExcludedTransactionEntity
 import com.household.app.data.entities.MerchantRuleEntity
@@ -60,12 +62,39 @@ interface MerchantRuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertRule(rule: MerchantRuleEntity)
 
-    @Query("SELECT * FROM merchant_rules")
+    @Query("SELECT * FROM merchant_rules ORDER BY priority DESC, updatedAt DESC")
     suspend fun getAllRules(): List<MerchantRuleEntity>
+
+    @Query("SELECT * FROM merchant_rules WHERE isEnabled = 1 ORDER BY priority DESC, updatedAt DESC")
+    suspend fun getEnabledRules(): List<MerchantRuleEntity>
 
     @Query("SELECT * FROM merchant_rules WHERE merchantPattern = :merchantPattern")
     suspend fun getRule(merchantPattern: String): MerchantRuleEntity?
 
     @Query("DELETE FROM merchant_rules WHERE merchantPattern = :merchantPattern")
     suspend fun deleteRule(merchantPattern: String)
+}
+
+@Dao
+interface CategoryThresholdDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertThreshold(threshold: CategoryThresholdEntity)
+
+    @Query("SELECT * FROM category_thresholds ORDER BY categoryId")
+    suspend fun getAllThresholds(): List<CategoryThresholdEntity>
+
+    @Query("SELECT * FROM category_thresholds WHERE categoryId = :categoryId LIMIT 1")
+    suspend fun getThreshold(categoryId: String): CategoryThresholdEntity?
+}
+
+@Dao
+interface ImportAuditDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAudit(audit: ImportAuditEntity)
+
+    @Query("SELECT * FROM import_audits WHERE fileHash = :fileHash ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestByHash(fileHash: String): ImportAuditEntity?
+
+    @Query("SELECT * FROM import_audits ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentAudits(limit: Int = 10): List<ImportAuditEntity>
 }

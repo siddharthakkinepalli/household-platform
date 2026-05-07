@@ -45,6 +45,7 @@ fun V2AppNavHost(
         composable(route = Screen.Wallet.route) { V2FinanceScreen() }
         composable(route = Screen.Meals.route) { V2MealsScreen() }
         composable(route = Screen.Family.route) { V2FamilyScreen() }
+        composable(route = Screen.Config.route) { V2ConfigHubScreen() }
 
         composable(
             route = Screen.Docs.route,

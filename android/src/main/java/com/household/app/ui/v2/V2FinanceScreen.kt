@@ -41,12 +41,16 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -87,24 +91,35 @@ private data class CategoryBlockUi(
 fun V2FinanceScreen(
     viewModel: ExpensesViewModel = viewModel()
 ) {
+    // Refresh whenever this screen comes to the foreground (e.g. after a CSV import)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshTransactions()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val transactions by viewModel.recentTransactions.observeAsState(emptyList())
     val categorySummary by viewModel.categorySummary.observeAsState(emptyList())
     val selectedCategory by viewModel.selectedCategory.observeAsState("All")
-    val selectedTimeFilter by viewModel.selectedTimeFilter.observeAsState("This Month")
+    val selectedTimeFilter by viewModel.selectedTimeFilter.observeAsState("Current Cycle")
+    val activePeriodLabel by viewModel.activePeriodLabel.observeAsState("Current cycle")
+    val budgetLeft by viewModel.budgetLeft.observeAsState(0.0)
     var editingTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
     val editingTransaction = remember(editingTransactionId, transactions) {
         transactions.firstOrNull { it.id == editingTransactionId }
     }
-
-    val totalSpend = transactions.sumOf { abs(it.amount) }
-    val totalBudget = (totalSpend * 1.35).coerceAtLeast(1.0)
-    val totalBudgetLeft = (totalBudget - totalSpend).coerceAtLeast(0.0)
 
     val categoryGrid = remember(categorySummary) {
         listOf(
             CategoryBlockUi("Groceries", categoryAmountFor(categorySummary, "Groceries"), Color(0xFF14B8A6), Icons.Rounded.ShoppingCart),
             CategoryBlockUi("Eat Out", categoryAmountFor(categorySummary, "Eat Out"), Color(0xFFF59E0B), Icons.Rounded.Restaurant),
             CategoryBlockUi("Travel", categoryAmountFor(categorySummary, "Travel"), Color(0xFF3B82F6), Icons.Rounded.Flight),
+            CategoryBlockUi("Utilities", categoryAmountFor(categorySummary, "Utilities"), Color(0xFF8B5CF6), Icons.Rounded.Payments),
+            CategoryBlockUi("Transfers", categoryAmountFor(categorySummary, "Transfers"), Color(0xFF06B6D4), Icons.Rounded.Flight),
             CategoryBlockUi("Shopping", categoryAmountFor(categorySummary, "Shopping"), Color(0xFFEC4899), Icons.Rounded.CardGiftcard)
         )
     }
@@ -158,7 +173,7 @@ fun V2FinanceScreen(
                         color = TextMain
                     )
                     Text(
-                        text = "Monthly Overview",
+                        text = activePeriodLabel,
                         color = TextSecondary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -166,7 +181,7 @@ fun V2FinanceScreen(
             }
 
             item {
-                WalletHeroCard(totalBudgetLeft, filteredTransactions.take(14).map { abs(it.amount).toFloat() })
+                WalletHeroCard(budgetLeft, filteredTransactions.take(14).map { abs(it.amount).toFloat() })
             }
 
             item {
@@ -387,7 +402,7 @@ private fun LumeFilterPill(
             .padding(4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        listOf("All Time", "This Month", "Week 3").forEach { filter ->
+        listOf("All Time", "Current Cycle", "Previous Cycle").forEach { filter ->
             val isSelected = filter == selectedFilter
             Box(
                 modifier = Modifier
@@ -623,6 +638,8 @@ private fun canonicalCategory(category: String): String {
         "grocery" in key -> "Groceries"
         "eat" in key || "food" in key || "restaurant" in key -> "Eat Out"
         "travel" in key || "transport" in key -> "Travel"
+        "utilit" in key || "rent" in key || "bill" in key -> "Utilities"
+        "transfer" in key || "sepa" in key || "interbank" in key -> "Transfers"
         "shop" in key -> "Shopping"
         else -> "Other"
     }
@@ -633,6 +650,8 @@ private fun categoryTint(category: String): Color {
         "Groceries" -> Color(0xFF14B8A6)
         "Eat Out" -> Color(0xFFF59E0B)
         "Travel" -> Color(0xFF3B82F6)
+        "Utilities" -> Color(0xFF8B5CF6)
+        "Transfers" -> Color(0xFF06B6D4)
         "Shopping" -> Color(0xFFEC4899)
         "Excluded" -> Color(0xFF94A3B8)
         else -> TextMain.copy(alpha = 0.7f)
@@ -644,6 +663,8 @@ private fun categoryIcon(category: String): ImageVector {
         "Groceries" -> Icons.Rounded.LocalGroceryStore
         "Eat Out" -> Icons.Rounded.Restaurant
         "Travel" -> Icons.Rounded.Flight
+        "Utilities" -> Icons.Rounded.Payments
+        "Transfers" -> Icons.Rounded.Payments
         "Shopping" -> Icons.Rounded.CardGiftcard
         else -> Icons.Rounded.Payments
     }

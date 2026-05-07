@@ -6,6 +6,7 @@ import androidx.compose.material.icons.rounded.Cottage
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -27,9 +28,10 @@ sealed class Screen(
     object Meals  : Screen("meals",  Icons.Rounded.Restaurant,            "Meals")
     object Docs   : Screen("docs",   Icons.Rounded.FolderOpen,            "Documents")
     object Family : Screen("family", Icons.Rounded.Group,                 "Family")
+    object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
 
     companion object {
         /** Ordered list used to build nav rail items and NavHost destinations. */
-        val all: List<Screen> = listOf(Home, Wallet, Meals, Docs, Family)
+        val all: List<Screen> = listOf(Home, Wallet, Meals, Docs, Family, Config)
     }
 }
