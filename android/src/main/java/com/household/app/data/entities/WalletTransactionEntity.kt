@@ -14,6 +14,7 @@ data class WalletTransactionEntity(
     val date: LocalDate,
     val paymentType: String,
     val trip: String? = null,
+    val linkedVaultEntryId: Long? = null,
     val note: String = "",
     val bankName: String = "",
     val excluded: Boolean = false,

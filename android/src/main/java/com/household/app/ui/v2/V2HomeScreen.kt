@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.household.app.ui.compose.state.HomeViewModel
 import com.household.app.ui.compose.state.InsightType
 import com.household.app.ui.compose.state.Module
+import com.household.app.domain.usecases.GetBudgetRunwayUseCase
 import com.household.app.ui.compose.theme.LumeAmber
 import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.LumePurple
@@ -51,6 +53,7 @@ import com.household.app.ui.compose.theme.Red
 import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.compose.theme.TextSecondary
+import com.household.app.ui.v2.components.BudgetGauge
 import com.household.app.ui.v2.components.EliteGlassCard
 import androidx.compose.ui.geometry.Offset
 import java.time.LocalDate
@@ -62,6 +65,9 @@ fun V2HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val budgetRunway = remember(state.balanceValue) {
+        GetBudgetRunwayUseCase().execute(currentBalance = state.balanceValue, anchorDay = 25)
+    }
     val todayDate = LocalDate.now().format(DateTimeFormatter.ofPattern("EEE, d MMM"))
     val todayItems = listOf(
         TimelineItem("Review family budget", "09:30"),
@@ -153,61 +159,32 @@ fun V2HomeScreen(
 
             EliteGlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                glowColor = Color(0xFF8B5CF6),
+                glowColor = Color(0xFF67F6E8),
                 borderAlpha = 0.30f
             ) {
-                Text("FINANCE", color = Color(0xFF8B5CF6), style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
-                Text("TOTAL SPEND", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium)
-                Spacer(Modifier.height(16.dp))
+                Text("SMART BUDGET", color = Color(0xFF67F6E8), style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
+                Text("RUNWAY TO SALARY DAY", color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(10.dp))
                 
                 if (state.loading) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(96.dp),
+                            .height(240.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(color = LumeEmerald)
                     }
                 } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        Text(
-                            text = state.balanceFormatted,
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = TextMain
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ShowChart,
-                            contentDescription = null,
-                            tint = Color(0xFF8B5CF6),
-                            modifier = Modifier.size(72.dp)
-                        )
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        BudgetGauge(runway = budgetRunway)
                     }
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("May", "Eat out", "Travel").forEach { tag ->
-                            Surface(
-                                color = Color.White.copy(0.08f),
-                                shape = CircleShape,
-                                border = BorderStroke(1.dp, Color.White.copy(0.1f)),
-                                modifier = Modifier
-                            ) {
-                                Text(
-                                    tag,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Remaining pool: ${state.balanceFormatted}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 

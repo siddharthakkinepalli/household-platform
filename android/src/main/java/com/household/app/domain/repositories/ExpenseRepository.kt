@@ -10,4 +10,6 @@ interface ExpenseRepository {
         startDate: LocalDate,
         endDate: LocalDate
     ): List<Expense>
+
+    suspend fun attachReceipt(expenseId: Int, vaultId: Long)
 }

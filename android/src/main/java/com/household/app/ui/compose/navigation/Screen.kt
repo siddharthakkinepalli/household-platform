@@ -3,6 +3,7 @@ package com.household.app.ui.compose.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Cottage
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Restaurant
@@ -27,6 +28,7 @@ sealed class Screen(
     object Wallet : Screen("wallet", Icons.Rounded.AccountBalanceWallet,  "Wallet")
     object Meals  : Screen("meals",  Icons.Rounded.Restaurant,            "Meals")
     object Docs   : Screen("docs",   Icons.Rounded.FolderOpen,            "Documents")
+    object VaultScanner : Screen("docs/scanner", Icons.Rounded.DocumentScanner, "Scanner")
     object Family : Screen("family", Icons.Rounded.Group,                 "Family")
     object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
 

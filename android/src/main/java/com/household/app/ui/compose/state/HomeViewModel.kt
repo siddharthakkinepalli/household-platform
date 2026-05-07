@@ -59,6 +59,7 @@ class HomeViewModel : ViewModel() {
             _state.update {
                 it.copy(
                     userName = "Siddharth",
+                    balanceValue = 2480.0,
                     balanceFormatted = "€2,480.00",
                     deltaPercent = 18f,
                     loading = false

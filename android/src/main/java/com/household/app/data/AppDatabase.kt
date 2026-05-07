@@ -14,6 +14,7 @@ import com.household.app.data.dao.MerchantRuleDao
 import com.household.app.data.dao.MealsSummaryDao
 import com.household.app.data.dao.CategoryThresholdDao
 import com.household.app.data.dao.TransactionOverrideDao
+import com.household.app.data.dao.VaultDao
 import com.household.app.data.dao.WalletTransactionDao
 import com.household.app.data.dao.WalletTripDao
 import com.household.app.data.dao.WeightSnapshotDao
@@ -24,6 +25,7 @@ import com.household.app.data.entities.ImportAuditEntity
 import com.household.app.data.entities.MerchantRuleEntity
 import com.household.app.data.entities.MealsSummaryEntity
 import com.household.app.data.entities.TransactionOverrideEntity
+import com.household.app.data.entities.VaultEntity
 import com.household.app.data.entities.WalletTransactionEntity
 import com.household.app.data.entities.WalletTripEntity
 import com.household.app.data.entities.WeightSnapshotEntity
@@ -39,9 +41,10 @@ import com.household.app.data.entities.WeightSnapshotEntity
         DashboardPrefsEntity::class,
         MerchantRuleEntity::class,
         CategoryThresholdEntity::class,
-        ImportAuditEntity::class
+        ImportAuditEntity::class,
+        VaultEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -56,6 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun merchantRuleDao(): MerchantRuleDao
     abstract fun categoryThresholdDao(): CategoryThresholdDao
     abstract fun importAuditDao(): ImportAuditDao
+    abstract fun vaultDao(): VaultDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -130,6 +134,32 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS vault_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        imagePath TEXT NOT NULL,
+                        merchantName TEXT,
+                        totalAmount REAL,
+                        currency TEXT NOT NULL,
+                        dateEpoch INTEGER NOT NULL,
+                        rawOcrContent TEXT NOT NULL,
+                        isLinkedToExpense INTEGER NOT NULL,
+                        linkedExpenseId INTEGER
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_vault_entries_dateEpoch ON vault_entries(dateEpoch)"
+                )
+                db.execSQL(
+                    "ALTER TABLE wallet_transactions ADD COLUMN linkedVaultEntryId INTEGER"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -140,7 +170,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "household_app.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance

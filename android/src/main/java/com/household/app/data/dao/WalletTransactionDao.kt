@@ -23,6 +23,9 @@ interface WalletTransactionDao {
     @Query("SELECT * FROM wallet_transactions WHERE id = :id")
     suspend fun getTransactionById(id: Int): WalletTransactionEntity?
 
+    @Query("UPDATE wallet_transactions SET linkedVaultEntryId = :vaultId WHERE id = :expenseId")
+    suspend fun attachVaultEntry(expenseId: Int, vaultId: Long)
+
     @Query(
         """
         SELECT * FROM wallet_transactions

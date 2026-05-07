@@ -134,6 +134,13 @@ dependencies {
     // ML Kit OCR bridge (AndroidVisionPipe handshake input)
     implementation("com.google.mlkit:text-recognition:16.0.0")
 
+    // CameraX (in-app receipt scanner)
+    val cameraXVersion = "1.3.4"
+    implementation("androidx.camera:camera-core:$cameraXVersion")
+    implementation("androidx.camera:camera-camera2:$cameraXVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraXVersion")
+    implementation("androidx.camera:camera-view:$cameraXVersion")
+
     // Compose Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 

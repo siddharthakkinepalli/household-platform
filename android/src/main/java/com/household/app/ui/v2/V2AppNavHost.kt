@@ -52,6 +52,17 @@ fun V2AppNavHost(
             deepLinks = listOf(
                 androidx.navigation.navDeepLink { uriPattern = "jugaad://${Screen.Docs.route}" }
             )
-        ) { V2DocumentVaultScreen() }
+        ) {
+            V2DocumentVaultScreen(
+                onScanClick = { navController.navigate(Screen.VaultScanner.route) }
+            )
+        }
+
+        composable(route = Screen.VaultScanner.route) {
+            V2ScannerScreen(
+                onBack = { navController.popBackStack() },
+                onScanProcessed = { navController.popBackStack() }
+            )
+        }
     }
 }

@@ -29,4 +29,8 @@ class ExpenseRepositoryImpl(
             )
         }
     }
+
+    override suspend fun attachReceipt(expenseId: Int, vaultId: Long) {
+        walletTransactionDao.attachVaultEntry(expenseId = expenseId, vaultId = vaultId)
+    }
 }

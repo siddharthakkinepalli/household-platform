@@ -49,6 +49,7 @@ data class Module(
 @Immutable
 data class HomeState(
     val userName: String = "Siddharth",
+    val balanceValue: Double = 0.0,
     val balanceFormatted: String = "€0.00",
     val deltaPercent: Float = 0f,
     val insights: List<Insight> = emptyList(),

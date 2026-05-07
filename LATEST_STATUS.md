@@ -1,11 +1,75 @@
 # Household Platform - LATEST STATUS
 
-Last updated: 2026-05-05 (UI button visibility fix verified)
+Last updated: 2026-05-07 (Vault scanner + confirmation workflow implemented and deployed to emulator + phone)
 Status owner: GitHub Copilot session handoff
 Canonical handoff file: LATEST_STATUS.md
 
 ## Current Objective
 Enable reliable Backup/Restore testing in the Android emulator for JUGAAD (Household Platform) and keep this file as the single resume point for future sessions.
+
+## What Changed In This Session (2026-05-07)
+- Implemented end-to-end Vault receipt scanning flow with CameraX + ML Kit OCR:
+  - Added camera permission and CameraX dependencies.
+  - Added scanner route and destination under Documents flow.
+  - Added camera capture screen with runtime permission handling and OCR handoff to Vault viewmodel.
+  - Files:
+    - `android/build.gradle.kts`
+    - `android/src/main/AndroidManifest.xml`
+    - `android/src/main/java/com/household/app/ui/compose/navigation/Screen.kt`
+    - `android/src/main/java/com/household/app/ui/v2/V2AppNavHost.kt`
+    - `android/src/main/java/com/household/app/ui/v2/V2ScannerScreen.kt`
+
+- Rebuilt Documents/Vault screen into evidence-board behavior and wired scan FAB to scanner:
+  - Files:
+    - `android/src/main/java/com/household/app/ui/v2/V2DocumentVaultScreen.kt`
+
+- Implemented Vault data model, Room wiring, repository/use cases, and transaction-linking bridge:
+  - Added vault table/entity/dao/repository and DB migration wiring.
+  - Added wallet transaction link column + DAO update.
+  - Added use case for linking receipt to wallet expense.
+  - Files:
+    - `android/src/main/java/com/household/app/data/AppDatabase.kt`
+    - `android/src/main/java/com/household/app/data/dao/VaultDao.kt`
+    - `android/src/main/java/com/household/app/data/entities/VaultEntity.kt`
+    - `android/src/main/java/com/household/app/data/repository/VaultRepositoryImpl.kt`
+    - `android/src/main/java/com/household/app/data/service/FileStorageService.kt`
+    - `android/src/main/java/com/household/app/domain/repositories/VaultRepository.kt`
+    - `android/src/main/java/com/household/app/domain/usecases/LinkReceiptToExpenseUseCase.kt`
+    - `android/src/main/java/com/household/app/data/dao/WalletTransactionDao.kt`
+    - `android/src/main/java/com/household/app/data/entities/WalletTransactionEntity.kt`
+    - `android/src/main/java/com/household/app/data/repository/ExpenseRepositoryImpl.kt`
+    - `android/src/main/java/com/household/app/domain/repositories/ExpenseRepository.kt`
+
+- Upgraded confirmation UX from basic scan sheet to editable confirm sheet:
+  - Added editable merchant/amount/date fields.
+  - Added low-confidence amount highlight (<0.6) in amber.
+  - Added candidate-link row haptic pulse interaction.
+  - Added navigation bar-safe modal insets handling.
+  - Files:
+    - `android/src/main/java/com/household/app/ui/v2/components/ConfirmScanSheet.kt`
+    - `android/src/main/java/com/household/app/ui/viewmodels/VaultViewModel.kt`
+    - `android/src/main/java/com/household/app/domain/repositories/VaultRepository.kt`
+    - `android/src/main/java/com/household/app/data/repository/VaultRepositoryImpl.kt`
+
+- Home dashboard runway visual additions (in current working set):
+  - Files:
+    - `android/src/main/java/com/household/app/domain/models/BudgetRunway.kt`
+    - `android/src/main/java/com/household/app/domain/usecases/GetBudgetRunwayUseCase.kt`
+    - `android/src/main/java/com/household/app/ui/v2/components/BudgetGauge.kt`
+    - `android/src/main/java/com/household/app/ui/compose/state/HomeModels.kt`
+    - `android/src/main/java/com/household/app/ui/compose/state/HomeViewModel.kt`
+    - `android/src/main/java/com/household/app/ui/v2/V2HomeScreen.kt`
+
+## Verification Snapshot (2026-05-07)
+- Build/install:
+  - `:android:installDebug` completed successfully after latest changes.
+- Emulator:
+  - Documents tab visible.
+  - Vault screen visible with scan FAB.
+  - Scanner flow visible after camera permission dialog acceptance.
+- Physical phone (SM-S928B / `R3CXB0K5SEF`):
+  - Install succeeded via `ANDROID_SERIAL=R3CXB0K5SEF`.
+  - App launch succeeded (`com.jugaad.home` process confirmed running).
 
 ## What Changed In This Session
 - Left rail collapse UX updated to maximize content space:
