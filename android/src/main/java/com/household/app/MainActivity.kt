@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             AppShell(
+                fragmentManager = supportFragmentManager,
                 onFinish        = { finish() }
             )
         }

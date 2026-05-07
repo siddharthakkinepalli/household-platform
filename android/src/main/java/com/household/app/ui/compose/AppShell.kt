@@ -12,14 +12,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentManager
 import androidx.navigation.compose.rememberNavController
 import com.household.app.ui.compose.components.NavigationRailComposable
 import com.household.app.ui.compose.components.edgeSwipeRail
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.theme.JugaadTheme
-import com.household.app.domain.usecases.ApplyTransferCategoryMigrationUseCase
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.platform.LocalContext
+import com.household.app.ui.v2.V2AppShell
 
 /**
  * AppShell — root Composable set as the content of MainActivity.
@@ -41,15 +40,22 @@ import androidx.compose.ui.platform.LocalContext
  */
 @Composable
 fun AppShell(
+    fragmentManager: FragmentManager,
+    onFinish: () -> Unit
+) {
+    V2AppShell(
+        fragmentManager = fragmentManager,
+        onFinish = onFinish
+    )
+}
+
+@Composable
+fun AppShellLegacy(
+    fragmentManager: FragmentManager,
     onFinish: () -> Unit
 ) {
     JugaadTheme {
-        val context = LocalContext.current
         val navController = rememberNavController()
-
-        LaunchedEffect(Unit) {
-            ApplyTransferCategoryMigrationUseCase.execute(context)
-        }
 
         // derivedStateOf: only recomposes consumers when route value changes
         val currentRoute by remember {
@@ -77,7 +83,6 @@ fun AppShell(
                 expanded = expanded,
                 onToggle = { expanded = !expanded },
                 onNavigate = { route ->
-                    expanded = false
                     navController.navigate(route) {
                         popUpTo(Screen.Home.route) { saveState = true }
                         launchSingleTop = true

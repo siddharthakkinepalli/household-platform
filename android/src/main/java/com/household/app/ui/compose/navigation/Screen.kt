@@ -32,6 +32,6 @@ sealed class Screen(
 
     companion object {
         /** Ordered list used to build primary rail items and NavHost destinations. */
-        val all: List<Screen> = listOf(Home, Wallet, Meals, Docs, Family)
+        val all: List<Screen> = listOf(Home, Wallet, Meals, Docs, Family, Config)
     }
 }
