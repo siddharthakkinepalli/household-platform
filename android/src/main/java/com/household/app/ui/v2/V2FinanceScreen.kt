@@ -518,7 +518,7 @@ private fun TransactionEditSheet(
     onDismiss: () -> Unit,
     onUpdateCategory: (String, Boolean) -> Unit
 ) {
-    var applyToFuture by rememberSaveable(transaction.id) { mutableStateOf(true) }
+    var applyToFuture by rememberSaveable(transaction.id) { mutableStateOf(false) }
     val categories = listOf("Groceries", "Eat Out", "Travel", "Shopping", "Exclude")
     val selectedCategory = canonicalCategory(transaction.category)
 
@@ -635,7 +635,7 @@ private fun canonicalCategory(category: String): String {
     val key = category.lowercase()
     return when {
         "exclude" in key -> "Excluded"
-        "grocery" in key -> "Groceries"
+        "grocer" in key -> "Groceries"
         "eat" in key || "food" in key || "restaurant" in key -> "Eat Out"
         "travel" in key || "transport" in key -> "Travel"
         "utilit" in key || "rent" in key || "bill" in key -> "Utilities"

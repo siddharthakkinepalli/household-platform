@@ -79,13 +79,20 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                 val mergedTransactions = withContext(Dispatchers.IO) {
                     WalletUserDataStore.loadMergedTransactions(appContext, walletDataLoader.loadTransactions())
                 }
+                val manualOverrides = withContext(Dispatchers.IO) {
+                    db.transactionOverrideDao().getAllOverrides()
+                        .filter { it.categoryOverride != null }
+                        .associate { it.transactionId to it.categoryOverride!! }
+                }
 
                 allTransactions = mergedTransactions
                     .map { transaction ->
+                        val hasManualOverride = manualOverrides.containsKey(transaction.id)
                         val rule = RuleEngineService.pickRule(transaction.title, rules)
                         val resolvedCategory = when {
                             transaction.excluded -> "Excluded"
                             rule?.isExclusion == true -> "Excluded"
+                            hasManualOverride -> transaction.category
                             rule != null -> rule.targetCategoryId
                             else -> transaction.category
                         }
