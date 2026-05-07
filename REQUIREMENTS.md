@@ -15,6 +15,8 @@ Last updated: 2026-05-07
 - `:android:installDebug` succeeded.
 - Emulator documents/vault/scanner flow verified after camera permission grant.
 - Phone install and app launch verified on `R3CXB0K5SEF`.
+- `publish_internal.bat` built release AAB successfully but Play upload was blocked by policy requirement:
+   - Privacy policy must be configured for camera permission before upload can succeed.
 
 ## Next Steps
 1. Add scanner integration smoke test script (permission + capture + confirm save/link).
@@ -22,6 +24,8 @@ Last updated: 2026-05-07
    - Total vaulted amount.
    - Total unlinked amount.
 3. Validate Play internal release path for this exact commit after push.
+   - First set Privacy Policy URL in Play Console for `com.jugaad.home`.
+   - Then re-run `publish_internal.bat`.
 4. Optional polish:
    - Replace temporary `vaultId = -1` placeholder in sheet state with actual pending vault id lifecycle.
    - Add tighter input validation for date/amount edits with inline error labels.

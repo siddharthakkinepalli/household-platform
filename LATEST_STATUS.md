@@ -71,6 +71,20 @@ Enable reliable Backup/Restore testing in the Android emulator for JUGAAD (House
   - Install succeeded via `ANDROID_SERIAL=R3CXB0K5SEF`.
   - App launch succeeded (`com.jugaad.home` process confirmed running).
 
+## Play Console Publish Attempt (2026-05-07)
+- Publish command run:
+  - `publish_internal.bat`
+- Script actions completed:
+  - Auto-bumped app version to `versionCode=26`, `versionName=1.0.25`.
+  - Built release AAB successfully (`:android:bundleRelease`).
+- Upload result:
+  - Blocked by Google Play API policy error (HTTP 403):
+    - App now requests camera permission and Play requires privacy policy to be configured.
+    - Error excerpt: `The apk has permissions that require a privacy policy set for the app, e.g: android.permission.CAMERA.`
+- Required manual action before next upload:
+  - Set Privacy Policy URL in Play Console app listing/policy settings for package `com.jugaad.home`.
+  - Re-run `publish_internal.bat` after policy is saved.
+
 ## What Changed In This Session
 - Left rail collapse UX updated to maximize content space:
   - Added a small collapse icon at the top-right edge of the left bar.
