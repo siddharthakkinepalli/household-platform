@@ -27,4 +27,10 @@ interface VaultDao {
 
     @Query("SELECT * FROM vault_entries WHERE id = :id")
     suspend fun getEntryById(id: Long): VaultEntity?
+
+    @Query("SELECT COUNT(*) FROM vault_entries WHERE isLinkedToExpense = 0")
+    suspend fun getUnlinkedCount(): Int
+
+    @Query("SELECT * FROM vault_entries ORDER BY dateEpoch DESC LIMIT :limit")
+    suspend fun getRecentEntries(limit: Int): List<VaultEntity>
 }

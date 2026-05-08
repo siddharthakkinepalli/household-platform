@@ -1,12 +1,10 @@
 package com.household.app.ui.v2
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,32 +19,35 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ShowChart
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.household.app.domain.usecases.GetBudgetRunwayUseCase
+import com.household.app.ui.compose.state.ActivityItem
 import com.household.app.ui.compose.state.HomeViewModel
 import com.household.app.ui.compose.state.InsightType
 import com.household.app.ui.compose.state.Module
-import com.household.app.domain.usecases.GetBudgetRunwayUseCase
 import com.household.app.ui.compose.theme.LumeAmber
+import com.household.app.ui.compose.theme.LumeCyan
 import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.LumePurple
 import com.household.app.ui.compose.theme.Red
@@ -65,20 +66,10 @@ fun V2HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val budgetRunway = remember(state.balanceValue) {
-        GetBudgetRunwayUseCase().execute(currentBalance = state.balanceValue, anchorDay = 25)
+    val budgetRunway = remember(state.balanceValue, state.salaryAnchorDay) {
+        GetBudgetRunwayUseCase().execute(currentBalance = state.balanceValue, anchorDay = state.salaryAnchorDay)
     }
     val todayDate = LocalDate.now().format(DateTimeFormatter.ofPattern("EEE, d MMM"))
-    val todayItems = listOf(
-        TimelineItem("Review family budget", "09:30"),
-        TimelineItem("Plan weekly groceries", "18:00"),
-        TimelineItem("Archive a receipt", "20:15")
-    )
-    val alerts = listOf(
-        AlertEntry("Drive backup not connected yet", true),
-        AlertEntry("2 contracts need metadata", true),
-        AlertEntry("Meals plan still using placeholders", false)
-    )
 
     Box(
         modifier = Modifier
@@ -188,17 +179,31 @@ fun V2HomeScreen(
                 }
             }
 
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val wide = maxWidth > 600.dp
-                if (wide) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        TodayCard(todayItems = todayItems, modifier = Modifier.weight(1f))
-                        AlertsCard(alerts = alerts, modifier = Modifier.weight(1f))
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        TodayCard(todayItems = todayItems, modifier = Modifier.fillMaxWidth())
-                        AlertsCard(alerts = alerts, modifier = Modifier.fillMaxWidth())
+            // Zone 2 — Active Insights
+            if (state.unlinkedVaultCount > 0) {
+                InsightCard(
+                    title    = "Unlinked Receipts",
+                    subtitle = "${state.unlinkedVaultCount} scans waiting to be matched to expenses",
+                    icon     = Icons.Rounded.ReceiptLong,
+                    color    = LumeAmber,
+                    onClick  = {}
+                )
+            }
+
+            // Zone 3 — Recent Activity
+            if (state.recentActivity.isNotEmpty()) {
+                EliteGlassCard(modifier = Modifier.fillMaxWidth(), glowColor = LumePurple) {
+                    Text(
+                        "RECENT ACTIVITY",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.5.sp,
+                        fontSize = 10.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    state.recentActivity.forEach { item ->
+                        ActivityRow(item)
+                        Spacer(Modifier.height(8.dp))
                     }
                 }
             }
@@ -220,93 +225,102 @@ fun V2HomeScreen(
                 }
             }
 
-            EliteGlassCard(modifier = Modifier.fillMaxWidth(), glowColor = LumeAmber) {
-                Text("Premium Preview", color = TextMain, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "This screen is the new visual baseline: navy shell, glass cards, luminescent accents, and bottom navigation. Once you approve this direction, the other tabs can be rebuilt to match.",
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-
             Spacer(Modifier.height(108.dp))
         }
     }
 }
 
 @Composable
-private fun DeltaChip(deltaPercent: Float) {
-    val positive = deltaPercent >= 0f
-    val chipColor = if (positive) LumeEmerald else Red
-    val label = if (positive) {
-        "↑ ${"%.0f".format(abs(deltaPercent))}% vs last month"
-    } else {
-        "↓ ${"%.0f".format(abs(deltaPercent))}% vs last month"
-    }
-
-    Box(
-        modifier = Modifier
-            .background(chipColor.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+private fun InsightCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = color.copy(alpha = 0.05f),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.25f)),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Text(label, color = chipColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun TodayCard(todayItems: List<TimelineItem>, modifier: Modifier = Modifier) {
-    EliteGlassCard(modifier = modifier, glowColor = LumeEmerald) {
-        Text("TODAY", color = TextMuted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
-        Spacer(Modifier.height(10.dp))
-        todayItems.take(2).forEach { item ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(LumeEmerald, CircleShape)
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(item.label, color = TextMain, fontWeight = FontWeight.Medium)
-                    Text(item.time, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-        Text("+ ${todayItems.size - 2} more", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun AlertsCard(alerts: List<AlertEntry>, modifier: Modifier = Modifier) {
-    EliteGlassCard(modifier = modifier, glowColor = LumeAmber) {
-        Text("ALERTS", color = TextMuted, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, fontSize = 10.sp)
-        Spacer(Modifier.height(10.dp))
-        alerts.forEach { alert ->
-            Row(
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        if (alert.urgent) LumeAmber.copy(alpha = 0.08f) else Color.Transparent,
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(40.dp)
+                    .background(color.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (alert.urgent) Icons.Rounded.WarningAmber else Icons.Rounded.Schedule,
-                    contentDescription = null,
-                    tint = if (alert.urgent) LumeAmber else TextSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(alert.label, color = TextMain, style = MaterialTheme.typography.bodyMedium)
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TextMain)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = color.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
+
+@Composable
+private fun ActivityRow(item: ActivityItem) {
+    val (icon, iconTint, label, sublabel, amountText, amountColor) = when (item) {
+        is ActivityItem.Scan -> ActivityRowData(
+            icon       = Icons.Rounded.ReceiptLong,
+            iconTint   = LumeCyan,
+            label      = item.merchant,
+            sublabel   = "Vault receipt",
+            amountText = item.amount?.let { "€${"%.2f".format(it)}" } ?: "–",
+            amountColor = TextSecondary
+        )
+        is ActivityItem.Spend -> ActivityRowData(
+            icon        = Icons.Rounded.Payments,
+            iconTint    = LumePurple,
+            label       = item.description,
+            sublabel    = item.category,
+            amountText  = "- €${"%.2f".format(abs(item.amount))}",
+            amountColor = Red
+        )
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(iconTint.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, color = TextMain, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            Text(sublabel, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+        Text(amountText, color = amountColor, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+private data class ActivityRowData(
+    val icon: ImageVector,
+    val iconTint: Color,
+    val label: String,
+    val sublabel: String,
+    val amountText: String,
+    val amountColor: Color
+)
 
 @Composable
 private fun ModuleCard(module: Module, modifier: Modifier = Modifier) {
@@ -318,12 +332,3 @@ private fun ModuleCard(module: Module, modifier: Modifier = Modifier) {
     }
 }
 
-private data class TimelineItem(
-    val label: String,
-    val time: String
-)
-
-private data class AlertEntry(
-    val label: String,
-    val urgent: Boolean
-)

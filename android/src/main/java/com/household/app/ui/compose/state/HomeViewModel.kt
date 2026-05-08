@@ -1,43 +1,48 @@
 package com.household.app.ui.compose.state
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.household.app.ui.compose.navigation.Screen
-import com.household.app.ui.compose.theme.DocsColor
-import com.household.app.ui.compose.theme.FamilyColor
-import com.household.app.ui.compose.theme.MealsColor
-import com.household.app.ui.compose.theme.WalletColor
+import android.app.Application
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Restaurant
-import com.household.app.ui.compose.state.InsightPriority.HIGH
-import com.household.app.ui.compose.state.InsightPriority.LOW
-import com.household.app.ui.compose.state.InsightPriority.MEDIUM
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.household.app.data.AppDatabase
+import com.household.app.data.DashboardPrefs
+import com.household.app.data.WalletDataLoader
+import com.household.app.data.WalletUserDataStore
+import com.household.app.domain.utils.FiscalDateUtils
+import com.household.app.domain.utils.MerchantNameCleaner
+import com.household.app.ui.compose.navigation.Screen
+import com.household.app.ui.compose.theme.DocsColor
+import com.household.app.ui.compose.theme.FamilyColor
+import com.household.app.ui.compose.theme.MealsColor
+import com.household.app.ui.compose.theme.WalletColor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlin.math.abs
 
-/**
- * HomeViewModel — MVI pattern.
- *
- * Phase 2: insights are generic placeholders so the public repo does not ship household data.
- * Phase 3: replace loadInsights() with a real InsightRepository call to GET /api/v1/insights.
- */
-class HomeViewModel : ViewModel() {
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val db by lazy { AppDatabase.getInstance(getApplication()) }
+    private val walletLoader by lazy { WalletDataLoader(getApplication()) }
 
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
-    // ── Static module definitions ─────────────────────────────────────────
     val modules: List<Module> = listOf(
-        Module("wallet",  "Wallet",    Icons.Rounded.AccountBalanceWallet, WalletColor, "Placeholder data", Screen.Wallet.route),
-        Module("meals",   "Meals",     Icons.Rounded.Restaurant,           MealsColor,  "Template plan",   Screen.Meals.route),
-        Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,   "Starter docs",    Screen.Docs.route),
-        Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor, "Private by design", Screen.Family.route)
+        Module("wallet",  "Wallet",    Icons.Rounded.AccountBalanceWallet, WalletColor, "Transactions & budget", Screen.Wallet.route),
+        Module("meals",   "Meals",     Icons.Rounded.Restaurant,           MealsColor,  "Meal planning",         Screen.Meals.route),
+        Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,   "Vault & receipts",      Screen.Docs.route),
+        Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor, "Private by design",     Screen.Family.route)
     )
 
     init {
@@ -46,74 +51,86 @@ class HomeViewModel : ViewModel() {
 
     fun handle(intent: HomeIntent) {
         when (intent) {
-            is HomeIntent.Load             -> loadAll()
-            is HomeIntent.RefreshInsights  -> loadInsights()
-            is HomeIntent.DismissInsight   -> dismissInsight(intent.id)
+            is HomeIntent.Load            -> loadAll()
+            is HomeIntent.RefreshInsights -> loadAll()
+            is HomeIntent.DismissInsight  -> dismissInsight(intent.id)
         }
     }
 
     private fun loadAll() {
         viewModelScope.launch {
             _state.update { it.copy(loading = true) }
-            loadInsights()
-            _state.update {
-                it.copy(
-                    userName = "Siddharth",
-                    balanceValue = 2480.0,
-                    balanceFormatted = "€2,480.00",
-                    deltaPercent = 18f,
-                    loading = false
-                )
+            try {
+                withContext(Dispatchers.IO) {
+                    val ctx = getApplication<Application>()
+                    val anchorDay     = DashboardPrefs.getSalaryAnchorDay(ctx)
+                    val monthlyBudget = DashboardPrefs.getMonthlyBudget(ctx)
+
+                    val merged = WalletUserDataStore.loadMergedTransactions(ctx, walletLoader.loadTransactions())
+
+                    // Budget left for current salary cycle (25th–25th)
+                    val today      = LocalDate.now()
+                    val cycleStart = FiscalDateUtils.getFiscalCycleStart(today, anchorDay)
+                    val budgetCategories = setOf("Grocery", "Groceries", "Eat out", "Eat Out", "Travel", "Shopping")
+                    val spent = merged
+                        .filter { !it.excluded && it.amount < 0 && !it.date.isBefore(cycleStart) && it.category in budgetCategories }
+                        .sumOf { abs(it.amount) }
+                    val budgetLeft = (monthlyBudget - spent).coerceAtLeast(0.0)
+
+                    val unlinkedCount = db.vaultDao().getUnlinkedCount()
+                    val recentVault   = db.vaultDao().getRecentEntries(5)
+                    val recentTx = merged
+                        .filter { !it.excluded && it.amount < 0 }
+                        .sortedByDescending { it.date }
+                        .take(5)
+
+                    val activity = buildActivity(recentVault, recentTx)
+
+                    _state.update {
+                        it.copy(
+                            balanceValue      = budgetLeft,
+                            balanceFormatted  = "€%,.2f".format(budgetLeft),
+                            salaryAnchorDay   = anchorDay,
+                            unlinkedVaultCount = unlinkedCount,
+                            recentActivity    = activity,
+                            loading           = false
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = e.message) }
             }
         }
     }
 
-    private fun loadInsights() {
-        viewModelScope.launch {
-            val mockInsights = listOf(
-                Insight(
-                    id       = "mock_1",
-                    type     = InsightType.SUCCESS,
-                    category = "BUDGET",
-                    priority = MEDIUM,
-                    title    = "Spending trend improved",
-                    message  = "You're 18% under last month. Review Wallet for the strongest savings categories.",
-                    action   = Screen.Wallet.route
-                ),
-                Insight(
-                    id       = "mock_2",
-                    type     = InsightType.WARNING,
-                    category = "RENEWAL",
-                    priority = HIGH,
-                    title    = "Insurance renewal",
-                    message  = "Insurance renewal is due in 12 days.",
-                    action   = Screen.Docs.route
-                ),
-                Insight(
-                    id       = "mock_3",
-                    type     = InsightType.INFO,
-                    category = "MEALS",
-                    priority = LOW,
-                    title    = "Meal planning hint",
-                    message  = "One dinner slot is still unplanned this week.",
-                    action   = Screen.Meals.route
-                )
-            ).sortedBy { insightPriorityRank(it.priority) }
-            _state.update { it.copy(insights = mockInsights) }
+    private fun buildActivity(
+        vault: List<com.household.app.data.entities.VaultEntity>,
+        transactions: List<WalletDataLoader.WalletTransaction>
+    ): List<ActivityItem> {
+        val vaultItems = vault.map {
+            ActivityItem.Scan(
+                id       = it.id,
+                merchant = it.merchantName?.takeIf { m -> m.isNotBlank() } ?: "Receipt",
+                amount   = it.totalAmount,
+                currency = it.currency,
+                epochMs  = it.dateEpoch
+            )
         }
+        val txItems = transactions.map {
+            ActivityItem.Spend(
+                id          = it.id,
+                description = MerchantNameCleaner.clean(it.title),
+                amount      = it.amount,
+                category    = it.category,
+                epochMs     = it.date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            )
+        }
+        return (vaultItems + txItems)
+            .sortedByDescending { it.epochMs }
+            .take(5)
     }
 
     private fun dismissInsight(id: String) {
-        _state.update { state ->
-            state.copy(insights = state.insights.filterNot { it.id == id })
-        }
-    }
-
-    private fun insightPriorityRank(priority: InsightPriority): Int {
-        return when (priority) {
-            HIGH -> 0
-            MEDIUM -> 1
-            LOW -> 2
-        }
+        _state.update { state -> state.copy(insights = state.insights.filterNot { it.id == id }) }
     }
 }

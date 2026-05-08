@@ -1,6 +1,7 @@
 package com.household.app.ui.compose.state
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 
 // ── Insight domain model ──────────────────────────────────────────────────
 
@@ -44,6 +45,31 @@ data class Module(
     val route: String
 )
 
+// ── Activity stream items ─────────────────────────────────────────────────
+
+@Stable
+sealed class ActivityItem {
+    abstract val epochMs: Long
+
+    @Immutable
+    data class Scan(
+        val id: Long,
+        val merchant: String,
+        val amount: Double?,
+        val currency: String,
+        override val epochMs: Long
+    ) : ActivityItem()
+
+    @Immutable
+    data class Spend(
+        val id: Int,
+        val description: String,
+        val amount: Double,
+        val category: String,
+        override val epochMs: Long
+    ) : ActivityItem()
+}
+
 // ── HomeScreen MVI ────────────────────────────────────────────────────────
 
 @Immutable
@@ -53,6 +79,9 @@ data class HomeState(
     val balanceFormatted: String = "€0.00",
     val deltaPercent: Float = 0f,
     val insights: List<Insight> = emptyList(),
+    val unlinkedVaultCount: Int = 0,
+    val recentActivity: List<ActivityItem> = emptyList(),
+    val salaryAnchorDay: Int = 25,
     val loading: Boolean = false,
     val error: String? = null
 )
