@@ -9,8 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentManager
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.household.app.ui.compose.motion.Motion
 import com.household.app.ui.compose.navigation.Screen
 
@@ -45,7 +47,9 @@ fun V2AppNavHost(
         composable(route = Screen.Wallet.route) { V2FinanceScreen() }
         composable(route = Screen.Meals.route) { V2MealsScreen() }
         composable(route = Screen.Family.route) { V2FamilyScreen() }
-        composable(route = Screen.Config.route) { V2ConfigHubScreen() }
+        composable(route = Screen.Config.route) {
+            V2ConfigHubScreen(onBack = { navController.popBackStack() })
+        }
 
         composable(
             route = Screen.Docs.route,
@@ -54,7 +58,22 @@ fun V2AppNavHost(
             )
         ) {
             V2DocumentVaultScreen(
-                onScanClick = { navController.navigate(Screen.VaultScanner.route) }
+                onScanClick = { navController.navigate(Screen.VaultScanner.route) },
+                onStagingRequested = { vaultId ->
+                    navController.navigate(Screen.PantryStaging.route(vaultId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.PantryStaging.route,
+            arguments = listOf(navArgument("vaultId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val vaultId = backStackEntry.arguments?.getLong("vaultId") ?: return@composable
+            PantryStagingScreen(
+                vaultId = vaultId,
+                onBack = { navController.popBackStack() },
+                onConfirmed = { navController.popBackStack() }
             )
         }
 

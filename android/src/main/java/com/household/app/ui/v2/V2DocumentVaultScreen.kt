@@ -55,6 +55,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -72,13 +73,15 @@ import com.household.app.ui.v2.components.EliteGlassCard
 import com.household.app.ui.v2.components.ScanConfirmationState
 import com.household.app.ui.viewmodels.VaultUiState
 import com.household.app.ui.viewmodels.VaultViewModel
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun V2DocumentVaultScreen(
-    onScanClick: () -> Unit = {}
+    onScanClick: () -> Unit = {},
+    onStagingRequested: (vaultId: Long) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = context as ComponentActivity
@@ -92,6 +95,16 @@ fun V2DocumentVaultScreen(
     )
     val vaultUiState by viewModel.uiState.collectAsStateWithLifecycle()
     val vaultEntries by viewModel.vaultEntries.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.uiState
+            .filterIsInstance<VaultUiState.ScanSaved>()
+            .collect { saved ->
+                val vaultId = saved.vaultId
+                onStagingRequested(vaultId)
+                viewModel.acknowledgeScanned()
+            }
+    }
 
     Scaffold(
         topBar = { VaultTopBar() },

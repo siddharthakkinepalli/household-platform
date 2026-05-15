@@ -166,6 +166,39 @@ class ApiClient {
   async getHealth() {
     return this.client.get('/health')
   }
+
+  // Receipt Scanner
+  async parseReceiptText(text: string, mode: string = 'local', apiKey?: string) {
+    return this.client.post('/receipt/parse/text', {
+      text,
+      mode,
+      api_key: apiKey,
+    })
+  }
+
+  async parseReceiptFile(file: File, mode: string = 'local', apiKey?: string) {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (mode !== 'local') {
+      formData.append('mode', mode)
+      if (apiKey) formData.append('api_key', apiKey)
+    }
+    return this.client.post('/receipt/parse', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
+
+  async getReceiptModes() {
+    return this.client.get('/receipt/modes')
+  }
+
+  async ocrImage(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return this.client.post('/receipt/ocr', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  }
 }
 
 export const apiClient = new ApiClient()

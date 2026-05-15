@@ -1,18 +1,22 @@
 package com.household.app.data.repository
 
 import android.net.Uri
+import com.household.app.data.dao.PantryDao
 import com.household.app.data.dao.VaultDao
+import com.household.app.data.entities.PantryEntity
 import com.household.app.data.entities.VaultEntity
 import com.household.app.data.service.FileStorageService
 import com.household.app.domain.models.RefinedScan
 import com.household.app.domain.models.vault.VisionTextPayload
 import com.household.app.domain.repositories.VaultRepository
+import com.household.app.domain.services.ReceiptItemParser
 import com.household.app.domain.services.ReceiptRefiner
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
 class VaultRepositoryImpl(
     private val vaultDao: VaultDao,
+    private val pantryDao: PantryDao,
     private val storageService: FileStorageService,
     private val refiner: ReceiptRefiner
 ) : VaultRepository {
@@ -57,10 +61,28 @@ class VaultRepositoryImpl(
             rawOcrContent = payload.fullText,
             isLinkedToExpense = false
         )
-        return vaultDao.insertVaultEntry(entity)
+        val vaultId = vaultDao.insertVaultEntry(entity)
+        stageReceiptItems(vaultId, payload.fullText)
+        return vaultId
     }
 
     override suspend fun linkReceiptToExpense(vaultId: Long, expenseId: Long) {
         vaultDao.linkToExpense(vaultId, expenseId.toLong())
+    }
+
+    private suspend fun stageReceiptItems(vaultId: Long, receiptText: String) {
+        val parsed = ReceiptItemParser.parse(receiptText)
+        if (parsed.isEmpty()) return
+        pantryDao.insertItems(
+            parsed.map { item ->
+                PantryEntity(
+                    name = item.name,
+                    category = item.category.name,
+                    quantity = item.quantity,
+                    vaultId = vaultId,
+                    isConfirmed = false
+                )
+            }
+        )
     }
 }

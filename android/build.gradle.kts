@@ -130,6 +130,13 @@ dependencies {
     // Google Drive integration
     implementation("com.google.android.gms:play-services-auth:21.1.1")
     implementation("com.google.apis:google-api-services-drive:v3-rev20240123-2.0.0")
+    implementation("com.google.api-client:google-api-client-android:2.2.0")
+
+    // Background sync
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Preferences DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // ML Kit OCR bridge (AndroidVisionPipe handshake input)
     implementation("com.google.mlkit:text-recognition:16.0.0")

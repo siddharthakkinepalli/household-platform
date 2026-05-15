@@ -58,3 +58,12 @@ val ConfigAccent    = Color(0xFF67F6E8)
 val ConfigPanelStroke = Color(0x1FFFFFFF)
 val CriticalRed     = Color(0xFFFF4B4B)
 val TextMain        = Color(0xFFF8FAFC)
+
+// ── Household OS Dark Mode Palette ─────────────────────────────────────────
+val MatteCharcoal   = Color(0xFF121212)
+val DeepCharcoal    = Color(0xFF1A1A1A)
+val GoldAccent      = Color(0xFFD4AF37)
+val GoldAccentLight = Color(0xFFE8C547)
+val GoldBorder      = Color(0xFFB8962E)
+val TungstenYellow  = Color(0xFFFCC201)
+val TungstenSoft    = Color(0xFFFFF3CC)

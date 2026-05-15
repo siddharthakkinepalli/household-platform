@@ -7,6 +7,7 @@ import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -29,6 +30,9 @@ sealed class Screen(
     object Meals  : Screen("meals",  Icons.Rounded.Restaurant,            "Meals")
     object Docs   : Screen("docs",   Icons.Rounded.FolderOpen,            "Documents")
     object VaultScanner : Screen("docs/scanner", Icons.Rounded.DocumentScanner, "Scanner")
+    object PantryStaging : Screen("pantry_staging/{vaultId}", Icons.Rounded.ShoppingCart, "Pantry") {
+        fun route(vaultId: Long) = "pantry_staging/$vaultId"
+    }
     object Family : Screen("family", Icons.Rounded.Group,                 "Family")
     object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
 

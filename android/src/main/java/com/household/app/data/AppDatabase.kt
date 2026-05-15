@@ -14,21 +14,37 @@ import com.household.app.data.dao.MerchantRuleDao
 import com.household.app.data.dao.MealsSummaryDao
 import com.household.app.data.dao.CategoryThresholdDao
 import com.household.app.data.dao.TransactionOverrideDao
+import com.household.app.data.dao.PantryDao
 import com.household.app.data.dao.VaultDao
 import com.household.app.data.dao.WalletTransactionDao
 import com.household.app.data.dao.WalletTripDao
 import com.household.app.data.dao.WeightSnapshotDao
+import com.household.app.data.dao.ProductDao
+import com.household.app.data.dao.ProductAliasDao
+import com.household.app.data.dao.ReceiptLineDao
+import com.household.app.data.dao.DocumentAlertDao
+import com.household.app.data.dao.DocumentDao
+import com.household.app.data.dao.FamilyMemberDao
+import com.household.app.data.dao.InventoryEventDao
 import com.household.app.data.entities.CategoryThresholdEntity
 import com.household.app.data.entities.DashboardPrefsEntity
+import com.household.app.data.entities.DocumentEntity
+import com.household.app.data.entities.DocumentAlertEntity
 import com.household.app.data.entities.ExcludedTransactionEntity
 import com.household.app.data.entities.ImportAuditEntity
 import com.household.app.data.entities.MerchantRuleEntity
 import com.household.app.data.entities.MealsSummaryEntity
 import com.household.app.data.entities.TransactionOverrideEntity
+import com.household.app.data.entities.PantryEntity
 import com.household.app.data.entities.VaultEntity
 import com.household.app.data.entities.WalletTransactionEntity
 import com.household.app.data.entities.WalletTripEntity
 import com.household.app.data.entities.WeightSnapshotEntity
+import com.household.app.data.entities.ProductEntity
+import com.household.app.data.entities.ProductAliasEntity
+import com.household.app.data.entities.ReceiptLineEntity
+import com.household.app.data.entities.FamilyMemberEntity
+import com.household.app.data.entities.InventoryEventEntity
 
 @Database(
     entities = [
@@ -42,9 +58,17 @@ import com.household.app.data.entities.WeightSnapshotEntity
         MerchantRuleEntity::class,
         CategoryThresholdEntity::class,
         ImportAuditEntity::class,
-        VaultEntity::class
+        VaultEntity::class,
+        PantryEntity::class,
+        ProductEntity::class,
+        ProductAliasEntity::class,
+        ReceiptLineEntity::class,
+        InventoryEventEntity::class,
+        FamilyMemberEntity::class,
+        DocumentEntity::class,
+        DocumentAlertEntity::class
     ],
-    version = 5,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -60,6 +84,14 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryThresholdDao(): CategoryThresholdDao
     abstract fun importAuditDao(): ImportAuditDao
     abstract fun vaultDao(): VaultDao
+    abstract fun pantryDao(): PantryDao
+    abstract fun productDao(): ProductDao
+    abstract fun productAliasDao(): ProductAliasDao
+    abstract fun receiptLineDao(): ReceiptLineDao
+    abstract fun inventoryEventDao(): InventoryEventDao
+    abstract fun familyMemberDao(): FamilyMemberDao
+    abstract fun documentDao(): DocumentDao
+    abstract fun documentAlertDao(): DocumentAlertDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -160,6 +192,170 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pantry_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        quantity REAL NOT NULL DEFAULT 1.0,
+                        expiryEstimate TEXT,
+                        vaultId INTEGER,
+                        isConfirmed INTEGER NOT NULL DEFAULT 0,
+                        addedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_pantry_items_vaultId ON pantry_items(vaultId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_pantry_items_isConfirmed ON pantry_items(isConfirmed)"
+                )
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Products table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS products (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        canonicalName TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+
+                // Product Aliases table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS product_aliases (
+                        rawOcrString TEXT NOT NULL,
+                        productId INTEGER NOT NULL,
+                        storeName TEXT NOT NULL,
+                        frequency INTEGER NOT NULL DEFAULT 1,
+                        lastSeenAt INTEGER NOT NULL,
+                        PRIMARY KEY (rawOcrString, storeName),
+                        FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_product_aliases_productId ON product_aliases(productId)")
+
+                // Receipt Lines table (Observation Layer)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS receipt_lines (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        scanId INTEGER NOT NULL,
+                        rawText TEXT NOT NULL,
+                        parsedPrice REAL,
+                        matchedProductId INTEGER,
+                        pantryItemId INTEGER,
+                        confidence REAL NOT NULL DEFAULT 0,
+                        resolutionMethod TEXT NOT NULL DEFAULT 'FAILED',
+                        timestamp INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_receipt_lines_matchedProductId ON receipt_lines(matchedProductId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_receipt_lines_pantryItemId ON receipt_lines(pantryItemId)")
+
+                // Inventory Events table (State Projection)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS inventory_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        pantryItemId INTEGER NOT NULL DEFAULT -1,
+                        delta REAL NOT NULL DEFAULT 0,
+                        eventType TEXT NOT NULL DEFAULT 'ADD',
+                        sourceReceiptLineId INTEGER,
+                        timestamp INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_inventory_events_pantryItemId ON inventory_events(pantryItemId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_inventory_events_sourceReceiptLineId ON inventory_events(sourceReceiptLineId)")
+
+                // Seed common products for learning
+                val commonProducts = listOf(
+                    "Milch", "Butter", "Käse", "Joghurt", "Eier",
+                    "Brot", "Brötchen", "Nudeln", "Reis",
+                    "Äpfel", "Bananen", "Tomaten", "Gurken", "Kartoffeln",
+                    "Hähnchen", "Rinderhack", "Schweinefleisch", "Fisch",
+                    "Wasser", "Saft", "Kaffee", "Tee"
+                )
+                val now = System.currentTimeMillis()
+                commonProducts.forEachIndexed { index, name ->
+                    db.execSQL("INSERT INTO products (id, canonicalName, createdAt) VALUES (${index + 1}, '$name', $now)")
+                }
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Family Members table (no DEFAULT - Room handles via Kotlin code)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS family_members (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        avatarPath TEXT,
+                        colorCode TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_family_members_role ON family_members(role)")
+
+                // Documents table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS documents (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        ownerId INTEGER,
+                        title TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        expiryDate INTEGER,
+                        noticePeriodDays INTEGER NOT NULL,
+                        monthlyCost REAL,
+                        localUri TEXT,
+                        notes TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY (ownerId) REFERENCES family_members(id) ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_documents_ownerId ON documents(ownerId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_documents_expiryDate ON documents(expiryDate)")
+
+                // Document Alerts table
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS document_alerts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        documentId INTEGER NOT NULL,
+                        alertType TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        daysUntil INTEGER NOT NULL,
+                        isAcknowledged INTEGER NOT NULL,
+                        actionTaken TEXT,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY (documentId) REFERENCES documents(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_document_alerts_documentId ON document_alerts(documentId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_document_alerts_isAcknowledged ON document_alerts(isAcknowledged)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -170,7 +366,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "household_app.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 INSTANCE = instance
                 instance

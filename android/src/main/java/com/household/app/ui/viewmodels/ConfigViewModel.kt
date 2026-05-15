@@ -1,10 +1,13 @@
 package com.household.app.ui.viewmodels
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import com.household.app.data.AppDatabase
 import com.household.app.data.DashboardPrefs
 import com.household.app.data.config.CsvParserService
@@ -17,6 +20,8 @@ import com.household.app.data.entities.ImportAuditEntity
 import com.household.app.data.entities.MerchantRuleEntity
 import com.household.app.data.entities.WalletTransactionEntity
 import com.household.app.domain.utils.FiscalDateUtils
+import com.household.app.vault.DriveAuthManager
+import com.household.app.vault.DriveDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,6 +73,9 @@ sealed class ConfigIntent {
     object CancelThresholdEdit : ConfigIntent()
     data class ToggleRule(val ruleId: String, val enabled: Boolean) : ConfigIntent()
     data class RequestUndo(val actionId: String) : ConfigIntent()
+    object ToggleCloudSync : ConfigIntent()
+    data class HandleSignInResult(val data: Intent?) : ConfigIntent()
+    object SignOutGoogle : ConfigIntent()
 }
 
 sealed class ImportWorkflow {
@@ -111,7 +119,10 @@ data class ConfigUiState(
     val pendingRules: List<MerchantRule> = emptyList(),
     val recentAudits: List<ImportAuditRecord> = emptyList(),
     val undoStack: List<UndoableAction> = emptyList(),
-    val typedErrors: List<ConfigError> = emptyList()
+    val typedErrors: List<ConfigError> = emptyList(),
+    val isCloudSyncEnabled: Boolean = false,
+    val connectedEmail: String? = null,
+    val signInError: String? = null
 )
 
 class ConfigViewModel(application: Application) : AndroidViewModel(application) {
@@ -137,6 +148,9 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
             ConfigIntent.CancelThresholdEdit -> cancelThresholdEdit()
             is ConfigIntent.ToggleRule -> toggleRule(intent.ruleId, intent.enabled)
             is ConfigIntent.RequestUndo -> undo(intent.actionId)
+            ConfigIntent.ToggleCloudSync -> toggleCloudSync()
+            is ConfigIntent.HandleSignInResult -> handleSignInResult(intent.data)
+            ConfigIntent.SignOutGoogle -> signOutGoogle()
         }
     }
 
@@ -157,6 +171,10 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
             val collisions = RuleEngineService.findCollisions(rules)
             val currentWorkflow = _uiState.value.importWorkflow
 
+            val ctx = getApplication<Application>()
+            val cloudEnabled = DriveDataStore.isDriveEnabled(ctx)
+            val connectedEmail = DriveAuthManager(ctx).lastSignedInAccount()?.email
+
             _uiState.update {
                 it.copy(
                     salaryAnchor = salaryAnchor,
@@ -176,7 +194,9 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
                         )
                     },
                     recentAudits = recentAudits.map(::mapAudit),
-                    importWorkflow = currentWorkflow
+                    importWorkflow = currentWorkflow,
+                    isCloudSyncEnabled = cloudEnabled,
+                    connectedEmail = connectedEmail
                 )
             }
         }
@@ -304,7 +324,7 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun updateSalaryAnchor(value: Int) {
-        val anchor = value.coerceIn(1, 28)
+        val anchor = value.coerceIn(1, 31)
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 DashboardPrefs.setSalaryAnchorDay(getApplication(), anchor)
@@ -409,6 +429,38 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
                     it.copy(undoStack = it.undoStack.filterNot { item -> item.actionId == actionId })
                 }
             }
+        }
+    }
+
+    private fun toggleCloudSync() {
+        val ctx = getApplication<Application>()
+        val newEnabled = !_uiState.value.isCloudSyncEnabled
+        _uiState.update { it.copy(isCloudSyncEnabled = newEnabled) }
+        viewModelScope.launch {
+            DriveDataStore.setDriveEnabled(ctx, newEnabled)
+        }
+    }
+
+    private fun handleSignInResult(data: Intent?) {
+        val task = GoogleSignIn.getSignedInAccountFromIntent(data ?: return)
+        if (task.isSuccessful) {
+            val email = task.result?.email
+            _uiState.update { it.copy(connectedEmail = email, signInError = null) }
+            refreshState()
+        } else {
+            val code = (task.exception as? ApiException)?.statusCode ?: -1
+            _uiState.update {
+                it.copy(signInError = "Sign-in failed (error $code). Check SHA-1 is registered in Google Cloud Console.")
+            }
+        }
+    }
+
+    private fun signOutGoogle() {
+        val ctx = getApplication<Application>()
+        DriveAuthManager(ctx).signOut()
+        viewModelScope.launch {
+            DriveDataStore.clearOnSignOut(ctx)
+            _uiState.update { it.copy(isCloudSyncEnabled = false, connectedEmail = null) }
         }
     }
 

@@ -9,6 +9,7 @@ import androidx.room.Update
 import com.household.app.data.entities.WeightSnapshotEntity
 import com.household.app.data.entities.MealsSummaryEntity
 import com.household.app.data.entities.DashboardPrefsEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WeightSnapshotDao {
@@ -62,4 +63,7 @@ interface DashboardPrefsDao {
 
     @Query("DELETE FROM dashboard_prefs")
     suspend fun deleteAllPrefs()
+
+    @Query("SELECT salaryAnchorDay FROM dashboard_prefs WHERE id = 1")
+    fun observeAnchorDay(): Flow<Int?>
 }

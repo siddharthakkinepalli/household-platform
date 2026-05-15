@@ -39,12 +39,16 @@ from ai_pipeline import (
     build_event_graph,
     apply_automation_rules,
 )
+from receipt_parser.routes import register_receipt_routes
 
 # ---------------------------------------------------------------------------
 # Flask Setup
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__, static_folder=None)
+
+# Register receipt parser routes
+register_receipt_routes(app)
 
 # Database
 DB_PATH = BACKEND_DIR / 'household_platform.db'

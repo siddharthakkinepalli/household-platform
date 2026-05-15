@@ -6,28 +6,31 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object FiscalDateUtils {
+
+    fun getCycleRange(anchorDay: Int): Pair<LocalDate, LocalDate> =
+        getFiscalCycleRange(LocalDate.now(), anchorDay)
+
     fun getFiscalCycleStart(date: LocalDate, anchorDay: Int): LocalDate {
-        val normalizedAnchor = anchorDay.coerceIn(1, 28)
-        val candidateMonth = if (date.dayOfMonth >= normalizedAnchor) {
-            YearMonth.from(date)
+        val thisYM = YearMonth.from(date)
+        val candidate = thisYM.atDay(anchorDay.coerceIn(1, thisYM.lengthOfMonth()))
+        return if (!date.isBefore(candidate)) {
+            candidate
         } else {
-            YearMonth.from(date.minusMonths(1))
+            val prevYM = thisYM.minusMonths(1)
+            prevYM.atDay(anchorDay.coerceIn(1, prevYM.lengthOfMonth()))
         }
-        return candidateMonth.atDay(normalizedAnchor.coerceAtMost(candidateMonth.lengthOfMonth()))
     }
 
     fun getFiscalCycleRange(date: LocalDate, anchorDay: Int): Pair<LocalDate, LocalDate> {
         val start = getFiscalCycleStart(date, anchorDay)
-        val nextMonth = YearMonth.from(start).plusMonths(1)
-        val normalizedAnchor = anchorDay.coerceIn(1, 28)
-        val nextStart = nextMonth.atDay(normalizedAnchor.coerceAtMost(nextMonth.lengthOfMonth()))
+        val nextYM = YearMonth.from(start).plusMonths(1)
+        val nextStart = nextYM.atDay(anchorDay.coerceIn(1, nextYM.lengthOfMonth()))
         return start to nextStart.minusDays(1)
     }
 
     fun getPreviousFiscalCycleRange(date: LocalDate, anchorDay: Int): Pair<LocalDate, LocalDate> {
         val currentStart = getFiscalCycleStart(date, anchorDay)
-        val previousReference = currentStart.minusDays(1)
-        return getFiscalCycleRange(previousReference, anchorDay)
+        return getFiscalCycleRange(currentStart.minusDays(1), anchorDay)
     }
 
     fun getFiscalCycleId(date: LocalDate, anchorDay: Int): String {
@@ -36,7 +39,7 @@ object FiscalDateUtils {
     }
 
     fun formatRangeLabel(range: Pair<LocalDate, LocalDate>): String {
-        val formatter = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
-        return "${range.first.format(formatter)} - ${range.second.format(formatter)}"
+        val fmt = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+        return "${range.first.format(fmt)} - ${range.second.format(fmt)}"
     }
 }

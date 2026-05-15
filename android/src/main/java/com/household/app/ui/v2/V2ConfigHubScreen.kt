@@ -1,60 +1,83 @@
 package com.household.app.ui.v2
 
 import android.app.Application
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.EuroSymbol
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.drop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -66,7 +89,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -75,6 +100,10 @@ import com.household.app.data.config.ImportSummary
 import com.household.app.ui.compose.theme.ConfigAccent
 import com.household.app.ui.compose.theme.ConfigPanelStroke
 import com.household.app.ui.compose.theme.CriticalRed
+import com.household.app.ui.compose.theme.EliteNavy
+import com.household.app.ui.compose.theme.LumeAmber
+import com.household.app.ui.compose.theme.LumeEmerald
+import com.household.app.ui.compose.theme.LumePurple
 import com.household.app.ui.compose.theme.LumeWhite
 import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextMuted
@@ -88,7 +117,7 @@ import com.household.app.ui.viewmodels.ImportAuditRecord
 import com.household.app.ui.viewmodels.ImportWorkflow
 
 @Composable
-fun V2ConfigHubScreen() {
+fun V2ConfigHubScreen(onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val viewModel: ConfigViewModel = viewModel(
         factory = viewModelFactory {
@@ -108,6 +137,11 @@ fun V2ConfigHubScreen() {
             viewModel.onIntent(ConfigIntent.FileSelected(uri))
         }
     }
+    val signInLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        viewModel.onIntent(ConfigIntent.HandleSignInResult(result.data))
+    }
 
     LaunchedEffect(uiState.undoStack.lastOrNull()?.actionId) {
         val action = uiState.undoStack.lastOrNull() ?: return@LaunchedEffect
@@ -121,13 +155,16 @@ fun V2ConfigHubScreen() {
         }
     }
 
+    val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
+
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             EliteHeader(
                 title = "System Setup",
-                subtitle = "Household OS Command Center"
+                subtitle = "Household OS Command Center",
+                onBack = onBack
             )
         }
     ) { padding ->
@@ -135,17 +172,42 @@ fun V2ConfigHubScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 110.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 24.dp + navBarPadding.calculateBottomPadding()
+            ),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // 1 — Salary Anchor horizontal date picker
             item {
-                SalaryAnchorCard(
-                    salaryAnchor = uiState.salaryAnchor,
+                SalaryAnchorPickerCard(
+                    selectedDay = uiState.salaryAnchor,
                     fiscalLabel = uiState.currentFiscalLabel,
                     onIntent = viewModel::onIntent
                 )
             }
 
+            // 2 — Cloud Sync toggle
+            item {
+                CloudSyncCard(
+                    isEnabled = uiState.isCloudSyncEnabled,
+                    connectedEmail = uiState.connectedEmail,
+                    signInError = uiState.signInError,
+                    onIntent = viewModel::onIntent,
+                    onSignIn = {
+                        val intent = com.household.app.vault.DriveAuthManager(context).signInIntent()
+                        signInLauncher.launch(intent)
+                    }
+                )
+            }
+
+            // 3 — Currency / Locale (read-only)
+            item {
+                CurrencyLocaleCard()
+            }
+
+            // 4 — Bank CSV intake
             item {
                 CsvIngestCard(
                     uiState = uiState,
@@ -156,6 +218,7 @@ fun V2ConfigHubScreen() {
                 )
             }
 
+            // 5 — Budget thresholds header
             item {
                 Text(
                     text = "Budget Thresholds",
@@ -179,6 +242,7 @@ fun V2ConfigHubScreen() {
                 )
             }
 
+            // 6 — Transaction rules
             item {
                 TransactionRulesCard(
                     uiState = uiState,
@@ -186,6 +250,7 @@ fun V2ConfigHubScreen() {
                 )
             }
 
+            // 7 — Recent import audit trail
             if (uiState.recentAudits.isNotEmpty()) {
                 item {
                     RecentImportsCard(uiState.recentAudits)
@@ -195,43 +260,307 @@ fun V2ConfigHubScreen() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Salary Anchor — horizontal day picker
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SalaryAnchorCard(
-    salaryAnchor: Int,
+private fun SalaryAnchorPickerCard(
+    selectedDay: Int,
     fiscalLabel: String,
     onIntent: (ConfigIntent) -> Unit
 ) {
-    EliteGlassCard(glowColor = LumeWhite.copy(alpha = 0.18f), borderAlpha = 0.18f) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    val haptics = LocalHapticFeedback.current
+    val listState = rememberLazyListState()
+    val snapFling = rememberSnapFlingBehavior(lazyListState = listState)
+
+    // Haptic tick every time a new item snaps into view while scrolling
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .drop(1)
+            .collect {
+                if (listState.isScrollInProgress) {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            }
+    }
+
+    LaunchedEffect(selectedDay) {
+        val scrollTo = (selectedDay - 4).coerceAtLeast(0)
+        listState.animateScrollToItem(scrollTo)
+    }
+
+    EliteGlassCard(glowColor = ConfigAccent.copy(alpha = 0.18f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
                 text = "FISCAL CYCLE",
                 style = MaterialTheme.typography.labelSmall,
-                color = LumeWhite.copy(alpha = 0.62f)
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
             )
             Text(
-                text = "Salary Payment Date",
+                text = "Budget Reset Day",
                 color = TextMain,
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.titleMedium
             )
+            if (fiscalLabel.isNotBlank()) {
+                Text(
+                    text = "Current cycle: $fiscalLabel",
+                    color = LumeWhite.copy(alpha = 0.65f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            LazyRow(
+                state = listState,
+                flingBehavior = snapFling,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) {
+                items(31) { index ->
+                    val day = index + 1
+                    DayChip(
+                        day = day,
+                        isSelected = day == selectedDay,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onIntent(ConfigIntent.UpdateSalaryAnchor(day))
+                        }
+                    )
+                }
+            }
+
             Text(
-                text = "Cycles currently run across $fiscalLabel",
-                color = LumeWhite.copy(alpha = 0.72f),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            SalaryAnchorDial(
-                anchor = salaryAnchor,
-                onIncrement = { onIntent(ConfigIntent.UpdateSalaryAnchor((salaryAnchor + 1).coerceAtMost(28))) },
-                onDecrement = { onIntent(ConfigIntent.UpdateSalaryAnchor((salaryAnchor - 1).coerceAtLeast(1))) }
-            )
-            Text(
-                text = "Anchor: ${salaryAnchor}th of each month",
+                text = "Salary lands on the ${selectedDay}th — cycles run ${selectedDay}th → ${selectedDay}th",
                 color = TextMuted,
                 style = MaterialTheme.typography.bodySmall
             )
         }
     }
 }
+
+@Composable
+private fun DayChip(day: Int, isSelected: Boolean, onClick: () -> Unit) {
+    val bgColor by animateColorAsState(
+        targetValue = if (isSelected) ConfigAccent else LumeWhite.copy(alpha = 0.06f),
+        animationSpec = tween(durationMillis = 180),
+        label = "day_bg_$day"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) EliteNavy else LumeWhite.copy(alpha = 0.55f),
+        animationSpec = tween(durationMillis = 180),
+        label = "day_text_$day"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .then(if (isSelected) Modifier.neonGlow(ConfigAccent, blurRadius = 10.dp) else Modifier)
+            .clip(RoundedCornerShape(12.dp))
+            .background(bgColor)
+            .then(
+                if (isSelected) Modifier.border(1.dp, ConfigAccent, RoundedCornerShape(12.dp))
+                else Modifier
+            )
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Day $day" },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "$day",
+            color = textColor,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cloud Sync toggle card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CloudSyncCard(
+    isEnabled: Boolean,
+    connectedEmail: String?,
+    signInError: String? = null,
+    onIntent: (ConfigIntent) -> Unit,
+    onSignIn: () -> Unit = {}
+) {
+    val glowColor = if (isEnabled) LumeEmerald.copy(alpha = 0.22f) else Color.Transparent
+    val statusIcon = if (isEnabled) Icons.Rounded.CloudDone else Icons.Rounded.CloudOff
+    val statusTint = if (isEnabled) LumeEmerald else LumeWhite.copy(alpha = 0.35f)
+    val isConnected = connectedEmail != null
+
+    EliteGlassCard(glowColor = glowColor) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(
+                text = "CLOUD BACKUP",
+                style = MaterialTheme.typography.labelSmall,
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(statusTint.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(statusIcon, contentDescription = null, tint = statusTint, modifier = Modifier.size(22.dp))
+                }
+
+                Spacer(Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Google Drive Sync",
+                        color = TextMain,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = when {
+                            !isConnected -> "No Google account connected"
+                            isEnabled    -> "Active — uploads on Wi-Fi"
+                            else         -> "Paused"
+                        },
+                        color = if (isEnabled && isConnected) LumeEmerald else LumeWhite.copy(alpha = 0.55f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (connectedEmail != null) {
+                        Text(
+                            text = connectedEmail,
+                            color = LumeWhite.copy(alpha = 0.4f),
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                }
+
+                Switch(
+                    checked = isEnabled,
+                    onCheckedChange = { onIntent(ConfigIntent.ToggleCloudSync) },
+                    enabled = isConnected,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = EliteNavy,
+                        checkedTrackColor = LumeEmerald,
+                        uncheckedThumbColor = LumeWhite.copy(alpha = 0.6f),
+                        uncheckedTrackColor = LumeWhite.copy(alpha = 0.1f),
+                        disabledUncheckedTrackColor = LumeWhite.copy(alpha = 0.05f),
+                        disabledUncheckedThumbColor = LumeWhite.copy(alpha = 0.2f)
+                    )
+                )
+            }
+
+            if (!isConnected) {
+                OutlinedButton(
+                    onClick = onSignIn,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = LumeWhite),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        LumeWhite.copy(alpha = 0.25f)
+                    )
+                ) {
+                    Text("Connect Google Account", fontWeight = FontWeight.Medium)
+                }
+                if (signInError != null) {
+                    Text(
+                        text = signInError,
+                        color = LumeAmber,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            } else {
+                TextButton(
+                    onClick = { onIntent(ConfigIntent.SignOutGoogle) },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Disconnect", color = LumeWhite.copy(alpha = 0.45f), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Currency / Locale — read-only grounding card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CurrencyLocaleCard() {
+    EliteGlassCard(glowColor = LumeAmber.copy(alpha = 0.14f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(
+                text = "LOCALE & CURRENCY",
+                style = MaterialTheme.typography.labelSmall,
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                LocaleDataPill(
+                    icon = Icons.Rounded.EuroSymbol,
+                    label = "EUR (€)",
+                    sub = "Euro",
+                    tint = LumeAmber,
+                    modifier = Modifier.weight(1f)
+                )
+                LocaleDataPill(
+                    icon = Icons.Rounded.Language,
+                    label = "Germany",
+                    sub = "Region",
+                    tint = LumePurple,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Text(
+                text = "OCR parser is calibrated for German supermarket receipts — ALDI, REWE, LIDL, Kaufland. Price format: 1,99 €",
+                color = LumeWhite.copy(alpha = 0.48f),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocaleDataPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    sub: String,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .background(tint.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Column {
+            Text(label, color = TextMain, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+            Text(sub, color = tint.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CSV intake (unchanged logic, kept as private composable)
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun CsvIngestCard(
@@ -269,7 +598,8 @@ private fun CsvIngestCard(
                     .defaultMinSize(minHeight = 120.dp)
                     .border(
                         1.dp,
-                        if (uiState.importWorkflow is ImportWorkflow.Idle) ConfigPanelStroke else glowColor.copy(alpha = 0.45f),
+                        if (uiState.importWorkflow is ImportWorkflow.Idle) ConfigPanelStroke
+                        else glowColor.copy(alpha = 0.45f),
                         RoundedCornerShape(20.dp)
                     )
                     .background(LumeWhite.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
@@ -321,7 +651,9 @@ private fun LoadingState(progress: Float, stage: String) {
     )
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
     ) {
         CircularProgressIndicator(
             progress = { if (progress <= 0f) 0.08f else animatedProgress.coerceIn(0.08f, 1f) },
@@ -346,7 +678,9 @@ private fun LoadingState(progress: Float, stage: String) {
         Spacer(Modifier.height(14.dp))
         LinearProgressIndicator(
             progress = { if (progress <= 0f) 0.08f else animatedProgress.coerceIn(0.08f, 1f) },
-            modifier = Modifier.fillMaxWidth().height(6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp),
             color = ConfigAccent,
             trackColor = LumeWhite.copy(alpha = 0.1f)
         )
@@ -356,7 +690,9 @@ private fun LoadingState(progress: Float, stage: String) {
 @Composable
 private fun ReviewState(summary: ImportSummary, salaryAnchor: Int, onIntent: (ConfigIntent) -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -376,7 +712,10 @@ private fun ReviewState(summary: ImportSummary, salaryAnchor: Int, onIntent: (Co
             color = LumeWhite.copy(alpha = 0.7f),
             style = MaterialTheme.typography.bodySmall
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Button(
                 onClick = { onIntent(ConfigIntent.CancelImport) },
                 modifier = Modifier.weight(1f),
@@ -389,7 +728,7 @@ private fun ReviewState(summary: ImportSummary, salaryAnchor: Int, onIntent: (Co
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = ConfigAccent)
             ) {
-                Text("Confirm Import", color = LumeWhite, fontWeight = FontWeight.Bold)
+                Text("Confirm Import", color = EliteNavy, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -397,7 +736,12 @@ private fun ReviewState(summary: ImportSummary, salaryAnchor: Int, onIntent: (Co
 
 @Composable
 private fun WarningState(text: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
         Icon(Icons.Rounded.WarningAmber, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(32.dp))
         Text(text, color = LumeWhite, modifier = Modifier.padding(top = 12.dp), textAlign = TextAlign.Center)
         Text(
@@ -412,9 +756,18 @@ private fun WarningState(text: String) {
 
 @Composable
 private fun SuccessState(text: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Icon(Icons.Rounded.CheckCircle, null, tint = Color(0xFF22C55E), modifier = Modifier.size(48.dp))
-        Text(text, color = Color(0xFF22C55E), fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp), textAlign = TextAlign.Center)
+        Text(
+            text,
+            color = Color(0xFF22C55E),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 12.dp),
+            textAlign = TextAlign.Center
+        )
         Text(
             text = "Wallet refresh will pick these up automatically.",
             color = TextMuted,
@@ -432,10 +785,23 @@ private fun ErrorState(error: ImportErrorType, onIntent: (ConfigIntent) -> Unit)
         ImportErrorType.MissingColumns -> "Required CSV columns were not detected. Check file format."
         is ImportErrorType.ParseFailure -> error.reason
     }
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
             Icon(Icons.Rounded.WarningAmber, null, tint = CriticalRed, modifier = Modifier.size(24.dp))
-            Text(message, color = LumeWhite.copy(0.8f), modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.bodySmall)
+            Text(
+                message,
+                color = LumeWhite.copy(0.8f),
+                modifier = Modifier.padding(start = 12.dp),
+                style = MaterialTheme.typography.bodySmall
+            )
         }
         Button(
             onClick = { onIntent(ConfigIntent.CancelImport) },
@@ -446,6 +812,10 @@ private fun ErrorState(error: ImportErrorType, onIntent: (ConfigIntent) -> Unit)
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Budget threshold editor row
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 private fun CategoryLimitRow(
     threshold: CategoryThreshold,
@@ -453,6 +823,8 @@ private fun CategoryLimitRow(
     isEditing: Boolean,
     onIntent: (ConfigIntent) -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
+
     EliteGlassCard(
         glowColor = if (isEditing) ConfigAccent else Color.Transparent,
         borderAlpha = if (isEditing) 0.22f else 0.12f
@@ -465,7 +837,11 @@ private fun CategoryLimitRow(
                         .background(categoryColor(threshold.id).copy(alpha = 0.12f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(threshold.name.take(1), color = categoryColor(threshold.id), fontWeight = FontWeight.Bold)
+                    Text(
+                        threshold.name.take(1),
+                        color = categoryColor(threshold.id),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 Column(modifier = Modifier.padding(start = 14.dp)) {
                     Text(threshold.name, color = TextMain, fontWeight = FontWeight.SemiBold)
@@ -484,7 +860,8 @@ private fun CategoryLimitRow(
             if (isEditing) {
                 LumeStepper(
                     currentValue = displayValue,
-                    onValueChange = { onIntent(ConfigIntent.UpdateDraftLimit(it)) }
+                    onValueChange = { onIntent(ConfigIntent.UpdateDraftLimit(it)) },
+                    haptics = haptics
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
@@ -504,6 +881,55 @@ private fun CategoryLimitRow(
         }
     }
 }
+
+@Composable
+private fun LumeStepper(
+    currentValue: Float,
+    onValueChange: (Float) -> Unit,
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..2000f,
+    stepAmount: Float = 10f
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .background(LumeWhite.copy(alpha = 0.05f), CircleShape)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onValueChange((currentValue - stepAmount).coerceAtLeast(valueRange.start))
+        }) {
+            Icon(Icons.Rounded.Remove, null, tint = ConfigAccent)
+        }
+        androidx.compose.material3.Slider(
+            value = currentValue.coerceIn(valueRange.start, valueRange.endInclusive),
+            onValueChange = {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onValueChange(it)
+            },
+            valueRange = valueRange,
+            modifier = Modifier.weight(1f),
+            colors = androidx.compose.material3.SliderDefaults.colors(
+                thumbColor = ConfigAccent,
+                activeTrackColor = ConfigAccent.copy(alpha = 0.52f),
+                inactiveTrackColor = LumeWhite.copy(alpha = 0.16f)
+            )
+        )
+        IconButton(onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onValueChange((currentValue + stepAmount).coerceAtMost(valueRange.endInclusive))
+        }) {
+            Icon(Icons.Rounded.Add, null, tint = ConfigAccent)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transaction rules card
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun TransactionRulesCard(
@@ -546,7 +972,8 @@ private fun TransactionRulesCard(
                         Button(
                             onClick = { onIntent(ConfigIntent.ToggleRule(rule.id, !rule.isEnabled)) },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (rule.isEnabled) ConfigAccent.copy(alpha = 0.18f) else Color.Transparent
+                                containerColor = if (rule.isEnabled) ConfigAccent.copy(alpha = 0.18f)
+                                else Color.Transparent
                             )
                         ) {
                             Text(if (rule.isEnabled) "Enabled" else "Paused", color = LumeWhite)
@@ -558,50 +985,9 @@ private fun TransactionRulesCard(
     }
 }
 
-@Composable
-private fun LumeStepper(
-    currentValue: Float,
-    onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float> = 0f..2000f,
-    stepAmount: Float = 10f
-) {
-    val haptics = LocalHapticFeedback.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .background(LumeWhite.copy(alpha = 0.05f), CircleShape)
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onValueChange((currentValue - stepAmount).coerceAtLeast(valueRange.start))
-        }) {
-            Icon(Icons.Rounded.Remove, null, tint = ConfigAccent)
-        }
-        Slider(
-            value = currentValue.coerceIn(valueRange.start, valueRange.endInclusive),
-            onValueChange = {
-                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onValueChange(it)
-            },
-            valueRange = valueRange,
-            modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = ConfigAccent,
-                activeTrackColor = ConfigAccent.copy(alpha = 0.52f),
-                inactiveTrackColor = LumeWhite.copy(alpha = 0.16f)
-            )
-        )
-        IconButton(onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onValueChange((currentValue + stepAmount).coerceAtMost(valueRange.endInclusive))
-        }) {
-            Icon(Icons.Rounded.Add, null, tint = ConfigAccent)
-        }
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Import audit trail
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun RecentImportsCard(audits: List<ImportAuditRecord>) {
@@ -635,75 +1021,28 @@ private fun RecentImportsCard(audits: List<ImportAuditRecord>) {
     }
 }
 
-private fun categoryColor(categoryId: String): Color {
-    return when (categoryId) {
-        "groceries" -> Color(0xFF22C55E)
-        "housing" -> Color(0xFFF59E0B)
-        "transport" -> Color(0xFF60A5FA)
-        "dining" -> Color(0xFFFB7185)
-        "utilities" -> Color(0xFFA78BFA)
-        else -> ConfigAccent
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+private fun Modifier.neonGlow(color: Color, blurRadius: Dp): Modifier = this.drawBehind {
+    drawIntoCanvas { canvas ->
+        val paint = Paint().apply {
+            asFrameworkPaint().apply {
+                isAntiAlias = true
+                this.color = android.graphics.Color.TRANSPARENT
+                setShadowLayer(blurRadius.toPx(), 0f, 0f, color.copy(alpha = 0.85f).toArgb())
+            }
+        }
+        canvas.drawRoundRect(0f, 0f, size.width, size.height, 12.dp.toPx(), 12.dp.toPx(), paint)
     }
 }
 
-@Composable
-private fun SalaryAnchorDial(
-    anchor: Int,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit
-) {
-    val haptics = LocalHapticFeedback.current
-    val normalized = ((anchor - 1).toFloat() / 27f).coerceIn(0f, 1f)
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onDecrement()
-        }) {
-            Icon(Icons.Rounded.Remove, null, tint = ConfigAccent)
-        }
-
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(156.dp)) {
-            Canvas(modifier = Modifier.size(156.dp)) {
-                val stroke = 10.dp.toPx()
-                val topLeft = Offset(stroke / 2f, stroke / 2f)
-                val arcSize = size.copy(width = size.width - stroke, height = size.height - stroke)
-
-                drawArc(
-                    color = LumeWhite.copy(alpha = 0.12f),
-                    startAngle = 135f,
-                    sweepAngle = 270f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                )
-                drawArc(
-                    color = ConfigAccent,
-                    startAngle = 135f,
-                    sweepAngle = 270f * normalized,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                )
-            }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Salary Day", color = LumeWhite.copy(alpha = 0.62f), style = MaterialTheme.typography.labelSmall)
-                Text("${anchor}th", color = TextMain, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        IconButton(onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onIncrement()
-        }) {
-            Icon(Icons.Rounded.Add, null, tint = ConfigAccent)
-        }
-    }
+private fun categoryColor(categoryId: String): Color = when (categoryId) {
+    "groceries"  -> Color(0xFF22C55E)
+    "housing"    -> Color(0xFFF59E0B)
+    "transport"  -> Color(0xFF60A5FA)
+    "dining"     -> Color(0xFFFB7185)
+    "utilities"  -> Color(0xFFA78BFA)
+    else         -> ConfigAccent
 }

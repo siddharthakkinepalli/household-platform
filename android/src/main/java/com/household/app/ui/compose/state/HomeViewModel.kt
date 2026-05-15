@@ -23,6 +23,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,6 +50,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         handle(HomeIntent.Load)
+        observeAnchorDay()
+    }
+
+    private fun observeAnchorDay() {
+        viewModelScope.launch {
+            db.dashboardPrefsDao()
+                .observeAnchorDay()
+                .filterNotNull()
+                .distinctUntilChanged()
+                .drop(1) // skip initial emission already loaded by loadAll()
+                .collect { loadAll() }
+        }
     }
 
     fun handle(intent: HomeIntent) {

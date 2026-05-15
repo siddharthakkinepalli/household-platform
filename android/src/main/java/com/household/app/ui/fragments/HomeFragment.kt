@@ -62,7 +62,7 @@ class HomeFragment : Fragment() {
         val buttonOpenFamily: Button = view.findViewById(R.id.button_open_family)
 
         // Observe household profile
-        viewModel.householdProfile.observe(viewLifecycleOwner, Observer { profile ->
+        viewModel.householdProfileLive.observe(viewLifecycleOwner, Observer { profile ->
             textHouseholdName.text = profile.name
             textMembersCount.text = "Members: ${profile.membersCount}"
             textCurrency.text = "Currency: ${profile.currency}"
@@ -82,15 +82,15 @@ class HomeFragment : Fragment() {
             textIntegrationMeals.text = "Meal planning works offline with local storage"
         })
 
-        viewModel.timelineLines.observe(viewLifecycleOwner, Observer { lines ->
+        viewModel.timelineLinesLive.observe(viewLifecycleOwner, Observer { lines ->
             textTimeline1.text = lines.getOrNull(0) ?: "-"
             textTimeline2.text = lines.getOrNull(1) ?: "-"
             textTimeline3.text = lines.getOrNull(2) ?: "-"
         })
 
-        viewModel.captureMessage.observe(viewLifecycleOwner, Observer { msg ->
+        viewModel.captureMessageLive.observe(viewLifecycleOwner, Observer { msg ->
             if (!msg.isNullOrBlank()) {
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), msg as CharSequence, Toast.LENGTH_SHORT).show()
             }
         })
 
