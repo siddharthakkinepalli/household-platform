@@ -354,9 +354,16 @@ private fun ReceiptCard(entry: VaultEntity) {
 
 @Composable
 private fun AsyncReceiptImage(imagePath: String, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = imagePath) {
         value = withContext(Dispatchers.IO) {
-            if (imagePath.isBlank()) null else BitmapFactory.decodeFile(imagePath)
+            if (imagePath.isBlank()) return@withContext null
+            if (imagePath.startsWith("content://")) {
+                context.contentResolver.openInputStream(android.net.Uri.parse(imagePath))
+                    ?.use { BitmapFactory.decodeStream(it) }
+            } else {
+                BitmapFactory.decodeFile(imagePath)
+            }
         }
     }
 

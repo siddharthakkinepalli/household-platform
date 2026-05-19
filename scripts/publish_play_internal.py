@@ -203,11 +203,11 @@ def main() -> int:
         sa_json_path=sa_json_path,
         release_status=args.status,
     )
-    print(f"✓ Uploaded versionCode {uploaded_version_code} to track '{track}' as {args.status.upper()}.")
+    print(f"[OK] Uploaded versionCode {uploaded_version_code} to track '{track}' as {args.status.upper()}.")
     if args.status == "draft":
-        print("✓ Next step: Promote/release manually in Play Console.")
+        print("[OK] Next step: Promote/release manually in Play Console.")
     else:
-        print("✓ Release is live to testers on selected track.")
+        print("[OK] Release is live to testers on selected track.")
     return 0
 
 
