@@ -333,9 +333,108 @@ Checkpoints:
 
 ---
 
+## Multi-Device Sync — Drive + Local WiFi 📱↔️📱
+
+**Decision: Google Drive as the sync backbone, local WiFi as the fast path.**
+
+No new backend. No Firebase. Data lives in the primary user's own Google Drive account —
+not a third-party database. Drive sharing is the pairing mechanism. Child phone is
+read-only by design, so there are zero write conflicts.
+
+Privacy: meaningfully better than Firebase. Drive is file storage — Google sees files in
+your account. Firebase is a queryable database — Google can index structured records.
+
+### How it works
+
+Primary phone owns a Drive folder `Jugaad Household/` containing a full snapshot of all
+household data as JSON. The folder is shared (view-only) with the child phone's Google
+account via a share link encoded in a QR code. Child phone scans once, syncs forever.
+
+```
+Jugaad Household/           ← primary phone writes, child phone reads
+  ├── household.json        metadata, sync version, last updated
+  ├── expenses.json         all wallet transactions
+  ├── vault.json            document metadata (titles, amounts, dates, categories)
+  ├── pantry.json           confirmed pantry items
+  ├── date_events.json      contracts, renewals, reminders (when built)
+  └── images/               receipt scans and PDFs (already syncing today)
+```
+
+### Pairing flow
+
+```
+Primary phone                       Child phone
+────────────────────────────────────────────────
+Settings → Drive → Enable sync
+→ creates "Jugaad Household" folder
+→ generates view-only share link
+→ displays QR code
+                                    Settings → Join Household
+                                    → scan QR
+                                    → receives Drive folder ID
+                                    → downloads all JSON files
+                                    → populates local Room DB
+                                    "Synced ✓  last updated just now"
+```
+
+One scan. No accounts to create. No codes to type.
+
+### Sync strategy
+
+- **Primary phone**: writes full snapshot to Drive on every significant change
+  (new expense, new scan, pantry update) via background WorkManager job
+- **Child phone**: pulls latest snapshot on app open + periodic background refresh
+  (every few hours via WorkManager)
+- **At home on WiFi**: local WiFi sync kicks in for instant updates (see below)
+- **Away from home**: Drive snapshot is the fallback — a few hours of lag, acceptable
+  for the "checking expenses" use case
+
+### Local WiFi sync — fast path when both phones are home
+
+When both phones are on the same network, sync directly without Drive:
+
+- Primary phone runs a lightweight embedded HTTP server (Ktor/NanoHTTPD)
+- Advertises itself via mDNS: `jugaad._tcp.local`
+- Child phone's `NsdManager` discovers it automatically when on same WiFi
+- Pulls delta (changes since `lastSyncTimestamp`) directly from primary — instant
+- Drive sync still runs in background as persistent backup and source of truth
+
+WiFi sync = speed. Drive sync = persistence and pairing. Together they cover both cases.
+
+### Checkpoints
+
+**Primary phone — Drive export:**
+- [ ] `HouseholdExportService` — serialises all Room entities to typed JSON
+      (expenses, vault metadata, pantry, date events, family — every domain)
+- [ ] Expand `DriveSyncWorker` to write full household snapshot, not just vault entries
+- [ ] Named files per domain in `Jugaad Household/` folder (not scattered files)
+- [ ] Incremental: only rewrite files for domains that changed since last sync
+- [ ] "Last synced to Drive" timestamp stored in `DriveDataStore`, shown in settings
+
+**Child phone — Drive import:**
+- [ ] `HouseholdImportService` — downloads JSON files, deserialises into local Room DB
+- [ ] Merge strategy: Drive snapshot is source of truth, replaces local on conflict
+- [ ] Sync on app open (foreground) + WorkManager periodic (background, every 4h)
+- [ ] "Read-only" mode indicator in UI — child phone shows sync badge, no write operations
+- [ ] Images lazy-loaded from Drive on demand (not bulk downloaded)
+
+**QR pairing:**
+- [ ] Primary: Settings → "Add device" → generates view-only Drive share link → QR code
+- [ ] QR encodes: `jugaad://join/{driveFolderId}/{shareToken}`
+- [ ] Child: Settings → "Join household" → camera scan → auto-configures Drive folder ID
+- [ ] Joined devices list in primary settings (can revoke access per device)
+
+**Local WiFi sync:**
+- [ ] Embedded HTTP server on primary (Ktor, ~200KB) — starts when app is in foreground
+- [ ] `NsdManager` discovery on child — detects primary on same network automatically
+- [ ] Delta endpoint: `GET /sync/since/{timestamp}` — only changed records
+- [ ] WiFi sync takes priority over Drive sync when primary is reachable
+- [ ] Graceful fallback: if WiFi sync fails, Drive sync runs as normal
+
+---
+
 ## Later / Nice to Have 💡
 
-- [ ] Google Drive full sync (not just receipts)
 - [ ] Export vault as PDF report
 - [ ] Multi-language receipt support (English receipts)
 - [ ] Barcode scanning for pantry items
