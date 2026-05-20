@@ -7,6 +7,7 @@ import com.household.app.data.entities.PantryEntity
 import com.household.app.data.entities.VaultEntity
 import com.household.app.data.service.FileStorageService
 import com.household.app.domain.models.RefinedScan
+import com.household.app.domain.models.vault.VaultCategory
 import com.household.app.domain.models.vault.VisionTextPayload
 import com.household.app.domain.repositories.VaultRepository
 import com.household.app.domain.services.ReceiptItemParser
@@ -24,6 +25,9 @@ class VaultRepositoryImpl(
     override fun getVaultEntries(): Flow<List<VaultEntity>> = vaultDao.getAllEntries()
 
     override fun getUnlinkedVaultEntries(): Flow<List<VaultEntity>> = vaultDao.getUnlinkedEntries()
+
+    override fun getEntriesByCategory(category: VaultCategory): Flow<List<VaultEntity>> =
+        vaultDao.getEntriesByCategory(category.name)
 
     override suspend fun processAndSaveScan(tempUri: Uri, payload: VisionTextPayload): Long {
         val permanentPath = storageService.saveReceiptImage(tempUri)
@@ -66,8 +70,32 @@ class VaultRepositoryImpl(
         return vaultId
     }
 
+    override suspend fun saveDocument(
+        uri: Uri,
+        mimeType: String,
+        category: VaultCategory,
+        title: String
+    ): Long {
+        val path = storageService.saveDocument(uri, mimeType)
+        val entity = VaultEntity(
+            imagePath = path,
+            merchantName = null,
+            totalAmount = null,
+            dateEpoch = LocalDate.now().toEpochDay(),
+            rawOcrContent = "",
+            category = category.name,
+            documentTitle = title.trim().ifBlank { null },
+            mimeType = mimeType
+        )
+        return vaultDao.insertVaultEntry(entity)
+    }
+
     override suspend fun linkReceiptToExpense(vaultId: Long, expenseId: Long) {
         vaultDao.linkToExpense(vaultId, expenseId.toLong())
+    }
+
+    override suspend fun deleteEntry(id: Long) {
+        vaultDao.getEntryById(id)?.let { vaultDao.deleteEntry(it) }
     }
 
     private suspend fun stageReceiptItems(vaultId: Long, receiptText: String) {

@@ -43,7 +43,9 @@ fun V2AppNavHost(
                 slideOutHorizontally(tween(Motion.DURATION_SLIDE)) { it / 8 }
         }
     ) {
-        composable(route = Screen.Home.route) { V2HomeScreen() }
+        composable(route = Screen.Home.route) {
+            V2HomeScreen(onNavigateToVault = { navController.navigate(Screen.Docs.route) })
+        }
         composable(route = Screen.Wallet.route) { V2FinanceScreen() }
         composable(route = Screen.Meals.route) { V2MealsScreen() }
         composable(route = Screen.Family.route) { V2FamilyScreen() }
@@ -61,7 +63,8 @@ fun V2AppNavHost(
                 onScanClick = { navController.navigate(Screen.VaultScanner.route) },
                 onStagingRequested = { vaultId ->
                     navController.navigate(Screen.PantryStaging.route(vaultId))
-                }
+                },
+                onPantryClick = { navController.navigate(Screen.Pantry.route) }
             )
         }
 
@@ -82,6 +85,10 @@ fun V2AppNavHost(
                 onBack = { navController.popBackStack() },
                 onScanProcessed = { navController.popBackStack() }
             )
+        }
+
+        composable(route = Screen.Pantry.route) {
+            PantryScreen(onBack = { navController.popBackStack() })
         }
     }
 }

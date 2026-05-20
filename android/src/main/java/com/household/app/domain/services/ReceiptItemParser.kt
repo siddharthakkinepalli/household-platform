@@ -28,6 +28,17 @@ object ReceiptItemParser {
         Regex("""(?i)\b(ec[\-\s]?karte|mastercard|visa|zahlung|gegeben|zurück|wechselgeld|kartenzahlung)\b"""),
         Regex("""(?i)^\s*(artikel|menge|preis|betrag)\s*$"""),
         Regex("""(?i)\bbar\b.*\d+[,.]\d{2}"""),
+        // Payment terminal / footer metadata
+        Regex("""(?i)\b(approved|contactless|debit|gutschrift)\b"""),
+        Regex("""(?i)\b(bezahlung|kundenbeleg|beleg-nr|trace-nr|vw-nr)\b"""),
+        Regex("""(?i)\b(terminal.?id|pos.?info|pos.?infe|as.?zeit|as.?proc|capt.?ref)\b"""),
+        // Header utility noise
+        Regex("""(?i)\b(telefon|tel\.?|uid)\b"""),
+        Regex("""(?i)\buhr(zeit)?\b"""),
+        // Address: 5-digit postal code followed by a letter (German city)
+        Regex("""\b\d{5}\s+\p{L}"""),
+        // Standalone store/chain name line (merchant header, not a product)
+        Regex("""(?i)^\s*(rewe|aldi|lidl|kaufland|edeka|penny|netto|norma|rossmann|dm)\s*$"""),
     )
 
     // Weight-based pricing: "0,452 kg x 1,29 EUR/kg"
@@ -194,10 +205,14 @@ object ReceiptItemParser {
                 ITEM_LINE_WITH_PRICE.find(workLine)?.groupValues?.getOrNull(1)?.trim()
             LINE_ENDS_WITH_PRICE.matches(workLine) ->
                 LINE_ENDS_WITH_PRICE.find(workLine)?.groupValues?.getOrNull(1)?.trim()
-            // No price found — accept only if line looks like a product name
-            !workLine.any { it.isDigit() } || workLine.contains(Regex("""[a-zA-ZäöüÄÖÜß]{3,}""")) ->
-                workLine.trim()
-            else -> null
+            // No price found — only accept if the line is mostly uppercase (German product names are ALL-CAPS)
+            else -> {
+                val letters = workLine.filter { it.isLetter() }
+                val uppercaseRatio = if (letters.length >= 4)
+                    letters.count { it.isUpperCase() }.toFloat() / letters.length
+                else 0f
+                if (uppercaseRatio >= 0.5f) workLine.trim() else null
+            }
         } ?: return null
 
         if (name.isBlank() || name.length < 2) return null

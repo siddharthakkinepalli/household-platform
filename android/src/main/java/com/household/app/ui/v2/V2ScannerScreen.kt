@@ -8,9 +8,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
@@ -45,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -56,10 +61,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.google.android.gms.tasks.Task
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import com.household.app.data.refiner.toVisionTextPayload
+import com.household.app.vault.scan.DetectionState
+import com.household.app.vault.scan.DocumentCornerDetector
+import com.household.app.vault.scan.DocumentScanner
+import com.household.app.vault.scan.FrameDetectionResult
+import com.household.app.vault.scan.LiveDocumentDetector
+import com.household.app.vault.scan.OcrEngineProvider
+import com.household.app.vault.scan.ReceiptPreprocessor
+import com.household.app.vault.scan.ScanMode
+import com.household.app.vault.scan.toViewQuad
 import com.household.app.domain.models.vault.VisionTextPayload
 import com.household.app.ui.compose.theme.EliteNavy
 import com.household.app.ui.compose.theme.LumeAmber
@@ -77,7 +87,8 @@ import kotlin.coroutines.resumeWithException
 @Composable
 fun V2ScannerScreen(
     onBack: () -> Unit,
-    onScanProcessed: () -> Unit
+    onScanProcessed: () -> Unit,
+    scanMode: ScanMode = ScanMode.RECEIPT
 ) {
     val context = LocalContext.current
     val activity = context as ComponentActivity
@@ -112,6 +123,13 @@ fun V2ScannerScreen(
         )
     }
     var isProcessing by remember { mutableStateOf(false) }
+    var detectionState by remember { mutableStateOf<DetectionState>(DetectionState.Searching) }
+
+    val liveDetector = remember {
+        LiveDocumentDetector(intervalMs = 250L) { state ->
+            detectionState = state
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -140,13 +158,16 @@ fun V2ScannerScreen(
                             context = ctx,
                             lifecycleOwner = lifecycleOwner,
                             preview = preview,
-                            imageCapture = imageCapture
+                            imageCapture = imageCapture,
+                            scanMode = scanMode,
+                            liveDetector = liveDetector,
+                            analysisExecutor = cameraExecutor
                         )
                     }
                 }
             )
 
-            ScannerOverlay()
+            ScannerOverlay(detectionState = detectionState)
 
             Column(
                 modifier = Modifier
@@ -185,7 +206,7 @@ fun V2ScannerScreen(
                                     ) {
                                         coroutineScope.launch {
                                             runCatching {
-                                                processCapturedImage(context, outFile)
+                                                processCapturedImage(context, outFile, scanMode)
                                             }.onSuccess { payload ->
                                                 viewModel.processScanResult(
                                                     visionText = payload,
@@ -225,10 +246,21 @@ fun V2ScannerScreen(
                         )
                     }
 
+                    val hintText = when {
+                        detectionState is DetectionState.NoDocument ->
+                            "Place on a plain, contrasting surface"
+                        scanMode == ScanMode.DOCUMENT ->
+                            "Align document edges with the guide"
+                        else ->
+                            "Position receipt inside the frame"
+                    }
+                    val hintColor = if (detectionState is DetectionState.NoDocument)
+                        LumeAmber else TextMain
+
                     Text(
-                        text = "Position receipt inside the frame",
+                        text = hintText,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextMain,
+                        color = hintColor,
                         modifier = Modifier.padding(top = 12.dp)
                     )
                 }
@@ -295,36 +327,91 @@ fun V2ScannerScreen(
     }
 }
 
+/**
+ * Overlay that draws detected document quad in green when found,
+ * or falls back to static amber corner brackets while searching.
+ * Uses real frame dimensions + rotation to map quad points to view space correctly.
+ */
 @Composable
-private fun ScannerOverlay() {
+private fun ScannerOverlay(detectionState: DetectionState) {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val left = size.width * 0.12f
-        val top = size.height * 0.22f
-        val right = size.width * 0.88f
-        val bottom = size.height * 0.72f
-        val corner = 62f
-        val stroke = 7f
+        val w = size.width
+        val h = size.height
 
-        drawLine(LumeAmber, Offset(left, top), Offset(left + corner, top), strokeWidth = stroke)
-        drawLine(LumeAmber, Offset(left, top), Offset(left, top + corner), strokeWidth = stroke)
-
-        drawLine(LumeAmber, Offset(right, top), Offset(right - corner, top), strokeWidth = stroke)
-        drawLine(LumeAmber, Offset(right, top), Offset(right, top + corner), strokeWidth = stroke)
-
-        drawLine(LumeAmber, Offset(left, bottom), Offset(left + corner, bottom), strokeWidth = stroke)
-        drawLine(LumeAmber, Offset(left, bottom), Offset(left, bottom - corner), strokeWidth = stroke)
-
-        drawLine(LumeAmber, Offset(right, bottom), Offset(right - corner, bottom), strokeWidth = stroke)
-        drawLine(LumeAmber, Offset(right, bottom), Offset(right, bottom - corner), strokeWidth = stroke)
+        when (val state = detectionState) {
+            is DetectionState.Found -> {
+                // Transform from sensor space (with rotation) → display space → view space
+                val scaled = state.result.toViewQuad(w, h)
+                val path = Path().apply {
+                    moveTo(scaled.topLeft.x, scaled.topLeft.y)
+                    lineTo(scaled.topRight.x, scaled.topRight.y)
+                    lineTo(scaled.bottomRight.x, scaled.bottomRight.y)
+                    lineTo(scaled.bottomLeft.x, scaled.bottomLeft.y)
+                    close()
+                }
+                drawPath(path, Color(0xFF4CAF50), style = Stroke(width = 5f))
+            }
+            is DetectionState.NoDocument -> {
+                // Red-tinted brackets signal "move to better surface"
+                drawGuideBrackets(w, h, Color(0xFFFF5252))
+            }
+            is DetectionState.Searching -> {
+                drawGuideBrackets(w, h, LumeAmber)
+            }
+        }
     }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGuideBrackets(
+    w: Float, h: Float, color: Color
+) {
+    val left   = w * 0.05f
+    val top    = h * 0.08f
+    val right  = w * 0.95f
+    val bottom = h * 0.88f
+    val corner = 62f
+    val stroke = 7f
+
+    drawLine(color, Offset(left, top), Offset(left + corner, top), strokeWidth = stroke)
+    drawLine(color, Offset(left, top), Offset(left, top + corner), strokeWidth = stroke)
+    drawLine(color, Offset(right, top), Offset(right - corner, top), strokeWidth = stroke)
+    drawLine(color, Offset(right, top), Offset(right, top + corner), strokeWidth = stroke)
+    drawLine(color, Offset(left, bottom), Offset(left + corner, bottom), strokeWidth = stroke)
+    drawLine(color, Offset(left, bottom), Offset(left, bottom - corner), strokeWidth = stroke)
+    drawLine(color, Offset(right, bottom), Offset(right - corner, bottom), strokeWidth = stroke)
+    drawLine(color, Offset(right, bottom), Offset(right, bottom - corner), strokeWidth = stroke)
 }
 
 private fun bindCamera(
     context: android.content.Context,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
     preview: Preview,
-    imageCapture: ImageCapture
+    imageCapture: ImageCapture,
+    scanMode: ScanMode,
+    liveDetector: LiveDocumentDetector,
+    analysisExecutor: java.util.concurrent.Executor
 ) {
+    val imageAnalysis = ImageAnalysis.Builder()
+        .setResolutionSelector(
+            ResolutionSelector.Builder()
+                .setResolutionStrategy(
+                    ResolutionStrategy(
+                        android.util.Size(640, 480),
+                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                    )
+                )
+                .build()
+        )
+        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+        .build()
+        .also {
+            it.setAnalyzer(analysisExecutor) { image ->
+                // Skip Canny/contour pass entirely in receipt mode — no quad overlay needed
+                if (scanMode == ScanMode.DOCUMENT) liveDetector.analyze(image)
+                else image.close()
+            }
+        }
+
     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
     cameraProviderFuture.addListener(
         {
@@ -334,7 +421,8 @@ private fun bindCamera(
                 lifecycleOwner,
                 CameraSelector.DEFAULT_BACK_CAMERA,
                 preview,
-                imageCapture
+                imageCapture,
+                imageAnalysis
             )
         },
         ContextCompat.getMainExecutor(context)
@@ -343,15 +431,14 @@ private fun bindCamera(
 
 private suspend fun processCapturedImage(
     context: android.content.Context,
-    file: File
+    file: File,
+    scanMode: ScanMode
 ): VisionTextPayload = withContext(Dispatchers.IO) {
-    val inputImage = InputImage.fromFilePath(context, file.toUri())
-    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    try {
-        recognizer.process(inputImage).awaitResult().toVisionTextPayload()
-    } finally {
-        recognizer.close()
+    val enhanced = when (scanMode) {
+        ScanMode.RECEIPT  -> ReceiptPreprocessor.process(file)   // CLAHE + bilateral, no warp
+        ScanMode.DOCUMENT -> DocumentScanner.process(file)       // detect → warp → binarize
     }
+    OcrEngineProvider.engine.recognize(context, enhanced.toUri())
 }
 
 private suspend fun <T> Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->

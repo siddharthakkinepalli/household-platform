@@ -63,7 +63,8 @@ import kotlin.math.abs
 
 @Composable
 fun V2HomeScreen(
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    onNavigateToVault: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val budgetRunway = remember(state.balanceValue, state.salaryAnchorDay) {
@@ -186,7 +187,7 @@ fun V2HomeScreen(
                     subtitle = "${state.unlinkedVaultCount} scans waiting to be matched to expenses",
                     icon     = Icons.Rounded.ReceiptLong,
                     color    = LumeAmber,
-                    onClick  = {}
+                    onClick  = onNavigateToVault
                 )
             }
 

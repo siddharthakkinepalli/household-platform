@@ -33,6 +33,7 @@ sealed class Screen(
     object PantryStaging : Screen("pantry_staging/{vaultId}", Icons.Rounded.ShoppingCart, "Pantry") {
         fun route(vaultId: Long) = "pantry_staging/$vaultId"
     }
+    object Pantry : Screen("pantry", Icons.Rounded.ShoppingCart, "Pantry")
     object Family : Screen("family", Icons.Rounded.Group,                 "Family")
     object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
 

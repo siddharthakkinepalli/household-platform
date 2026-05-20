@@ -2,14 +2,27 @@ package com.household.app.ui.v2
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,49 +36,77 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.DocumentScanner
+import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.activity.ComponentActivity
 import com.household.app.data.entities.VaultEntity
+import com.household.app.domain.models.vault.VaultCategory
 import com.household.app.ui.compose.theme.ConfigAccent
 import com.household.app.ui.compose.theme.EliteNavy
 import com.household.app.ui.compose.theme.LumeAmber
 import com.household.app.ui.compose.theme.LumeEmerald
+import com.household.app.ui.compose.theme.LumePurple
+import com.household.app.ui.compose.theme.LumeWhite
 import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.v2.components.ConfirmScanSheet
@@ -73,57 +114,96 @@ import com.household.app.ui.v2.components.EliteGlassCard
 import com.household.app.ui.v2.components.ScanConfirmationState
 import com.household.app.ui.viewmodels.VaultUiState
 import com.household.app.ui.viewmodels.VaultViewModel
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun V2DocumentVaultScreen(
     onScanClick: () -> Unit = {},
-    onStagingRequested: (vaultId: Long) -> Unit = {}
+    onStagingRequested: (vaultId: Long) -> Unit = {},
+    onPantryClick: () -> Unit = {}
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val activity = context as ComponentActivity
     val viewModel: VaultViewModel = viewModel(
         viewModelStoreOwner = activity,
         factory = viewModelFactory {
-            initializer {
-                VaultViewModel(context.applicationContext as android.app.Application)
-            }
+            initializer { VaultViewModel(context.applicationContext as android.app.Application) }
         }
     )
     val vaultUiState by viewModel.uiState.collectAsStateWithLifecycle()
     val vaultEntries by viewModel.vaultEntries.collectAsStateWithLifecycle()
+    val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
+
+    var fabExpanded by remember { mutableStateOf(false) }
+    var selectedEntry by remember { mutableStateOf<VaultEntity?>(null) }
+    var showUploadSheet by remember { mutableStateOf(false) }
+    var pendingUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingMime by remember { mutableStateOf("application/octet-stream") }
+
+    val filePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        fabExpanded = false
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            pendingUri = uri
+            pendingMime = mime
+            showUploadSheet = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.uiState
             .filterIsInstance<VaultUiState.ScanSaved>()
             .collect { saved ->
-                val vaultId = saved.vaultId
-                onStagingRequested(vaultId)
+                onStagingRequested(saved.vaultId)
                 viewModel.acknowledgeScanned()
             }
     }
 
     Scaffold(
-        topBar = { VaultTopBar() },
+        topBar = { VaultTopBar(onPantryClick = onPantryClick) },
         floatingActionButton = {
-            ScanFAB(
-                onClick = onScanClick
+            VaultFab(
+                expanded = fabExpanded,
+                onToggle = { fabExpanded = !fabExpanded },
+                onScanClick = { fabExpanded = false; onScanClick() },
+                onUploadClick = { fabExpanded = false; filePicker.launch(arrayOf("image/*", "application/pdf")) }
             )
         },
         containerColor = Color.Transparent
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            when {
-                vaultUiState is VaultUiState.Loading -> LoadingGlow()
-                vaultEntries.isEmpty()               -> EmptyVaultPrompt()
-                else                                 -> VaultGallery(vaultEntries)
+            CategoryFilterRow(
+                selected = selectedCategory,
+                onSelect = { viewModel.selectCategory(it) }
+            )
+
+            // Scrim lives INSIDE the Scaffold content so the FAB layer stays above it
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    vaultUiState is VaultUiState.Loading -> LoadingGlow()
+                    vaultEntries.isEmpty()               -> EmptyVaultPrompt(selectedCategory)
+                    else                                 -> VaultGallery(vaultEntries, onEntryClick = { selectedEntry = it })
+                }
+                if (fabExpanded) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clickable { fabExpanded = false }
+                    )
+                }
             }
         }
     }
@@ -137,13 +217,35 @@ fun V2DocumentVaultScreen(
                 vaultId = -1L
             ),
             onLinkConfirmed = { _, expenseId, editedScan ->
-                val matchedExpense = confirmState.candidates.firstOrNull { it.id.toLong() == expenseId }
-                if (matchedExpense != null) {
-                    viewModel.linkPendingScanToExpense(matchedExpense, editedScan)
-                }
+                val matched = confirmState.candidates.firstOrNull { it.id.toLong() == expenseId }
+                if (matched != null) viewModel.linkPendingScanToExpense(matched, editedScan)
             },
             onManualSave = { editedScan -> viewModel.savePendingScanToVault(editedScan) },
             onDismiss = { viewModel.dismissConfirmation() }
+        )
+    }
+
+    if (showUploadSheet && pendingUri != null) {
+        UploadDocumentSheet(
+            uri = pendingUri!!,
+            mimeType = pendingMime,
+            onSave = { category, title ->
+                viewModel.saveDocument(pendingUri!!, pendingMime, category, title)
+                showUploadSheet = false
+                pendingUri = null
+            },
+            onDismiss = { showUploadSheet = false; pendingUri = null }
+        )
+    }
+
+    selectedEntry?.let { entry ->
+        DocumentDetailSheet(
+            entry = entry,
+            onDismiss = { selectedEntry = null },
+            onDelete = { e ->
+                viewModel.deleteEntry(e.id)
+                selectedEntry = null
+            }
         )
     }
 }
@@ -152,21 +254,26 @@ fun V2DocumentVaultScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun VaultTopBar() {
+private fun VaultTopBar(onPantryClick: () -> Unit = {}) {
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text  = "VAULT",
+                    text = "VAULT",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = TextMain
                 )
                 Text(
-                    text  = "Evidence Board",
+                    text = "Document Manager",
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMuted
                 )
+            }
+        },
+        actions = {
+            IconButton(onClick = onPantryClick) {
+                Icon(Icons.Rounded.ShoppingCart, contentDescription = "Pantry", tint = LumeAmber)
             }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -176,22 +283,268 @@ private fun VaultTopBar() {
     )
 }
 
-// ── FAB ───────────────────────────────────────────────────────────────────────
+// ── Category filter chips ──────────────────────────────────────────────────────
 
 @Composable
-private fun ScanFAB(onClick: () -> Unit) {
-    FloatingActionButton(
-        onClick       = onClick,
-        shape         = CircleShape,
-        containerColor = LumeAmber,
-        contentColor  = EliteNavy,
-        modifier      = Modifier.navigationBarsPadding()
+private fun CategoryFilterRow(
+    selected: VaultCategory?,
+    onSelect: (VaultCategory?) -> Unit
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(
-            imageVector        = Icons.Rounded.DocumentScanner,
-            contentDescription = "Scan receipt",
-            modifier           = Modifier.size(24.dp)
+        item {
+            CategoryChip(
+                label = "All",
+                isSelected = selected == null,
+                onClick = { onSelect(null) }
+            )
+        }
+        items(VaultCategory.entries) { cat ->
+            CategoryChip(
+                label = cat.label,
+                isSelected = selected == cat,
+                onClick = { onSelect(if (selected == cat) null else cat) }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = isSelected,
+        onClick = onClick,
+        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = LumeAmber,
+            selectedLabelColor = EliteNavy,
+            containerColor = LumeWhite.copy(alpha = 0.08f),
+            labelColor = LumeWhite.copy(alpha = 0.7f)
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = isSelected,
+            borderColor = LumeWhite.copy(alpha = 0.15f),
+            selectedBorderColor = LumeAmber
         )
+    )
+}
+
+// ── Expandable FAB ────────────────────────────────────────────────────────────
+
+@Composable
+private fun FabOption(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(end = 4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .background(EliteNavy.copy(alpha = 0.92f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Text(label, color = LumeWhite, style = MaterialTheme.typography.labelMedium)
+        }
+        Spacer(Modifier.width(10.dp))
+        SmallFloatingActionButton(
+            onClick = onClick,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            shape = CircleShape
+        ) {
+            Icon(icon, contentDescription = label)
+        }
+    }
+}
+
+@Composable
+private fun VaultFab(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onScanClick: () -> Unit,
+    onUploadClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.End,
+        modifier = Modifier.navigationBarsPadding()
+    ) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.padding(bottom = 14.dp)
+            ) {
+                FabOption(
+                    icon = Icons.Rounded.UploadFile,
+                    label = "Upload Document",
+                    containerColor = EliteNavy,
+                    contentColor = LumeWhite,
+                    onClick = onUploadClick
+                )
+                FabOption(
+                    icon = Icons.Rounded.DocumentScanner,
+                    label = "Scan Receipt",
+                    containerColor = LumeAmber,
+                    contentColor = EliteNavy,
+                    onClick = onScanClick
+                )
+            }
+        }
+        FloatingActionButton(
+            onClick = onToggle,
+            containerColor = LumeAmber,
+            contentColor = EliteNavy,
+            shape = CircleShape
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.Close else Icons.Rounded.Add,
+                contentDescription = if (expanded) "Close" else "Add"
+            )
+        }
+    }
+}
+
+// ── Upload sheet ──────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UploadDocumentSheet(
+    uri: Uri,
+    mimeType: String,
+    onSave: (VaultCategory, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    var title by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf(VaultCategory.OTHER) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = EliteNavy,
+        dragHandle = null
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Text(
+                text = "Save Document",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = TextMain
+            )
+
+            // File preview hint
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LumeWhite.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Icon(
+                    imageVector = if (mimeType.contains("pdf")) Icons.Rounded.PictureAsPdf else Icons.Rounded.Description,
+                    contentDescription = null,
+                    tint = LumeAmber,
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = mimeType.substringAfterLast("/").uppercase(),
+                    color = LumeAmber,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            // Title input
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Document title (optional)", color = TextMuted) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextMain,
+                    unfocusedTextColor = TextMain,
+                    focusedBorderColor = LumeAmber,
+                    unfocusedBorderColor = LumeWhite.copy(alpha = 0.2f),
+                    cursorColor = LumeAmber
+                )
+            )
+
+            // Category picker
+            Text(
+                text = "Category",
+                style = MaterialTheme.typography.labelMedium,
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
+            )
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.heightIn(max = 200.dp)
+            ) {
+                items(VaultCategory.entries.size) { i ->
+                    val cat = VaultCategory.entries[i]
+                    val isSelected = cat == selectedCategory
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isSelected) LumeAmber.copy(alpha = 0.2f)
+                                else LumeWhite.copy(alpha = 0.06f)
+                            )
+                            .border(
+                                1.dp,
+                                if (isSelected) LumeAmber else LumeWhite.copy(alpha = 0.12f),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable { selectedCategory = cat }
+                            .padding(vertical = 10.dp, horizontal = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(cat.emoji, fontSize = 20.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = cat.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) LumeAmber else TextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = { onSave(selectedCategory, title) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = LumeAmber)
+            ) {
+                Text("Save to Vault", color = EliteNavy, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
@@ -201,19 +554,15 @@ private fun ScanFAB(onClick: () -> Unit) {
 private fun LoadingGlow() {
     val infiniteTransition = rememberInfiniteTransition(label = "glow_pulse")
     val alpha by infiniteTransition.animateFloat(
-        initialValue   = 0.3f,
-        targetValue    = 0.9f,
-        animationSpec  = infiniteRepeatable(
-            animation  = tween(900, easing = LinearEasing),
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_alpha"
     )
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
@@ -223,51 +572,37 @@ private fun LoadingGlow() {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector        = Icons.Rounded.DocumentScanner,
-                    contentDescription = null,
-                    tint               = LumeAmber.copy(alpha = alpha),
-                    modifier           = Modifier.size(36.dp)
+                    Icons.Rounded.DocumentScanner, null,
+                    tint = LumeAmber.copy(alpha = alpha),
+                    modifier = Modifier.size(36.dp)
                 )
             }
             Spacer(Modifier.height(16.dp))
-            Text(
-                text  = "Parsing receipt…",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextMuted.copy(alpha = alpha)
-            )
+            Text("Parsing receipt…", style = MaterialTheme.typography.bodyMedium, color = TextMuted.copy(alpha = alpha))
         }
     }
 }
 
 @Composable
-private fun EmptyVaultPrompt() {
+private fun EmptyVaultPrompt(filter: VaultCategory?) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
         EliteGlassCard(glowColor = LumeAmber.copy(alpha = 0.4f)) {
-            Column(
-                modifier            = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector        = Icons.Rounded.FolderOpen,
-                    contentDescription = null,
-                    tint               = LumeAmber,
-                    modifier           = Modifier.size(40.dp)
-                )
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Rounded.FolderOpen, null, tint = LumeAmber, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text  = "Vault is empty",
+                    text = if (filter != null) "No ${filter.label} yet" else "Vault is empty",
                     style = MaterialTheme.typography.titleSmall,
                     color = TextMain,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text  = "Tap the scan button to capture your first receipt.",
+                    text = if (filter != null) "Upload a document or scan a receipt to get started."
+                           else "Tap + to upload a document or scan a receipt.",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted
                 )
@@ -279,112 +614,319 @@ private fun EmptyVaultPrompt() {
 // ── Staggered Evidence Board ──────────────────────────────────────────────────
 
 @Composable
-private fun VaultGallery(entries: List<VaultEntity>) {
+private fun VaultGallery(entries: List<VaultEntity>, onEntryClick: (VaultEntity) -> Unit) {
     LazyVerticalStaggeredGrid(
-        columns              = StaggeredGridCells.Fixed(2),
-        modifier             = Modifier.fillMaxSize(),
-        contentPadding       = PaddingValues(
-            start  = 16.dp,
-            top    = 16.dp,
-            end    = 16.dp,
-            bottom = 80.dp
-        ),
-        verticalItemSpacing  = 16.dp,
+        columns = StaggeredGridCells.Fixed(2),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 80.dp),
+        verticalItemSpacing = 16.dp,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(entries, key = { it.id }) { entry ->
-            ReceiptCard(entry)
+            DocumentCard(entry, onClick = { onEntryClick(entry) })
         }
     }
 }
 
-// ── Receipt Card ──────────────────────────────────────────────────────────────
+// ── Document Card ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ReceiptCard(entry: VaultEntity) {
-    val glowColor = if (entry.isLinkedToExpense) LumeEmerald else LumeAmber
+private fun DocumentCard(entry: VaultEntity, onClick: () -> Unit) {
+    val category = runCatching { VaultCategory.valueOf(entry.category) }.getOrDefault(VaultCategory.OTHER)
+    val isReceipt = category == VaultCategory.RECEIPT
+    val glowColor = if (entry.isLinkedToExpense) LumeEmerald else categoryColor(category)
 
-    EliteGlassCard(
-        glowColor = glowColor,
-        modifier  = Modifier.fillMaxWidth()
-    ) {
-        // ── Thumbnail ─────────────────────────────────────────────────────────
-        AsyncReceiptImage(
-            imagePath = entry.imagePath,
-            modifier  = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 100.dp, max = 250.dp)
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-        )
+    EliteGlassCard(glowColor = glowColor, modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        // Thumbnail or document icon
+        if (isReceipt || entry.mimeType.startsWith("image")) {
+            AsyncReceiptImage(
+                imagePath = entry.imagePath,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 80.dp, max = 220.dp)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                    .background(glowColor.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (entry.mimeType.contains("pdf")) Icons.Rounded.PictureAsPdf
+                                  else Icons.Rounded.Description,
+                    contentDescription = null,
+                    tint = glowColor,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+        }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
 
-        // ── Merchant & Amount ─────────────────────────────────────────────────
-        Text(
-            text      = entry.merchantName ?: "Processing…",
-            style     = MaterialTheme.typography.bodyMedium,
-            color     = TextMain,
-            maxLines  = 1,
-            overflow  = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.height(4.dp))
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically
+        // Category badge
+        Box(
+            modifier = Modifier
+                .background(glowColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             Text(
-                text      = entry.totalAmount?.let { "€${"%.2f".format(it)}" } ?: "--",
-                style     = MaterialTheme.typography.titleSmall,
+                text = "${category.emoji} ${category.label}",
+                style = MaterialTheme.typography.labelSmall,
+                color = glowColor,
+                fontSize = 10.sp
+            )
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        // Title / merchant
+        Text(
+            text = entry.documentTitle ?: entry.merchantName ?: "Untitled",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextMain,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = entry.totalAmount?.let { "€${"%.2f".format(it)}" } ?: "",
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color     = ConfigAccent
+                color = ConfigAccent
             )
-            // ── Paperclip status icon ─────────────────────────────────────────
-            Icon(
-                imageVector        = if (entry.isLinkedToExpense) Icons.Rounded.Link else Icons.Rounded.LinkOff,
-                contentDescription = if (entry.isLinkedToExpense) "Linked" else "Unlinked",
-                tint               = glowColor.copy(alpha = 0.85f),
-                modifier           = Modifier.size(18.dp)
-            )
+            if (isReceipt) {
+                Icon(
+                    imageVector = if (entry.isLinkedToExpense) Icons.Rounded.Link else Icons.Rounded.LinkOff,
+                    contentDescription = null,
+                    tint = (if (entry.isLinkedToExpense) LumeEmerald else LumeAmber).copy(alpha = 0.85f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
 
-// ── Async receipt image loader ─────────────────────────────────────────────────
+// ── Document Detail Sheet ─────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DocumentDetailSheet(
+    entry: VaultEntity,
+    onDismiss: () -> Unit,
+    onDelete: (VaultEntity) -> Unit
+) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState()
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    val category = runCatching { VaultCategory.valueOf(entry.category) }.getOrDefault(VaultCategory.OTHER)
+    val isReceipt = category == VaultCategory.RECEIPT
+    val glowColor = if (entry.isLinkedToExpense) LumeEmerald else categoryColor(category)
+    val date = remember(entry.dateEpoch) { LocalDate.ofEpochDay(entry.dateEpoch) }
+    val dateFmt = remember { DateTimeFormatter.ofPattern("d MMM yyyy") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF0E1117)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            if (isReceipt || entry.mimeType.startsWith("image")) {
+                AsyncReceiptImage(
+                    imagePath = entry.imagePath,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(glowColor.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (entry.mimeType.contains("pdf")) Icons.Rounded.PictureAsPdf
+                                      else Icons.Rounded.Description,
+                        contentDescription = null,
+                        tint = glowColor,
+                        modifier = Modifier.size(52.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = entry.documentTitle ?: entry.merchantName ?: "Untitled",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = TextMain
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                entry.totalAmount?.let { amount ->
+                    Column {
+                        Text("Amount", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        Text("€${"%.2f".format(amount)}", style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold, color = ConfigAccent)
+                    }
+                }
+                Column {
+                    Text("Date", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text(date.format(dateFmt), style = MaterialTheme.typography.bodyLarge, color = TextMain)
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .background(glowColor.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("${category.emoji} ${category.label}", style = MaterialTheme.typography.labelSmall, color = glowColor)
+                }
+                if (isReceipt) {
+                    val linked = entry.isLinkedToExpense
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                (if (linked) LumeEmerald else LumeAmber).copy(alpha = 0.12f),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            if (linked) "Linked to expense" else "Unlinked",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (linked) LumeEmerald else LumeAmber
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (!entry.mimeType.startsWith("image")) {
+                    Button(
+                        onClick = { openFileExternally(context, entry.imagePath, entry.mimeType) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = glowColor.copy(alpha = 0.15f)),
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
+                        Icon(Icons.Rounded.OpenInNew, null, tint = glowColor, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Open", color = glowColor)
+                    }
+                }
+                Button(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4B4B).copy(alpha = 0.12f)),
+                    contentPadding = PaddingValues(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Delete, null, tint = Color(0xFFFF6B6B), modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Delete", color = Color(0xFFFF6B6B))
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete document?", color = TextMain) },
+            text = { Text("This cannot be undone.", color = TextMuted) },
+            confirmButton = {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete(entry) }) {
+                    Text("Delete", color = Color(0xFFFF6B6B))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = TextMuted) }
+            },
+            containerColor = Color(0xFF0E1117)
+        )
+    }
+}
+
+private fun openFileExternally(context: android.content.Context, path: String, mimeType: String) {
+    try {
+        val file = java.io.File(path)
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "${context.packageName}.provider", file
+        )
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeType)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        android.util.Log.e("VaultScreen", "Cannot open file: ${e.message}")
+    }
+}
+
+// ── Async image loader ─────────────────────────────────────────────────────────
 
 @Composable
 private fun AsyncReceiptImage(imagePath: String, modifier: Modifier = Modifier) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = imagePath) {
         value = withContext(Dispatchers.IO) {
             if (imagePath.isBlank()) return@withContext null
             if (imagePath.startsWith("content://")) {
-                context.contentResolver.openInputStream(android.net.Uri.parse(imagePath))
+                context.contentResolver.openInputStream(Uri.parse(imagePath))
                     ?.use { BitmapFactory.decodeStream(it) }
             } else {
                 BitmapFactory.decodeFile(imagePath)
             }
         }
     }
-
     if (bitmap != null) {
         Image(
-            bitmap             = bitmap!!.asImageBitmap(),
+            bitmap = bitmap!!.asImageBitmap(),
             contentDescription = null,
-            contentScale       = ContentScale.Crop,
-            modifier           = modifier
+            contentScale = ContentScale.Crop,
+            modifier = modifier
         )
     } else {
         Box(
-            modifier         = modifier.background(EliteNavy.copy(alpha = 0.5f)),
+            modifier = modifier.background(EliteNavy.copy(alpha = 0.5f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector        = Icons.Rounded.Description,
-                contentDescription = null,
-                tint               = TextMuted,
-                modifier           = Modifier.size(36.dp)
-            )
+            Icon(Icons.Rounded.Description, null, tint = TextMuted, modifier = Modifier.size(36.dp))
         }
     }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+private fun categoryColor(category: VaultCategory): Color = when (category) {
+    VaultCategory.RECEIPT      -> LumeAmber
+    VaultCategory.IDENTITY     -> LumePurple
+    VaultCategory.CONTRACT     -> Color(0xFF60A5FA)
+    VaultCategory.UTILITY_BILL -> Color(0xFF34D399)
+    VaultCategory.INSURANCE    -> Color(0xFFFB7185)
+    VaultCategory.MEDICAL      -> Color(0xFF4ADE80)
+    VaultCategory.OTHER        -> LumeWhite.copy(alpha = 0.5f)
 }

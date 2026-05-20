@@ -26,12 +26,14 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.household.app.domain.models.vault.VaultCategory
 import com.household.app.vault.DriveDataStore
 import com.household.app.vault.DriveSyncWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -73,14 +75,33 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow<VaultUiState>(VaultUiState.Idle)
     val uiState: StateFlow<VaultUiState> = _uiState.asStateFlow()
 
-    private val _vaultEntries = MutableStateFlow<List<VaultEntity>>(emptyList())
-    val vaultEntries: StateFlow<List<VaultEntity>> = _vaultEntries.asStateFlow()
+    private val _allEntries = MutableStateFlow<List<VaultEntity>>(emptyList())
+    private val _selectedCategory = MutableStateFlow<VaultCategory?>(null)
+    val selectedCategory: StateFlow<VaultCategory?> = _selectedCategory.asStateFlow()
+
+    val vaultEntries: StateFlow<List<VaultEntity>> = combine(_allEntries, _selectedCategory) { entries, cat ->
+        if (cat == null) entries else entries.filter { it.category == cat.name }
+    }.let { flow ->
+        val state = MutableStateFlow<List<VaultEntity>>(emptyList())
+        viewModelScope.launch { flow.collect { state.value = it } }
+        state.asStateFlow()
+    }
 
     init {
         viewModelScope.launch {
-            vaultRepository.getVaultEntries().collect { entries ->
-                _vaultEntries.value = entries
-            }
+            vaultRepository.getVaultEntries().collect { _allEntries.value = it }
+        }
+    }
+
+    fun selectCategory(category: VaultCategory?) {
+        _selectedCategory.value = category
+    }
+
+    fun saveDocument(uri: android.net.Uri, mimeType: String, category: VaultCategory, title: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val id = vaultRepository.saveDocument(uri, mimeType, category, title)
+            if (DriveDataStore.isDriveEnabled(appContext)) enqueueDriveSync(id)
+            _uiState.value = VaultUiState.Idle
         }
     }
 
@@ -118,11 +139,23 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 refinedOverride = confirmedScan
             )
 
-            // Memory-First Resolution: Pass lines through the learning pipeline
-            val lines = payload.fullText.lines().filter { it.isNotBlank() }
-            val storeName = extractStoreName(payload.fullText) // Try to detect store
+            val storeName = extractStoreName(payload.fullText)
 
-            val resolvedItems = receiptResolutionService.resolveReceiptLines(lines, id, storeName)
+            // Log raw OCR lines so we can see exactly what the camera captured
+            val rawLines = payload.fullText.lines().filter { it.isNotBlank() }
+            android.util.Log.d("ItemParser", "=== RAW OCR (${rawLines.size} lines) ===")
+            rawLines.forEachIndexed { i, l -> android.util.Log.d("ItemParser", "  [$i] '$l'") }
+
+            // Filter to actual grocery items only before passing to the resolver
+            val parsedItems = ReceiptItemParser.parse(payload.fullText)
+            android.util.Log.d("ItemParser", "=== FILTERED items (${parsedItems.size}) ===")
+            parsedItems.forEachIndexed { i, item ->
+                android.util.Log.d("ItemParser", "  [$i] '${item.name}' qty=${item.quantity} cat=${item.category}")
+            }
+
+            val resolvedItems = receiptResolutionService.resolveReceiptLines(
+                parsedItems.map { it.name }, id, storeName
+            )
 
             if (resolvedItems.isNotEmpty()) {
                 // Map resolved items to pantry (use canonical names from resolution)
@@ -178,6 +211,12 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             }
             _uiState.value = VaultUiState.Idle
             clearPending()
+        }
+    }
+
+    fun deleteEntry(id: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            vaultRepository.deleteEntry(id)
         }
     }
 
