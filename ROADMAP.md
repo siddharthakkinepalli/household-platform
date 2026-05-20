@@ -1,11 +1,35 @@
 # Household Platform — Roadmap
 
 ## Vision
-A unified household OS: tracks finances, documents, contracts, meals, pantry, family events,
-and important dates — all from a single home dashboard.
+A private household operating system with contextual intelligence.
+Not "AI organiser." A household memory and decision system.
 
-The AI layer is what transforms it from a smart database into a proactive household assistant
-that tells you things you didn't know you needed to know.
+Tracks finances, documents, contracts, meals, pantry, family events, and important dates.
+Intelligence layer surfaces what you didn't know you needed to know.
+
+---
+
+## Phase Model
+
+**Phase 1 — Deterministic Infrastructure** ← current stage
+Reliable ingestion, normalization, persistence, retrieval, domain modeling.
+Optimises for: trust, explainability, offline support, predictable behavior, zero cost.
+This is correct. Household systems require trust above all else.
+Users tolerate "AI is limited." They do not tolerate wrong bill totals or hallucinated dates.
+
+**Phase 2 — Intelligence Foundations**
+Canonical entity layer, LLM extraction pipeline with validation, vectorized memory.
+Prerequisite for everything in Phase 3. Cannot skip.
+
+**Phase 3 — Household Cognition**
+Insight engine: cross-domain, proactive, longitudinal.
+Financial drift. Expiration intelligence. Consumption patterns. Family coordination.
+This is the product moat — not the LLM, but the accumulated household context.
+
+**Phase 4 — Conversational Interface**
+Natural language queries over a mature data layer.
+Only valuable after Phase 3. Without proactive intelligence beneath it, chat becomes
+"search, but slower."
 
 ---
 
@@ -131,90 +155,181 @@ Checkpoints:
 
 ---
 
-## AI Layer — Where It Becomes a Real Household Assistant 🤖
+## Phase 2 — Intelligence Foundations 🧱
 
-This is what separates a smart document store from a proactive AI tool.
-The app has all the data — expenses, documents, contracts, pantry, family, calendar.
-The AI layer connects it and surfaces things the user didn't know they needed to know.
+These are prerequisites. The insight engine and conversational layer cannot function
+reliably without this layer being solid first.
 
-### AI-1. LLM Document Understanding (replace rule-based parsers)
-Current `WeightedReceiptRefiner` and planned `DocumentRefiner` are regex + scoring heuristics.
-They break on unusual formats and require constant maintenance.
+### AI-0. Canonical Entity Normalization (highest leverage, build first)
+This is underestimated and more important than the LLM itself.
+Without it, insights are noisy, trends are unreliable, and AI context quality degrades.
 
-Replace with a single LLM call per document:
-- Receipt → `{merchant, total, date, line_items[], tax}`
-- Contract → `{type, parties, start_date, end_date, notice_period, monthly_cost, auto_renewal, key_clauses[]}`
+The problem:
+```
+"Vodafone GmbH" / "Vodafone" / "VODAFONE DE" / "VF D2"  →  provider: Vodafone, category: Telecom
+"REWE" / "Rewe Markt" / "REWE Kevin Junker oHG"          →  merchant: REWE, category: Grocery
+"HUK-Coburg" / "HUK COBURG" / "HUK Versicherung"         →  provider: HUK-Coburg, category: Insurance
+```
+
+Every domain has this problem: merchants, utility providers, insurance companies,
+subscription services, family member names, recurring payees.
+
+Checkpoints:
+- [ ] `EntityRegistry` — canonical store: `(id, canonicalName, aliases[], category, metadata)`
+- [ ] Fuzzy match on ingest: Levenshtein + token overlap, confidence-scored
+- [ ] Auto-suggest canonical match on new entity, user confirms or creates new
+- [ ] Pre-seed with common German merchants, utilities, insurers, telecoms
+- [ ] All existing records link to canonical entity (not raw string)
+- [ ] Canonical name used in all insights, trends, and LLM context — never raw OCR strings
+- [ ] Admin screen to view/edit/merge canonical entities
+
+### AI-1. LLM Extraction Pipeline with Validation
+Current regex refiners are Phase 1 — correct for now, but maintenance cost grows
+exponentially as receipt formats, layouts, OCR drift, and languages diversify.
+
+The transition is gradual, not a rewrite:
+- Keep deterministic refiners as the baseline
+- Add LLM as fallback when confidence < threshold
+- Validate ALL LLM output deterministically before persisting
+- Never trust raw LLM output for financial or legal records
+
+**Production pipeline (the right architecture):**
+```
+OCR text
+  → LLM extraction  (structured JSON output)
+  → Validation layer (deterministic checks)
+  → Confidence scoring
+  → User confirmation (if confidence < threshold)
+  → Persistence
+```
+
+**Validation layer checks (non-negotiable):**
+- Does extracted total appear verbatim in OCR text?
+- Is date parseable and plausible (not in the future, not > 10 years ago)?
+- Does currency match document language/region?
+- Line item sum ≈ total (within rounding)?
+- VAT math plausible for stated category?
+- Is this a duplicate of a recently stored document?
+- Does merchant name exist in entity registry?
+
+LLM extraction targets:
+- Receipt → `{merchant, total, date, line_items[], tax_rate, currency}`
+- Contract → `{type, parties, start_date, end_date, notice_period_days, monthly_cost, auto_renewal}`
 - Insurance → `{provider, policy_number, coverage_type, renewal_date, annual_premium}`
-- Utility bill → `{provider, billing_period, amount_due, due_date, consumption}`
+- Utility bill → `{provider, billing_period, amount_due, due_date, consumption_kwh}`
 
 Checkpoints:
-- [ ] `DocumentUnderstandingService` — wraps LLM API call, returns structured JSON
-- [ ] Gemini API integration (primary) with Claude API as fallback
-- [ ] Confidence threshold: if confidence < 0.7, fall back to current rule-based parser
-- [ ] Privacy gate: explicit user opt-in before any document text leaves the device
-- [ ] On-device fallback: Gemini Nano (via Google AI Edge SDK) for basic extraction
-      on supported devices (Pixel 8+, Samsung S24+) without internet/API cost
-- [ ] Structured output replaces `RefinedScan` and feeds directly into `DateEvent` creation
+- [ ] `LLMExtractionService` — wraps API call, returns typed structured output
+- [ ] `ExtractionValidator` — deterministic validation layer, returns `ValidationResult`
+- [ ] Gradual rollout: LLM as fallback first, promote to primary once validated
+- [ ] Gemini API primary, Claude API secondary (both support structured output / JSON mode)
+- [ ] On-device: Gemini Nano for basic classification on supported devices (Pixel 8+, S24+)
+- [ ] Privacy gate: explicit per-document opt-in before text leaves device
+- [ ] Confidence score surfaces in UI — user sees when extraction is uncertain
 
-### AI-2. The Insight Engine (proactive, cross-domain intelligence)
-A background job (WorkManager, runs daily) that looks across ALL stored data and generates
-actionable insights the user didn't ask for. This is the core differentiator.
-
-Examples of real insights:
-- "Your electricity bill has increased 8% every quarter — you may be on the wrong tariff"
-- "Car insurance renews in 6 weeks. You have 3 insurance contracts — bundling could save money"
-- "You've bought milk 24 times in 6 months but it never appears in meal plans — possible waste"
-- "Grocery spend is 2× normal this month and salary is 4 days away — heads up"
-- "Your gym membership renews tomorrow. You haven't scanned a receipt for it in 3 months"
+### AI-2. Vectorized Household Memory
+Required for semantic querying, similarity search, and giving the LLM
+useful context without dumping the entire database into a prompt.
 
 Checkpoints:
-- [ ] `InsightEngine` — scheduled WorkManager job, runs nightly
-- [ ] Reads across: expenses (last 6 months), vault (all docs), pantry, family, date events
-- [ ] LLM prompt with structured household data → returns ranked list of insights
-- [ ] `HouseholdInsight` model: `(id, title, body, type, priority, sourceIds[], createdAt, isDismissed)`
-- [ ] Home screen insight card (already has the slot) powered by real AI insights, not static rules
-- [ ] Dismiss / snooze / act on insight
-- [ ] Insight types: COST_ALERT, RENEWAL_WARNING, PATTERN, ANOMALY, SUGGESTION
+- [ ] Embed all stored text (document OCR, expense descriptions, pantry items, notes)
+      using on-device embedding model (MiniLM via ONNX / TFLite)
+- [ ] Vector store (SQLite with sqlite-vec extension, or local FAISS index)
+- [ ] Semantic search: "find all documents related to my car" → nearest neighbors
+- [ ] Context retrieval for insight engine: given an insight topic, fetch relevant
+      document chunks rather than all raw data
+- [ ] Re-embed on document update; background job for initial indexing of existing vault
 
-### AI-3. Natural Language Query Interface
-The app has all the data. Users should be able to ask questions instead of navigating screens.
+---
 
-- "When does my internet contract end?"
-- "How much did we spend on groceries in April?"
-- "What's expiring in the next 60 days?"
-- "Do I have eggs in the pantry?"
-- "What was the last electricity bill amount?"
+## Phase 3 — Household Cognition 🧠
+
+The product moat. Not the LLM — the accumulated longitudinal household context.
+
+### AI-3. Insight Engine
+Background job (WorkManager, nightly) — reads across ALL domains, generates ranked
+insights the user did not ask for. This is the core differentiator.
+
+**Four insight categories:**
+
+**Financial drift detection** — households are terrible at noticing slow financial leakage
+- Utility cost creep: "Electricity up 8% every quarter for a year — check your tariff"
+- Subscription accumulation: "You have 7 active subscriptions totalling €94/month"
+- Insurance duplication: "3 separate accident insurance policies detected"
+- Spending deviation: "Dining spend 2× normal this month, salary in 4 days"
+- Recurring cost forecasting: "Based on history, expect ~€340 in fixed costs this month"
+
+**Expiration intelligence** — especially critical in Germany where contracts auto-renew
+- Contract notice windows: "Lease ends March 2026, notice deadline is December 2025"
+- Auto-renewal alert: "Gym contract renews in 3 weeks — last chance to cancel"
+- Document expiry: passport, driving licence, visa, residence permit
+- Warranty expiry: "Washing machine warranty expires next month"
+- Tax / filing deadlines
+
+**Consumption intelligence** — makes the pantry genuinely useful
+- Food waste signal: "Bought milk 24× in 6 months, rarely appears in meal plans"
+- Depletion forecast: "Based on purchase frequency, eggs likely running low"
+- Meal-vs-purchase mismatch: "Planned pasta week but no pasta in pantry"
+- Seasonal patterns: "Heating costs spike in Oct — budget accordingly"
+
+**Family operational coordination**
+- Overlapping appointments / travel conflicts
+- School document tracking and deadlines
+- Vaccination and medical appointment gaps
+- Vehicle maintenance schedules (MOT, service intervals)
+- Shared shopping — item requested by family member vs pantry stock
 
 Checkpoints:
-- [ ] `HouseholdQueryService` — takes natural language query, builds context from DB,
-      calls LLM, returns structured answer + source references
-- [ ] Chat-style UI on home screen (bottom sheet or dedicated tab)
-- [ ] Context window: inject relevant DB summaries (not raw data) to manage token cost
-- [ ] Source citations — answer links to the document/expense it came from
-- [ ] Voice input via Android SpeechRecognizer (optional, later)
+- [ ] `InsightEngine` service — WorkManager, nightly, reads structured summaries not raw data
+- [ ] `HouseholdInsight` model: `(id, title, body, category, priority, sourceIds[], actionRoute, isDismissed)`
+- [ ] Insight categories: `FINANCIAL_DRIFT`, `EXPIRATION`, `CONSUMPTION`, `FAMILY_OPS`, `ANOMALY`
+- [ ] Context builder: constructs minimal structured summary per domain for LLM prompt
+      (never raw document text — summaries only, to minimise data exposure and token cost)
+- [ ] Home screen powered by real InsightEngine output, not static heuristics
+- [ ] Dismiss / snooze (remind in N days) / act (deep-link to source)
+- [ ] Insight history — user can review past surfaced insights
+- [ ] Feedback loop: dismissed vs acted-on insights improve future relevance ranking
 
-### AI-4. Smart Receipt & Pantry Intelligence
-- [ ] LLM fallback for receipts where rule-based confidence < 0.6
-- [ ] Item deduplication: "H-MILCH 1,5%" and "MILCH 1.5%" are the same product
-- [ ] Auto-categorise pantry items using embeddings (better than keyword matching)
-- [ ] "Running low" prediction: if you buy milk every 5 days and last bought 4 days ago, flag it
-- [ ] Shopping list generation: cross-check pantry against planned meals → what to buy
+---
 
-### Architecture Decision: On-Device vs Cloud
-Privacy is critical for a household app (contracts, finances, family data).
+## Phase 4 — Conversational Interface 💬
 
-| Task | Approach |
-|------|----------|
-| Receipt parsing (basic) | On-device — current rule-based, fast, free |
-| Receipt parsing (fallback) | Gemini Nano on-device if available, else Gemini API |
-| Document understanding (contracts etc.) | Gemini/Claude API — with explicit user consent |
-| Insight engine | Gemini/Claude API — summarised data, no raw document text |
-| NL query | Gemini/Claude API — context-injected, not full document dump |
-| Pantry categorisation | On-device embedding model (TFLite) |
+Built last, on top of a mature data layer. Without Phase 3 beneath it, this becomes
+"search, but slower."
 
-- [ ] Settings screen: AI preferences — on-device only / allow cloud / API key (BYO)
-- [ ] Data minimisation: send summaries and structured data to API, never raw document images
-- [ ] Clear user-facing explanation of what is and isn't sent to the cloud
+### AI-4. Natural Language Query
+- [ ] `HouseholdQueryService` — NL query → vector retrieval → LLM answer + source refs
+- [ ] Context injection: fetch relevant chunks via vector memory (AI-2), not full DB dump
+- [ ] Source citations: every answer links to the document/expense it came from
+- [ ] Query scope declared in prompt: only answer from household data, no hallucination
+- [ ] Chat UI: home screen bottom sheet, persisted query history
+- [ ] Voice input via Android SpeechRecognizer (future)
+
+---
+
+## Privacy & On-Device Architecture
+
+Household data is among the most sensitive: contracts, finances, family identities,
+addresses, children's data. This is not optional — especially for European users (GDPR).
+
+| Task | Where it runs | Rationale |
+|------|--------------|-----------|
+| OCR | On-device (ML Kit) | Always offline, no exposure |
+| Entity matching / classification | On-device | Fast, deterministic, free |
+| Embeddings / vector search | On-device (ONNX/TFLite) | Sensitive text never leaves |
+| Receipt extraction (basic) | On-device rule-based | Current system, reliable |
+| Receipt extraction (complex) | Gemini Nano on-device → Gemini API | Fallback chain |
+| Contract / doc understanding | Cloud API (Gemini / Claude) | Explicit consent required |
+| Insight engine context | Cloud API — structured summaries only | Never raw document text |
+| NL query context | Cloud API — retrieved chunks only | Minimal exposure |
+
+Checkpoints:
+- [ ] AI settings screen: on-device only / allow cloud (per document type) / BYO API key
+- [ ] Per-document cloud consent prompt (shown once per vault category, remembered)
+- [ ] Data minimisation enforced in code: `ContextBuilder` never includes raw OCR strings
+      in cloud-bound payloads — only structured extracted fields and summaries
+- [ ] Audit log: what was sent to cloud API, when, for which document ID
+- [ ] Full on-device mode must remain functional (degraded intelligence, not broken app)
 
 ---
 
