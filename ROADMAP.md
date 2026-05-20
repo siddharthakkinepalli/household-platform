@@ -4,6 +4,9 @@
 A unified household OS: tracks finances, documents, contracts, meals, pantry, family events,
 and important dates — all from a single home dashboard.
 
+The AI layer is what transforms it from a smart database into a proactive household assistant
+that tells you things you didn't know you needed to know.
+
 ---
 
 ## Done ✅
@@ -125,6 +128,93 @@ Checkpoints:
 - [ ] Pass PDF text (extracted via PdfRenderer + MLKit) through `DocumentRefiner`
       for date extraction (feeds into Important Dates system)
 - [ ] Thumbnail generation from first page for vault gallery card
+
+---
+
+## AI Layer — Where It Becomes a Real Household Assistant 🤖
+
+This is what separates a smart document store from a proactive AI tool.
+The app has all the data — expenses, documents, contracts, pantry, family, calendar.
+The AI layer connects it and surfaces things the user didn't know they needed to know.
+
+### AI-1. LLM Document Understanding (replace rule-based parsers)
+Current `WeightedReceiptRefiner` and planned `DocumentRefiner` are regex + scoring heuristics.
+They break on unusual formats and require constant maintenance.
+
+Replace with a single LLM call per document:
+- Receipt → `{merchant, total, date, line_items[], tax}`
+- Contract → `{type, parties, start_date, end_date, notice_period, monthly_cost, auto_renewal, key_clauses[]}`
+- Insurance → `{provider, policy_number, coverage_type, renewal_date, annual_premium}`
+- Utility bill → `{provider, billing_period, amount_due, due_date, consumption}`
+
+Checkpoints:
+- [ ] `DocumentUnderstandingService` — wraps LLM API call, returns structured JSON
+- [ ] Gemini API integration (primary) with Claude API as fallback
+- [ ] Confidence threshold: if confidence < 0.7, fall back to current rule-based parser
+- [ ] Privacy gate: explicit user opt-in before any document text leaves the device
+- [ ] On-device fallback: Gemini Nano (via Google AI Edge SDK) for basic extraction
+      on supported devices (Pixel 8+, Samsung S24+) without internet/API cost
+- [ ] Structured output replaces `RefinedScan` and feeds directly into `DateEvent` creation
+
+### AI-2. The Insight Engine (proactive, cross-domain intelligence)
+A background job (WorkManager, runs daily) that looks across ALL stored data and generates
+actionable insights the user didn't ask for. This is the core differentiator.
+
+Examples of real insights:
+- "Your electricity bill has increased 8% every quarter — you may be on the wrong tariff"
+- "Car insurance renews in 6 weeks. You have 3 insurance contracts — bundling could save money"
+- "You've bought milk 24 times in 6 months but it never appears in meal plans — possible waste"
+- "Grocery spend is 2× normal this month and salary is 4 days away — heads up"
+- "Your gym membership renews tomorrow. You haven't scanned a receipt for it in 3 months"
+
+Checkpoints:
+- [ ] `InsightEngine` — scheduled WorkManager job, runs nightly
+- [ ] Reads across: expenses (last 6 months), vault (all docs), pantry, family, date events
+- [ ] LLM prompt with structured household data → returns ranked list of insights
+- [ ] `HouseholdInsight` model: `(id, title, body, type, priority, sourceIds[], createdAt, isDismissed)`
+- [ ] Home screen insight card (already has the slot) powered by real AI insights, not static rules
+- [ ] Dismiss / snooze / act on insight
+- [ ] Insight types: COST_ALERT, RENEWAL_WARNING, PATTERN, ANOMALY, SUGGESTION
+
+### AI-3. Natural Language Query Interface
+The app has all the data. Users should be able to ask questions instead of navigating screens.
+
+- "When does my internet contract end?"
+- "How much did we spend on groceries in April?"
+- "What's expiring in the next 60 days?"
+- "Do I have eggs in the pantry?"
+- "What was the last electricity bill amount?"
+
+Checkpoints:
+- [ ] `HouseholdQueryService` — takes natural language query, builds context from DB,
+      calls LLM, returns structured answer + source references
+- [ ] Chat-style UI on home screen (bottom sheet or dedicated tab)
+- [ ] Context window: inject relevant DB summaries (not raw data) to manage token cost
+- [ ] Source citations — answer links to the document/expense it came from
+- [ ] Voice input via Android SpeechRecognizer (optional, later)
+
+### AI-4. Smart Receipt & Pantry Intelligence
+- [ ] LLM fallback for receipts where rule-based confidence < 0.6
+- [ ] Item deduplication: "H-MILCH 1,5%" and "MILCH 1.5%" are the same product
+- [ ] Auto-categorise pantry items using embeddings (better than keyword matching)
+- [ ] "Running low" prediction: if you buy milk every 5 days and last bought 4 days ago, flag it
+- [ ] Shopping list generation: cross-check pantry against planned meals → what to buy
+
+### Architecture Decision: On-Device vs Cloud
+Privacy is critical for a household app (contracts, finances, family data).
+
+| Task | Approach |
+|------|----------|
+| Receipt parsing (basic) | On-device — current rule-based, fast, free |
+| Receipt parsing (fallback) | Gemini Nano on-device if available, else Gemini API |
+| Document understanding (contracts etc.) | Gemini/Claude API — with explicit user consent |
+| Insight engine | Gemini/Claude API — summarised data, no raw document text |
+| NL query | Gemini/Claude API — context-injected, not full document dump |
+| Pantry categorisation | On-device embedding model (TFLite) |
+
+- [ ] Settings screen: AI preferences — on-device only / allow cloud / API key (BYO)
+- [ ] Data minimisation: send summaries and structured data to API, never raw document images
+- [ ] Clear user-facing explanation of what is and isn't sent to the cloud
 
 ---
 
