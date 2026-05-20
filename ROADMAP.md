@@ -100,6 +100,32 @@ Turn it into a real household command centre.
 - [ ] Configurable reminder lead time per event (1 day / 1 week / 1 month)
 - [ ] Notification taps deep-link to relevant screen
 
+### 8. Multi-Page Document Scanning
+Current camera is single-page and optimised for receipts. Contracts, insurance policies,
+and lease agreements are multi-page — they need a different scanning flow.
+
+**Decision: use ML Kit Document Scanner API, not a custom implementation.**
+
+Google's `GmsDocumentScanner` (play-services-mlkit-document-scanner) is essentially
+built-in CamScanner: automatic page detection, perspective correction, enhancement
+(colour / grayscale / B&W), multi-page capture, and native PDF output.
+Building it ourselves (page stitching + perspective warp + PDF generation) would be
+months of work for an inferior result.
+
+The existing upload flow already accepts PDFs and serves as the fallback for users who
+already have a scanned PDF from CamScanner / Adobe Scan / their phone's built-in scanner.
+
+Checkpoints:
+- [ ] Add `play-services-mlkit-document-scanner` dependency
+- [ ] New `DocumentScannerLauncher` wrapper — calls `GmsDocumentScannerOptions.Builder`
+      with `setPageLimit(20)`, `setResultFormats(PDF + JPEG)`, `setGalleryImportAllowed(true)`
+- [ ] FAB "Scan Document" option launches `GmsDocumentScanner` instead of custom camera
+      (keep existing receipt scanner as a separate "Scan Receipt" option)
+- [ ] On result: save the PDF via `FileStorageService`, store in vault with detected category
+- [ ] Pass PDF text (extracted via PdfRenderer + MLKit) through `DocumentRefiner`
+      for date extraction (feeds into Important Dates system)
+- [ ] Thumbnail generation from first page for vault gallery card
+
 ---
 
 ## Later / Nice to Have 💡
