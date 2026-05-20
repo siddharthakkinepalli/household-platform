@@ -127,6 +127,81 @@ Turn it into a real household command centre.
 - [ ] Configurable reminder lead time per event (1 day / 1 week / 1 month)
 - [ ] Notification taps deep-link to relevant screen
 
+### 9. Expense Categorization Engine
+Current categorization is basic. PayPal transactions are the core problem — they arrive
+as `PAYPAL *DEUTSCHE BA` or `PAYPAL *LIEFERANDO`. The bank sees PayPal. The actual
+merchant is buried in the reference. Wrong category every time.
+
+**Two-layer solution:**
+
+**Layer 1 — PayPal sub-merchant extraction**
+Detect `PAYPAL *{merchant}` pattern in transaction description, extract the merchant
+fragment, run categorization on that instead of the parent string "PayPal".
+Same pattern applies to: `AMAZON MKTP *{seller}`, `APPLE.COM/BILL *{app}`, etc.
+
+**Layer 2 — Keyword rules engine**
+A configurable table: `(keyword, matchType: CONTAINS/STARTS_WITH/EXACT, category, priority, isUserDefined)`
+Pre-seeded with common German merchants:
+
+| Keyword | Category |
+|---------|----------|
+| Deutsche Bahn, DB Vertrieb | Transport |
+| Lieferando, Takeaway, Deliveroo, Uber Eats | Dining |
+| Uber (lower priority than Uber Eats) | Transport |
+| Netflix, Spotify, Disney, Amazon Prime | Entertainment |
+| Google, Apple | Shopping (user-overridable) |
+| Apotheke, DocMorris | Health |
+| ARAL, Shell, Esso, Tankstelle | Transport |
+| Rewe, Lidl, Aldi, Edeka, Kaufland | Groceries |
+| dm, Rossmann | Household |
+
+**Reclassification + learning loop**
+User taps any expense → changes category → app asks "always classify [merchant] as [category]?"
+→ adds a user-defined rule to the table → applies retroactively to all matching past transactions.
+
+Checkpoints:
+- [ ] `MerchantRule` model: `(id, keyword, matchType, category, priority, isUserDefined)`
+- [ ] Room table + DAO for merchant rules
+- [ ] Pre-seed with ~40 common German merchant rules on first launch
+- [ ] `TransactionCategorizer` service — runs rules in priority order on every transaction
+- [ ] PayPal / Amazon / Apple sub-merchant extractor (regex on description field)
+- [ ] Runs on CSV import and on every manual expense entry
+- [ ] Reclassify UI: tap expense → category picker → "apply to all similar?" prompt
+- [ ] "Apply to all similar" retroactively re-categorises matching past transactions
+- [ ] Rules management screen in Config: view, edit, delete user-defined rules
+
+### 10. Local Backup & Restore (no cloud required)
+Drive sync is a sync mechanism. It is not a backup.
+If Drive is disabled and the phone is reset, all data is currently gone.
+This is a critical gap — independent of any sync choice.
+
+**Export:**
+- Single tap in Settings → exports full household data as a JSON file
+- Written to `Downloads/jugaad-backup-{date}.json`
+- User decides what to do with it — email, copy to PC, save to SD card
+- 100% offline, no accounts, no internet
+- Includes: expenses, vault metadata, pantry, date events, merchant rules, family
+- Does NOT include receipt images by default (large files) — optional separate export
+
+**Restore:**
+- Settings → "Restore from backup" → file picker
+- Reads JSON, validates schema version, repopulates all Room tables
+- Warns if restoring over existing data ("This will replace all current data")
+- Images restored separately if the image backup was also saved
+
+**Auto-backup prompt:**
+- After every 10 new expenses or vault entries, nudge: "You have unsaved changes — back up?"
+- User can dismiss or set "remind me monthly"
+
+Checkpoints:
+- [ ] `HouseholdExportSerializer` — serialises all Room entities to typed JSON
+- [ ] `HouseholdImportDeserializer` — validates + deserialises, handles schema version mismatches
+- [ ] Export writes to `Downloads/` via `MediaStore` (no storage permission needed on Android 10+)
+- [ ] Restore file picker via `ActivityResultContracts.OpenDocument`
+- [ ] Restore confirmation dialog with data summary ("replacing 847 expenses, 34 vault entries…")
+- [ ] Settings screen entries: "Export backup" + "Restore from backup"
+- [ ] Auto-backup nudge — WorkManager monthly reminder if no backup in 30 days
+
 ### 8. Multi-Page Document Scanning
 Current camera is single-page and optimised for receipts. Contracts, insurance policies,
 and lease agreements are multi-page — they need a different scanning flow.
@@ -344,6 +419,10 @@ read-only by design, so there are zero write conflicts.
 Privacy: meaningfully better than Firebase. Drive is file storage — Google sees files in
 your account. Firebase is a queryable database — Google can index structured records.
 
+**Important distinction**: Drive sync ≠ backup. Drive sync is for multi-device access.
+Local backup/restore (roadmap item 10) is the safety net for users who don't use Drive
+or want an offline copy regardless. Both should exist independently.
+
 ### How it works
 
 Primary phone owns a Drive folder `Jugaad Household/` containing a full snapshot of all
@@ -430,6 +509,82 @@ WiFi sync = speed. Drive sync = persistence and pairing. Together they cover bot
 - [ ] Delta endpoint: `GET /sync/since/{timestamp}` — only changed records
 - [ ] WiFi sync takes priority over Drive sync when primary is reachable
 - [ ] Graceful fallback: if WiFi sync fails, Drive sync runs as normal
+
+---
+
+## Execution Plan — Phase Map
+
+Dependencies flow downward. Parallel streams within a phase can run simultaneously.
+Every agent must produce a green build before marking a task done.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ PHASE A — Data Foundations          (2 parallel agents)         │
+│                                                                 │
+│  A1: DateEvent Room table + DAO     new table, safe to parallel │
+│  A2: MerchantRule Room table + DAO  new table, safe to parallel │
+│                                                                 │
+│  Exit gate: both tables in DB, build passes                     │
+└───────────────────────┬─────────────────────────────────────────┘
+                        │ A1 + A2 done
+┌───────────────────────▼─────────────────────────────────────────┐
+│ PHASE B — Core Features             (6 parallel streams)        │
+│                                                                 │
+│  B1: Important dates UI             needs A1                    │
+│      Add screen, home timeline, notifications                   │
+│                                                                 │
+│  B2: Expense categorization engine  needs A2                    │
+│      PayPal parser, keyword rules, reclassify UI                │
+│                                                                 │
+│  B3: Pantry consume loop            independent                 │
+│      Consume action, quantity, low-stock alerts                 │
+│                                                                 │
+│  B4: Multi-page doc scanning        independent                 │
+│      GmsDocumentScanner, PDF storage, thumbnail                 │
+│                                                                 │
+│  B5: Meals ↔ Pantry + Family events independent                 │
+│      Recipe ingredients, cross-check, family profiles           │
+│                                                                 │
+│  B6: Local backup / restore         independent                 │
+│      Export JSON to Downloads, restore from file                │
+│                                                                 │
+│  Exit gate: B1 + B3 done (home dashboard needs both)           │
+└───────────────────────┬─────────────────────────────────────────┘
+                        │ B phases done
+┌───────────────────────▼─────────────────────────────────────────┐
+│ PHASE C — Sync + Extraction         (sequential then parallel)  │
+│                                                                 │
+│  C1: HouseholdExportService         must be first               │
+│      Drive full snapshot, all domains                           │
+│      ↓                                                          │
+│  C2: QR pairing UI     C3: Child import    C4: WiFi sync        │
+│      (parallel after C1)                                        │
+│                                                                 │
+│  C5: Doc → Date auto-extraction     needs A1 + B4              │
+│      DocumentRefiner, German patterns, DateEvent creation       │
+│                                                                 │
+│  Exit gate: C1 + C2 + C3 done (sync usable end-to-end)        │
+└───────────────────────┬─────────────────────────────────────────┘
+                        │ B1 + B3 + C done
+┌───────────────────────▼─────────────────────────────────────────┐
+│ PHASE D — Home Dashboard Upgrade    (single integrating agent)  │
+│                                                                 │
+│  D1: Unified timeline + alerts                                  │
+│      Upcoming events, expiry alerts, pantry low-stock,          │
+│      today's meals — all in one home screen                     │
+└─────────────────────────────────────────────────────────────────┘
+
+AI Phase 2/3 (canonical normalization beyond foundation, LLM pipeline,
+vector memory, insight engine) — deferred, starts after Phase D.
+```
+
+### Agent contract (every agent, every task)
+1. Read STATUS.md → confirm task assignment
+2. Read only files listed for that task
+3. Implement
+4. Run `gradlew :android:assembleDebug` — must be green
+5. Update STATUS.md: mark done, list files changed
+6. Report: what changed + what to verify manually on device
 
 ---
 
