@@ -4,15 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M0,0h108v108h-108z">
-        <gradient
-            android:startX="0"
-            android:startY="0"
-            android:endX="108"
-            android:endY="108"
-            android:type="linear"
-            android:startColor="#2A3CE8"
-            android:centerColor="#5B45F0"
-            android:endColor="#9333EA" />
-    </path>
+    <!-- Dark navy background matching the Jugaad logo -->
+    <path
+        android:fillColor="#0D0D1E"
+        android:pathData="M0,0h108v108h-108z" />
 </vector>

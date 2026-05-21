@@ -113,6 +113,7 @@ import com.household.app.ui.compose.theme.ConfigPanelStroke
 import com.household.app.ui.compose.theme.CriticalRed
 import com.household.app.ui.compose.theme.EliteNavy
 import com.household.app.ui.compose.theme.LumeAmber
+import com.household.app.ui.compose.theme.LumeCyan
 import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.LumePurple
 import com.household.app.ui.compose.theme.LumeWhite
@@ -130,7 +131,9 @@ import com.household.app.ui.viewmodels.ImportWorkflow
 @Composable
 fun V2ConfigHubScreen(
     onBack: () -> Unit = {},
-    onNavigateToMerchantRules: () -> Unit = {}
+    onNavigateToMerchantRules: () -> Unit = {},
+    onNavigateToQrHost: () -> Unit = {},
+    onNavigateToQrScan: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: ConfigViewModel = viewModel(
@@ -269,7 +272,15 @@ fun V2ConfigHubScreen(
                 MerchantRulesNavCard(onClick = onNavigateToMerchantRules)
             }
 
-            // 8 — Recent import audit trail
+            // 8 — Pair with partner device
+            item {
+                PairDeviceCard(
+                    onShareClick = onNavigateToQrHost,
+                    onScanClick = onNavigateToQrScan
+                )
+            }
+
+            // 9 — Recent import audit trail
             if (uiState.recentAudits.isNotEmpty()) {
                 item {
                     RecentImportsCard(uiState.recentAudits)
@@ -1129,6 +1140,58 @@ private fun MerchantRulesNavCard(onClick: () -> Unit) {
                 tint = LumeWhite.copy(alpha = 0.55f),
                 modifier = Modifier.size(24.dp)
             )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pair device card (QR pairing)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun PairDeviceCard(onShareClick: () -> Unit, onScanClick: () -> Unit) {
+    EliteGlassCard(glowColor = LumeCyan.copy(alpha = 0.14f), borderAlpha = 0.14f) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "DEVICE SYNC",
+                style = MaterialTheme.typography.labelSmall,
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(LumeCyan.copy(alpha = 0.12f), androidx.compose.foundation.shape.CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Rounded.Language, contentDescription = null, tint = LumeCyan, modifier = Modifier.size(22.dp))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Pair with Partner", color = TextMain, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
+                    Text("Sync data with your partner's device over Wi-Fi", color = LumeWhite.copy(alpha = 0.55f), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onShareClick,
+                    modifier = Modifier.weight(1f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, LumeCyan.copy(alpha = 0.4f))
+                ) {
+                    Text("Share My Data", color = LumeCyan, style = MaterialTheme.typography.labelMedium)
+                }
+                androidx.compose.material3.Button(
+                    onClick = onScanClick,
+                    modifier = Modifier.weight(1f),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = LumeCyan.copy(alpha = 0.18f))
+                ) {
+                    Text("Scan QR", color = LumeCyan, style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
     }
 }

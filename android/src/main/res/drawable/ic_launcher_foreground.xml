@@ -1,14 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#A5B4FC"
-        android:fillAlpha="0.55"
-        android:pathData="M54,14.34a39.66,39.66 0,1 0,0 79.32a39.66,39.66 0,1 0,0 -79.32zM54,83.74a29.74,29.74 0,1 1,0 -59.48a29.74,29.74 0,1 1,0 59.48z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M37.55,29.11h32.9c4.22,0 4.22,4.22 4.22,4.22v4.22c0,4.22 -4.22,4.22 -4.22,4.22h-9.28v24.05c0,12.43 -8.83,20.25 -19.86,20.25s-19.86,-7.82 -19.86,-20.25v-3.38c0,-3.38 3.38,-3.38 3.38,-3.38h5.06c3.38,0 3.38,3.38 3.38,3.38v3.38c0,4.22 2.11,8.44 8.02,8.44s8.02,-4.22 8.02,-8.44v-24.05h-11.81c-4.22,0 -4.22,-4.22 -4.22,-4.22v-4.22c0,-4.22 4.22,-4.22 4.22,-4.22z" />
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/ic_launcher_foreground"
+    android:gravity="fill" />

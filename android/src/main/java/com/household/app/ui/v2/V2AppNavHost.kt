@@ -61,7 +61,9 @@ fun V2AppNavHost(
         composable(route = Screen.Config.route) {
             V2ConfigHubScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToMerchantRules = { navController.navigate(Screen.MerchantRules.route) }
+                onNavigateToMerchantRules = { navController.navigate(Screen.MerchantRules.route) },
+                onNavigateToQrHost = { navController.navigate(Screen.QrHost.route) },
+                onNavigateToQrScan = { navController.navigate(Screen.QrScan.route) }
             )
         }
 
@@ -109,6 +111,14 @@ fun V2AppNavHost(
 
         composable(route = Screen.Documents.route) {
             DocumentsScreen(navController = navController)
+        }
+
+        composable(route = Screen.QrHost.route) {
+            QrHostScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(route = Screen.QrScan.route) {
+            QrScanScreen(onBack = { navController.popBackStack() })
         }
     }
 }

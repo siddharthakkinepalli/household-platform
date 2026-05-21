@@ -38,6 +38,8 @@ sealed class Screen(
     object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
     object MerchantRules : Screen("merchant_rules", Icons.Rounded.Tune,   "Merchant Rules")
     object Documents : Screen("documents", Icons.Rounded.FolderOpen,      "Documents")
+    object QrHost : Screen("qr_host", Icons.Rounded.Tune, "Share My Data")
+    object QrScan : Screen("qr_scan", Icons.Rounded.Tune, "Scan Partner's QR")
 
     companion object {
         /** Ordered list used to build primary rail items and NavHost destinations. */

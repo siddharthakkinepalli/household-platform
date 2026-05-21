@@ -184,6 +184,12 @@ dependencies {
     // JSON serialization for local backup/restore
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // QR code generation (pure Java, no native deps)
+    implementation("com.google.zxing:core:3.5.3")
+
+    // QR / barcode scanning via camera
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
