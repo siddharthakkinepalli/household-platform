@@ -10,8 +10,18 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.household.app.R
+import com.household.app.vault.scan.DocumentScanner
+import com.household.app.vault.scan.OcrEngineProvider
+import com.household.app.vault.scan.PdfTextExtractor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.absoluteValue
@@ -71,37 +81,68 @@ class DocumentsFragment : Fragment() {
         val mimeType = resolver.getType(uri).orEmpty()
         val fileName = queryFileName(resolver, uri)
 
-        val parseResult = when {
-            mimeType.contains("pdf") || fileName.endsWith(".pdf", ignoreCase = true) -> {
-                NewPdfBridge.extractDates(resolver, uri, fileName)
-            }
-            mimeType.startsWith("image/") -> {
-                ParsedDates(
-                    dates = emptyList(),
-                    note = "Image selected. OCR hook is ready; integrate on-device OCR model next."
-                )
-            }
-            else -> {
-                ParsedDates(
-                    dates = emptyList(),
-                    note = "Unsupported format for parser. Upload PDF or image."
-                )
-            }
-        }
+        textParseStatus.text = "Processing…"
 
-        managedDocuments.add(
-            ManagedDocument(
-                name = fileName,
-                uri = uri,
-                mimeType = mimeType.ifBlank { "unknown" },
-                extractedDates = parseResult.dates,
-                parserNote = parseResult.note
+        viewLifecycleOwner.lifecycleScope.launch {
+            val parseResult = withContext(Dispatchers.IO) {
+                when {
+                    mimeType.contains("pdf") || fileName.endsWith(".pdf", ignoreCase = true) -> {
+                        val result = PdfTextExtractor.extract(requireContext(), resolver, uri)
+                        ParsedDates(dates = result.dates, note = result.note)
+                    }
+                    mimeType.startsWith("image/") -> extractDatesFromImage(resolver, uri)
+                    else -> ParsedDates(emptyList(), "Unsupported format. Upload PDF or image.")
+                }
+            }
+
+            managedDocuments.add(
+                ManagedDocument(
+                    name = fileName,
+                    uri = uri,
+                    mimeType = mimeType.ifBlank { "unknown" },
+                    extractedDates = parseResult.dates,
+                    parserNote = parseResult.note
+                )
             )
-        )
+            textParseStatus.text = parseResult.note
+            renderDocuments()
+            renderRenewals()
+        }
+    }
 
-        textParseStatus.text = parseResult.note
-        renderDocuments()
-        renderRenewals()
+    private suspend fun extractDatesFromImage(resolver: ContentResolver, uri: Uri): ParsedDates {
+        return runCatching {
+            // Copy to temp file so DocumentScanner can read it
+            val tmpFile = File(requireContext().cacheDir, "doc_scan_tmp.jpg")
+            resolver.openInputStream(uri)?.use { FileOutputStream(tmpFile).use { out -> it.copyTo(out) } }
+
+            val enhanced = DocumentScanner.process(tmpFile)
+            val engine = OcrEngineProvider.engine
+            val payload = engine.recognize(requireContext(), enhanced.toUri())
+            val text = payload.fullText
+            val dates = parseDatesFromText(text)
+            ParsedDates(
+                dates = dates,
+                note = "${engine.id}: ${text.length} chars, ${dates.size} date(s) found"
+            )
+        }.getOrElse { e ->
+            ParsedDates(emptyList(), "Image OCR failed: ${e.message}")
+        }
+    }
+
+    private fun parseDatesFromText(text: String): List<LocalDate> {
+        val found = mutableSetOf<LocalDate>()
+        val isoPattern = Regex("""(20\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])""")
+        val euPattern  = Regex("""\b(0?[1-9]|[12]\d|3[01])[./-](0?[1-9]|1[0-2])[./-](20\d{2})\b""")
+        isoPattern.findAll(text).forEach { m ->
+            runCatching { LocalDate.of(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt()) }
+                .getOrNull()?.let { found.add(it) }
+        }
+        euPattern.findAll(text).forEach { m ->
+            runCatching { LocalDate.of(m.groupValues[3].toInt(), m.groupValues[2].toInt(), m.groupValues[1].toInt()) }
+                .getOrNull()?.let { found.add(it) }
+        }
+        return found.sortedDescending()
     }
 
     private fun renderDocuments() {
@@ -166,51 +207,3 @@ private data class ParsedDates(
     val dates: List<LocalDate>,
     val note: String
 )
-
-private object NewPdfBridge {
-
-    private val dateRegex = Regex("(20\\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\\d|3[01])")
-
-    fun extractDates(resolver: ContentResolver, uri: Uri, fileName: String): ParsedDates {
-        val reflectedDates = extractWithNewPdfLibrary(uri)
-        if (reflectedDates.isNotEmpty()) {
-            return ParsedDates(
-                dates = reflectedDates,
-                note = "Parsed with NewPDF library"
-            )
-        }
-
-        val datesFromName = dateRegex.findAll(fileName)
-            .mapNotNull { match ->
-                val y = match.groupValues[1].toIntOrNull() ?: return@mapNotNull null
-                val m = match.groupValues[2].toIntOrNull() ?: return@mapNotNull null
-                val d = match.groupValues[3].toIntOrNull() ?: return@mapNotNull null
-                runCatching { LocalDate.of(y, m, d) }.getOrNull()
-            }
-            .toList()
-
-        val note = if (datesFromName.isEmpty()) {
-            "PDF uploaded. NewPDF bridge active; no explicit date string found yet."
-        } else {
-            "PDF uploaded. Date candidates extracted from filename."
-        }
-
-        resolver.openInputStream(uri)?.close()
-        return ParsedDates(dates = datesFromName, note = note)
-    }
-
-    private fun extractWithNewPdfLibrary(uri: Uri): List<LocalDate> {
-        return try {
-            val parserClass = Class.forName("com.newpdf.Parser")
-            val parser = parserClass.getDeclaredConstructor().newInstance()
-            val method = parserClass.getMethod("extractDateStrings", String::class.java)
-            val output = method.invoke(parser, uri.toString()) as? List<*> ?: return emptyList()
-            output.mapNotNull { item ->
-                val text = item?.toString().orEmpty()
-                runCatching { LocalDate.parse(text) }.getOrNull()
-            }
-        } catch (_: Throwable) {
-            emptyList()
-        }
-    }
-}

@@ -3,6 +3,7 @@ package com.household.app.ui.v2
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -46,6 +47,8 @@ import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.EuroSymbol
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.RestoreFromTrash
+import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -68,9 +71,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,8 +102,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.household.app.data.AppDatabase
 import com.household.app.data.config.ImportErrorType
 import com.household.app.data.config.ImportSummary
+import com.household.app.BuildConfig
+import com.household.app.domain.services.HouseholdExportService
+import com.household.app.domain.services.HouseholdImportService
 import com.household.app.ui.compose.theme.ConfigAccent
 import com.household.app.ui.compose.theme.ConfigPanelStroke
 import com.household.app.ui.compose.theme.CriticalRed
@@ -117,7 +128,10 @@ import com.household.app.ui.viewmodels.ImportAuditRecord
 import com.household.app.ui.viewmodels.ImportWorkflow
 
 @Composable
-fun V2ConfigHubScreen(onBack: () -> Unit = {}) {
+fun V2ConfigHubScreen(
+    onBack: () -> Unit = {},
+    onNavigateToMerchantRules: () -> Unit = {}
+) {
     val context = LocalContext.current
     val viewModel: ConfigViewModel = viewModel(
         factory = viewModelFactory {
@@ -250,11 +264,26 @@ fun V2ConfigHubScreen(onBack: () -> Unit = {}) {
                 )
             }
 
-            // 7 — Recent import audit trail
+            // 7 — Merchant Rules navigation entry
+            item {
+                MerchantRulesNavCard(onClick = onNavigateToMerchantRules)
+            }
+
+            // 8 — Recent import audit trail
             if (uiState.recentAudits.isNotEmpty()) {
                 item {
                     RecentImportsCard(uiState.recentAudits)
                 }
+            }
+
+            // 9 — Local backup / restore
+            item {
+                LocalBackupCard()
+            }
+
+            // 10 — About
+            item {
+                AboutCard()
             }
         }
     }
@@ -1022,6 +1051,219 @@ private fun RecentImportsCard(audits: List<ImportAuditRecord>) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// About
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun AboutCard() {
+    EliteGlassCard(glowColor = LumeWhite.copy(alpha = 0.06f), borderAlpha = 0.1f) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = "ABOUT",
+                style = MaterialTheme.typography.labelSmall,
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = "Jugaad Home",
+                color = TextMain,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                color = LumeWhite.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = "com.jugaad.home",
+                color = LumeWhite.copy(alpha = 0.3f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Merchant Rules navigation card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun MerchantRulesNavCard(onClick: () -> Unit) {
+    EliteGlassCard(
+        glowColor = LumePurple.copy(alpha = 0.14f),
+        borderAlpha = 0.14f
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "MERCHANT RULES",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LumeWhite.copy(alpha = 0.6f),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Merchant Rules",
+                    color = TextMain,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Manage pattern-based auto-categorization rules",
+                    color = LumeWhite.copy(alpha = 0.55f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = LumeWhite.copy(alpha = 0.55f),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Local backup / restore card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun LocalBackupCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val db = remember { AppDatabase.getInstance(context) }
+    val exportService = remember { HouseholdExportService(db) }
+    val importService = remember { HouseholdImportService(db) }
+
+    var isBusy by remember { mutableStateOf(false) }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            isBusy = true
+            scope.launch {
+                val result = importService.import(context, uri)
+                isBusy = false
+                val msg = if (result.success) {
+                    "${result.message} (${result.imported} records)"
+                } else {
+                    result.message
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    EliteGlassCard(glowColor = LumePurple.copy(alpha = 0.14f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(
+                text = "LOCAL BACKUP",
+                style = MaterialTheme.typography.labelSmall,
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
+            )
+
+            Text(
+                text = "Export / Import Data",
+                color = TextMain,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            Text(
+                text = "Save a full JSON backup of all household data to device storage, or restore from a previous backup.",
+                color = LumeWhite.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            if (isBusy) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = LumePurple,
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            isBusy = true
+                            scope.launch {
+                                try {
+                                    val uri = exportService.export(context)
+                                    Toast.makeText(
+                                        context,
+                                        "Backup saved: ${uri.lastPathSegment}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "Export failed: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    isBusy = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LumePurple.copy(alpha = 0.22f)
+                        )
+                    ) {
+                        Icon(
+                            Icons.Rounded.SaveAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Export Data", color = LumeWhite, fontWeight = FontWeight.Medium)
+                    }
+
+                    Button(
+                        onClick = {
+                            importLauncher.launch(arrayOf("application/json"))
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LumeWhite.copy(alpha = 0.08f)
+                        )
+                    ) {
+                        Icon(
+                            Icons.Rounded.RestoreFromTrash,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = LumeAmber
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Import Data", color = LumeAmber, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1039,10 +1281,9 @@ private fun Modifier.neonGlow(color: Color, blurRadius: Dp): Modifier = this.dra
 }
 
 private fun categoryColor(categoryId: String): Color = when (categoryId) {
-    "groceries"  -> Color(0xFF22C55E)
-    "housing"    -> Color(0xFFF59E0B)
-    "transport"  -> Color(0xFF60A5FA)
-    "dining"     -> Color(0xFFFB7185)
-    "utilities"  -> Color(0xFFA78BFA)
-    else         -> ConfigAccent
+    "groceries" -> Color(0xFF22C55E)
+    "travel"    -> Color(0xFF60A5FA)
+    "dining"    -> Color(0xFFFB7185)
+    "shopping"  -> Color(0xFFEC4899)
+    else        -> ConfigAccent
 }

@@ -22,4 +22,6 @@ interface VaultRepository {
     suspend fun saveDocument(uri: Uri, mimeType: String, category: VaultCategory, title: String): Long
     suspend fun linkReceiptToExpense(vaultId: Long, expenseId: Long)
     suspend fun deleteEntry(id: Long)
+    suspend fun deleteEntries(ids: List<Long>)
+    suspend fun moveEntries(ids: List<Long>, category: VaultCategory)
 }

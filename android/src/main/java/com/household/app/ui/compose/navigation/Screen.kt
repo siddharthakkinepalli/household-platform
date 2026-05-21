@@ -36,6 +36,8 @@ sealed class Screen(
     object Pantry : Screen("pantry", Icons.Rounded.ShoppingCart, "Pantry")
     object Family : Screen("family", Icons.Rounded.Group,                 "Family")
     object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
+    object MerchantRules : Screen("merchant_rules", Icons.Rounded.Tune,   "Merchant Rules")
+    object Documents : Screen("documents", Icons.Rounded.FolderOpen,      "Documents")
 
     companion object {
         /** Ordered list used to build primary rail items and NavHost destinations. */

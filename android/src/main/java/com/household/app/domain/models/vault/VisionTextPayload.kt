@@ -13,7 +13,9 @@ data class TextBlockPayload(
 
 data class TextLinePayload(
     val text: String,
-    val confidence: Float,
+    val confidence: Float,       // averaged from word-level ML Kit confidence values
     val boundingBoxTop: Float,
-    val boundingBoxBottom: Float
+    val boundingBoxBottom: Float,
+    val boundingBoxLeft: Float = 0f,
+    val boundingBoxRight: Float = 0f
 )

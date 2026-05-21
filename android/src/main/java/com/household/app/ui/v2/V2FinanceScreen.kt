@@ -519,7 +519,7 @@ private fun TransactionEditSheet(
     onUpdateCategory: (String, Boolean) -> Unit
 ) {
     var applyToFuture by rememberSaveable(transaction.id) { mutableStateOf(false) }
-    val categories = listOf("Groceries", "Eat Out", "Travel", "Shopping", "Exclude")
+    val categories = listOf("Groceries", "Eat Out", "Travel", "Utilities", "Transfers", "Shopping", "Exclude")
     val selectedCategory = canonicalCategory(transaction.category)
 
     ModalBottomSheet(

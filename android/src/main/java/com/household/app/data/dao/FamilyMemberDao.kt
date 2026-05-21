@@ -36,6 +36,12 @@ interface FamilyMemberDao {
 
     @Query("SELECT COUNT(*) FROM family_members")
     fun getMembersCount(): Flow<Int>
+
+    @Query("SELECT * FROM family_members ORDER BY createdAt DESC")
+    suspend fun getAllMembersList(): List<FamilyMemberEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMembers(members: List<FamilyMemberEntity>)
 }
 
 @Dao
@@ -76,4 +82,13 @@ interface DocumentDao {
 
     @Query("SELECT COUNT(*) FROM documents WHERE expiryDate IS NOT NULL AND expiryDate <= :thresholdTime")
     fun getExpiringDocumentsCount(thresholdTime: Long): Flow<Int>
+
+    @Query("SELECT * FROM documents ORDER BY createdAt DESC")
+    suspend fun getAllDocumentsList(): List<DocumentEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertDocuments(documents: List<DocumentEntity>)
+
+    @Query("SELECT * FROM documents WHERE expiryDate IS NOT NULL AND expiryDate BETWEEN :now AND :future ORDER BY expiryDate ASC")
+    fun getDocumentsExpiringSoon(now: Long, future: Long): Flow<List<DocumentEntity>>
 }

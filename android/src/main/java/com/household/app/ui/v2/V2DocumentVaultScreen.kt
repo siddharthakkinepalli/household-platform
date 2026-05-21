@@ -19,10 +19,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,7 +73,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileMove
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.IconButton
@@ -79,6 +83,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -142,6 +147,8 @@ fun V2DocumentVaultScreen(
     var showUploadSheet by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
     var pendingMime by remember { mutableStateOf("application/octet-stream") }
+    val selectedIds = remember { mutableStateListOf<Long>() }
+    var showMoveDialog by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -194,7 +201,22 @@ fun V2DocumentVaultScreen(
                 when {
                     vaultUiState is VaultUiState.Loading -> LoadingGlow()
                     vaultEntries.isEmpty()               -> EmptyVaultPrompt(selectedCategory)
-                    else                                 -> VaultGallery(vaultEntries, onEntryClick = { selectedEntry = it })
+                    else                                 -> VaultGallery(
+                        entries = vaultEntries,
+                        selectedIds = selectedIds,
+                        onEntryClick = { entry ->
+                            if (selectedIds.isNotEmpty()) {
+                                if (selectedIds.contains(entry.id)) selectedIds.remove(entry.id)
+                                else selectedIds.add(entry.id)
+                            } else {
+                                selectedEntry = entry
+                            }
+                        },
+                        onEntryLongClick = { entry ->
+                            if (selectedIds.contains(entry.id)) selectedIds.remove(entry.id)
+                            else selectedIds.add(entry.id)
+                        }
+                    )
                 }
                 if (fabExpanded) {
                     Box(
@@ -204,6 +226,15 @@ fun V2DocumentVaultScreen(
                             .clickable { fabExpanded = false }
                     )
                 }
+
+                // Multi-select action bar
+                MultiSelectActionBar(
+                    selectedCount = selectedIds.size,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    onDelete = { viewModel.deleteEntries(selectedIds.toList()); selectedIds.clear() },
+                    onMove = { showMoveDialog = true },
+                    onCancel = { selectedIds.clear() }
+                )
             }
         }
     }
@@ -247,6 +278,97 @@ fun V2DocumentVaultScreen(
                 selectedEntry = null
             }
         )
+    }
+
+    if (showMoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoveDialog = false },
+            title = { Text("Move to category", color = TextMain) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    VaultCategory.entries.forEach { cat ->
+                        TextButton(
+                            onClick = {
+                                viewModel.moveEntries(selectedIds.toList(), cat)
+                                selectedIds.clear()
+                                showMoveDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "${cat.emoji}  ${cat.label}",
+                                color = categoryColor(cat),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showMoveDialog = false }) {
+                    Text("Cancel", color = TextMuted)
+                }
+            },
+            containerColor = EliteNavy
+        )
+    }
+}
+
+// ── Multi-select action bar ───────────────────────────────────────────────────
+
+@Composable
+private fun MultiSelectActionBar(
+    selectedCount: Int,
+    modifier: Modifier = Modifier,
+    onDelete: () -> Unit,
+    onMove: () -> Unit,
+    onCancel: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = selectedCount > 0,
+        enter = slideInVertically { it },
+        exit = slideOutVertically { it },
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(EliteNavy.copy(alpha = 0.96f))
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "$selectedCount selected",
+                color = LumeWhite,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Button(
+                onClick = onDelete,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4B4B).copy(alpha = 0.18f)),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = Color(0xFFFF6B6B), modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Delete", color = Color(0xFFFF6B6B), style = MaterialTheme.typography.labelMedium)
+            }
+            Button(
+                onClick = onMove,
+                colors = ButtonDefaults.buttonColors(containerColor = LumeAmber.copy(alpha = 0.18f)),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Icon(Icons.Rounded.DriveFileMove, contentDescription = "Move", tint = LumeAmber, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Move", color = LumeAmber, style = MaterialTheme.typography.labelMedium)
+            }
+            TextButton(onClick = onCancel) {
+                Text("Cancel", color = TextMuted, style = MaterialTheme.typography.labelMedium)
+            }
+        }
     }
 }
 
@@ -614,7 +736,12 @@ private fun EmptyVaultPrompt(filter: VaultCategory?) {
 // ── Staggered Evidence Board ──────────────────────────────────────────────────
 
 @Composable
-private fun VaultGallery(entries: List<VaultEntity>, onEntryClick: (VaultEntity) -> Unit) {
+private fun VaultGallery(
+    entries: List<VaultEntity>,
+    selectedIds: List<Long>,
+    onEntryClick: (VaultEntity) -> Unit,
+    onEntryLongClick: (VaultEntity) -> Unit
+) {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Fixed(2),
         modifier = Modifier.fillMaxSize(),
@@ -623,20 +750,38 @@ private fun VaultGallery(entries: List<VaultEntity>, onEntryClick: (VaultEntity)
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(entries, key = { it.id }) { entry ->
-            DocumentCard(entry, onClick = { onEntryClick(entry) })
+            DocumentCard(
+                entry = entry,
+                isSelected = selectedIds.contains(entry.id),
+                onClick = { onEntryClick(entry) },
+                onLongClick = { onEntryLongClick(entry) }
+            )
         }
     }
 }
 
 // ── Document Card ──────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DocumentCard(entry: VaultEntity, onClick: () -> Unit) {
+private fun DocumentCard(
+    entry: VaultEntity,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     val category = runCatching { VaultCategory.valueOf(entry.category) }.getOrDefault(VaultCategory.OTHER)
     val isReceipt = category == VaultCategory.RECEIPT
     val glowColor = if (entry.isLinkedToExpense) LumeEmerald else categoryColor(category)
+    val selectionBorderColor = Color(0xFF2DD4BF) // teal
 
-    EliteGlassCard(glowColor = glowColor, modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+    EliteGlassCard(
+        glowColor = if (isSelected) selectionBorderColor else glowColor,
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    ) {
         // Thumbnail or document icon
         if (isReceipt || entry.mimeType.startsWith("image")) {
             AsyncReceiptImage(
@@ -714,7 +859,27 @@ private fun DocumentCard(entry: VaultEntity, onClick: () -> Unit) {
                 )
             }
         }
+    } // end EliteGlassCard
+
+    // Selection checkmark overlay
+    if (isSelected) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color(0xFF2DD4BF).copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                .border(2.dp, Color(0xFF2DD4BF), RoundedCornerShape(20.dp))
+        )
+        Icon(
+            imageVector = Icons.Rounded.CheckCircle,
+            contentDescription = "Selected",
+            tint = Color(0xFF2DD4BF),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(22.dp)
+        )
     }
+    } // end outer Box
 }
 
 // ── Document Detail Sheet ─────────────────────────────────────────────────────
@@ -883,6 +1048,7 @@ private fun openFileExternally(context: android.content.Context, path: String, m
         context.startActivity(intent)
     } catch (e: Exception) {
         android.util.Log.e("VaultScreen", "Cannot open file: ${e.message}")
+        android.widget.Toast.makeText(context, "Cannot open file: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
     }
 }
 

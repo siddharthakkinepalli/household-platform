@@ -9,4 +9,5 @@ interface PantryRepository {
     suspend fun stageParsedItems(items: List<PantryItem>)
     suspend fun confirmItems(selected: List<PantryItem>)
     suspend fun deleteStagedForVault(vaultId: Long)
+    suspend fun consumeItem(pantryItemId: Long, quantity: Int = 1)
 }

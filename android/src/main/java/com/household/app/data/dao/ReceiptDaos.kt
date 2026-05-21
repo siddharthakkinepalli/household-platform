@@ -90,12 +90,27 @@ interface InventoryEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: InventoryEventEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEvent(event: InventoryEventEntity)
+
     @Query("SELECT * FROM inventory_events WHERE pantryItemId = :pantryItemId ORDER BY timestamp DESC")
     suspend fun getEventsForPantryItem(pantryItemId: Long): List<InventoryEventEntity>
+
+    @Query("SELECT * FROM inventory_events WHERE pantryItemId = :pantryItemId ORDER BY timestamp DESC")
+    fun getEventsForItem(pantryItemId: Long): kotlinx.coroutines.flow.Flow<List<InventoryEventEntity>>
+
+    @Query("SELECT COUNT(*) FROM inventory_events WHERE pantryItemId = :pantryItemId AND eventType = 'CONSUME'")
+    suspend fun getConsumeCountForItem(pantryItemId: Long): Int
 
     @Query("SELECT * FROM inventory_events ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getRecentEvents(limit: Int = 50): List<InventoryEventEntity>
 
     @Query("SELECT SUM(delta) FROM inventory_events WHERE pantryItemId = :pantryItemId")
     suspend fun getCurrentStock(pantryItemId: Long): Float?
+
+    @Query("SELECT * FROM inventory_events ORDER BY timestamp DESC")
+    suspend fun getAllEvents(): List<InventoryEventEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertEvents(events: List<InventoryEventEntity>)
 }

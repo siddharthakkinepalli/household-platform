@@ -98,6 +98,14 @@ class VaultRepositoryImpl(
         vaultDao.getEntryById(id)?.let { vaultDao.deleteEntry(it) }
     }
 
+    override suspend fun deleteEntries(ids: List<Long>) {
+        vaultDao.deleteEntries(ids)
+    }
+
+    override suspend fun moveEntries(ids: List<Long>, category: VaultCategory) {
+        vaultDao.moveEntries(ids, category.name)
+    }
+
     private suspend fun stageReceiptItems(vaultId: Long, receiptText: String) {
         val parsed = ReceiptItemParser.parse(receiptText)
         if (parsed.isEmpty()) return

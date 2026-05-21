@@ -6,8 +6,10 @@ import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.ui.graphics.Color
 import com.household.app.data.AppDatabase
 import com.household.app.data.DashboardPrefs
 import com.household.app.data.WalletDataLoader
@@ -17,6 +19,7 @@ import com.household.app.domain.utils.MerchantNameCleaner
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.theme.DocsColor
 import com.household.app.ui.compose.theme.FamilyColor
+import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.MealsColor
 import com.household.app.ui.compose.theme.WalletColor
 import kotlinx.coroutines.Dispatchers
@@ -42,10 +45,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
     val modules: List<Module> = listOf(
-        Module("wallet",  "Wallet",    Icons.Rounded.AccountBalanceWallet, WalletColor, "Transactions & budget", Screen.Wallet.route),
-        Module("meals",   "Meals",     Icons.Rounded.Restaurant,           MealsColor,  "Meal planning",         Screen.Meals.route),
-        Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,   "Vault & receipts",      Screen.Docs.route),
-        Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor, "Private by design",     Screen.Family.route)
+        Module("wallet",  "Wallet",    Icons.Rounded.AccountBalanceWallet, WalletColor,  "Expenses & budget", Screen.Wallet.route),
+        Module("meals",   "Meals",     Icons.Rounded.Restaurant,           MealsColor,   "Meal planning",     Screen.Meals.route),
+        Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,    "Vault & receipts",  Screen.Docs.route),
+        Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor,  "Family hub",        Screen.Family.route),
+        Module("pantry",  "Pantry",    Icons.Rounded.ShoppingCart,         LumeEmerald,  "Stock & consume",   Screen.Pantry.route)
     )
 
     init {
@@ -101,14 +105,66 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                     val activity = buildActivity(recentVault, recentTx)
 
+                    // Per-category budgets
+                    val cycleTransactions = merged
+                        .filter { !it.excluded && it.amount < 0 && !it.date.isBefore(cycleStart) }
+
+                    val dbThresholds = db.categoryThresholdDao().getAllThresholds()
+                        .associateBy { it.categoryId }
+
+                    val defaultLimits = mapOf(
+                        "groceries" to 600.0,
+                        "travel"    to 150.0,
+                        "dining"    to 120.0,
+                        "shopping"  to 120.0
+                    )
+
+                    val categoryMatchMap: Map<String, List<String>> = mapOf(
+                        "groceries" to listOf("grocery", "groceries"),
+                        "travel"    to listOf("travel", "transport"),
+                        "dining"    to listOf("eat out", "dining"),
+                        "shopping"  to listOf("shopping")
+                    )
+
+                    val categoryColors: Map<String, Color> = mapOf(
+                        "groceries" to Color(0xFF22C55E),
+                        "travel"    to Color(0xFF60A5FA),
+                        "dining"    to Color(0xFFFB7185),
+                        "shopping"  to Color(0xFFEC4899)
+                    )
+
+                    val categoryNames: Map<String, String> = mapOf(
+                        "groceries" to "Groceries",
+                        "travel"    to "Travel",
+                        "dining"    to "Dining",
+                        "shopping"  to "Shopping"
+                    )
+
+                    val categoryBudgets = defaultLimits.keys.map { catId ->
+                        val limit = dbThresholds[catId]?.limitAmount?.toDouble()
+                            ?: defaultLimits[catId]!!
+                        val matchPatterns = categoryMatchMap[catId] ?: emptyList()
+                        val spent = cycleTransactions
+                            .filter { tx -> matchPatterns.any { tx.category.lowercase() == it } }
+                            .sumOf { abs(it.amount) }
+                        CategoryBudget(
+                            id    = catId,
+                            name  = categoryNames[catId] ?: catId,
+                            spent = spent,
+                            limit = limit,
+                            color = categoryColors[catId] ?: Color.Gray
+                        )
+                    }
+
                     _state.update {
                         it.copy(
-                            balanceValue      = budgetLeft,
-                            balanceFormatted  = "€%,.2f".format(budgetLeft),
-                            salaryAnchorDay   = anchorDay,
+                            balanceValue       = budgetLeft,
+                            balanceFormatted   = "€%,.2f".format(budgetLeft),
+                            salaryAnchorDay    = anchorDay,
                             unlinkedVaultCount = unlinkedCount,
-                            recentActivity    = activity,
-                            loading           = false
+                            recentActivity     = activity,
+                            categoryBudgets    = categoryBudgets,
+                            loading            = false
                         )
                     }
                 }

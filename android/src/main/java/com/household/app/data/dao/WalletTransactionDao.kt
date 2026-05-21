@@ -29,7 +29,7 @@ interface WalletTransactionDao {
     @Query(
         """
         SELECT * FROM wallet_transactions
-        WHERE amount BETWEEN :minAmount AND :maxAmount
+        WHERE ABS(amount) BETWEEN :minAmount AND :maxAmount
           AND date BETWEEN :startDate AND :endDate
         ORDER BY date DESC
         """
@@ -52,4 +52,10 @@ interface WalletTransactionDao {
 
     @Query("SELECT COUNT(*) FROM wallet_transactions")
     suspend fun getTransactionCount(): Int
+
+    @Query("UPDATE wallet_transactions SET category = :category WHERE id = :id")
+    suspend fun updateCategory(id: Int, category: String)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertTransactionsIgnore(transactions: List<WalletTransactionEntity>)
 }

@@ -33,6 +33,12 @@ interface DocumentAlertDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAlerts(alerts: List<DocumentAlertEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAlertsIgnore(alerts: List<DocumentAlertEntity>)
+
+    @Query("SELECT * FROM document_alerts ORDER BY createdAt DESC")
+    suspend fun getAllAlertsList(): List<DocumentAlertEntity>
+
     @Update
     suspend fun updateAlert(alert: DocumentAlertEntity)
 

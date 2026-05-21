@@ -220,6 +220,14 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteEntries(ids: List<Long>) {
+        viewModelScope.launch(Dispatchers.IO) { vaultRepository.deleteEntries(ids) }
+    }
+
+    fun moveEntries(ids: List<Long>, category: VaultCategory) {
+        viewModelScope.launch(Dispatchers.IO) { vaultRepository.moveEntries(ids, category) }
+    }
+
     fun dismissConfirmation() {
         _uiState.value = VaultUiState.Idle
         clearPending()

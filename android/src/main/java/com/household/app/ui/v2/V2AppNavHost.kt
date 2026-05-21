@@ -44,13 +44,25 @@ fun V2AppNavHost(
         }
     ) {
         composable(route = Screen.Home.route) {
-            V2HomeScreen(onNavigateToVault = { navController.navigate(Screen.Docs.route) })
+            V2HomeScreen(
+                onNavigateToVault = { navController.navigate(Screen.Docs.route) },
+                onNavigateToModule = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Screen.Home.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
         }
         composable(route = Screen.Wallet.route) { V2FinanceScreen() }
         composable(route = Screen.Meals.route) { V2MealsScreen() }
         composable(route = Screen.Family.route) { V2FamilyScreen() }
         composable(route = Screen.Config.route) {
-            V2ConfigHubScreen(onBack = { navController.popBackStack() })
+            V2ConfigHubScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToMerchantRules = { navController.navigate(Screen.MerchantRules.route) }
+            )
         }
 
         composable(
@@ -89,6 +101,14 @@ fun V2AppNavHost(
 
         composable(route = Screen.Pantry.route) {
             PantryScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(route = Screen.MerchantRules.route) {
+            MerchantRulesScreen(navController = navController)
+        }
+
+        composable(route = Screen.Documents.route) {
+            DocumentsScreen(navController = navController)
         }
     }
 }

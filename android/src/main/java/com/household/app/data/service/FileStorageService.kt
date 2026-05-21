@@ -5,21 +5,22 @@ import android.net.Uri
 import java.io.File
 
 class FileStorageService(private val context: Context) {
-    fun saveReceiptImage(tempUri: Uri): String {
-        val fileName = "receipt_${System.currentTimeMillis()}.jpg"
+    fun saveReceiptImage(tempUri: Uri): String = saveDocument(tempUri, "image/jpeg")
+
+    fun saveDocument(uri: Uri, mimeType: String): String {
+        val ext = extensionForMime(mimeType)
+        val fileName = "vault_${System.currentTimeMillis()}.$ext"
         val directory = File(context.filesDir, "vault_receipts")
-        if (!directory.exists()) {
-            directory.mkdirs()
-        }
+        if (!directory.exists()) directory.mkdirs()
+        val dest = File(directory, fileName)
+        context.contentResolver.openInputStream(uri)?.use { it.copyTo(dest.outputStream()) }
+        return dest.absolutePath
+    }
 
-        val destinationFile = File(directory, fileName)
-
-        context.contentResolver.openInputStream(tempUri)?.use { input ->
-            destinationFile.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-
-        return destinationFile.absolutePath
+    private fun extensionForMime(mimeType: String): String = when {
+        mimeType.contains("pdf")  -> "pdf"
+        mimeType.contains("png")  -> "png"
+        mimeType.contains("jpeg") || mimeType.contains("jpg") -> "jpg"
+        else -> "bin"
     }
 }

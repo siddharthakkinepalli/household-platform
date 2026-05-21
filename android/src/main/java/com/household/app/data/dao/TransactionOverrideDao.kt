@@ -68,11 +68,17 @@ interface MerchantRuleDao {
     @Query("SELECT * FROM merchant_rules WHERE isEnabled = 1 ORDER BY priority DESC, updatedAt DESC")
     suspend fun getEnabledRules(): List<MerchantRuleEntity>
 
+    @Query("SELECT * FROM merchant_rules ORDER BY priority DESC, updatedAt DESC")
+    fun observeAllRules(): kotlinx.coroutines.flow.Flow<List<MerchantRuleEntity>>
+
     @Query("SELECT * FROM merchant_rules WHERE merchantPattern = :merchantPattern")
     suspend fun getRule(merchantPattern: String): MerchantRuleEntity?
 
     @Query("DELETE FROM merchant_rules WHERE merchantPattern = :merchantPattern")
     suspend fun deleteRule(merchantPattern: String)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertRulesIgnore(rules: List<MerchantRuleEntity>)
 }
 
 @Dao
@@ -85,6 +91,9 @@ interface CategoryThresholdDao {
 
     @Query("SELECT * FROM category_thresholds WHERE categoryId = :categoryId LIMIT 1")
     suspend fun getThreshold(categoryId: String): CategoryThresholdEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertThresholdsIgnore(thresholds: List<CategoryThresholdEntity>)
 }
 
 @Dao

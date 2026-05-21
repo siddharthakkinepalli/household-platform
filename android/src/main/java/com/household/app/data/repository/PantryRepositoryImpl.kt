@@ -1,6 +1,8 @@
 package com.household.app.data.repository
 
+import com.household.app.data.dao.InventoryEventDao
 import com.household.app.data.dao.PantryDao
+import com.household.app.data.entities.InventoryEventEntity
 import com.household.app.data.entities.PantryEntity
 import com.household.app.domain.models.PantryCategory
 import com.household.app.domain.models.PantryItem
@@ -8,7 +10,10 @@ import com.household.app.domain.repositories.PantryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class PantryRepositoryImpl(private val dao: PantryDao) : PantryRepository {
+class PantryRepositoryImpl(
+    private val dao: PantryDao,
+    private val eventDao: InventoryEventDao? = null
+) : PantryRepository {
 
     override fun getStagedItems(vaultId: Long): Flow<List<PantryItem>> =
         dao.getStagedItemsByVault(vaultId).map { it.map(PantryEntity::toDomain) }
@@ -26,6 +31,21 @@ class PantryRepositoryImpl(private val dao: PantryDao) : PantryRepository {
 
     override suspend fun deleteStagedForVault(vaultId: Long) {
         dao.deleteStagedForVault(vaultId)
+    }
+
+    override suspend fun consumeItem(pantryItemId: Long, quantity: Int) {
+        // Insert a CONSUME event
+        eventDao?.insertEvent(
+            InventoryEventEntity(
+                pantryItemId = pantryItemId,
+                delta = -quantity.toFloat(),
+                eventType = "CONSUME",
+                timestamp = System.currentTimeMillis()
+            )
+        )
+        // Decrement quantity on the pantry item itself
+        val current = dao.getItemById(pantryItemId) ?: return
+        dao.insertItem(current.copy(quantity = (current.quantity - quantity).coerceAtLeast(0f)))
     }
 }
 

@@ -31,6 +31,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Per-ABI APKs: arm64-v8a (~35 MB) and armeabi-v7a (~30 MB) instead of a 120+ MB fat APK.
+    // Drops x86/x86_64 emulator slices. Use a universal APK only for manual sideloading.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = false
+        }
+    }
+
     signingConfigs {
         create("release") {
             storeFile = file(keystoreProps["storeFile"] as String)
@@ -138,8 +149,18 @@ dependencies {
     // Preferences DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // ML Kit OCR bridge (AndroidVisionPipe handshake input)
-    implementation("com.google.mlkit:text-recognition:16.0.0")
+    // PDF text extraction
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // OpenCV — edge detection + perspective correction
+    implementation("org.opencv:opencv:4.13.0")
+
+    // ONNX Runtime — ML inference (DocQuad model + future use)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.26.0")
+
+    // ML Kit OCR — Latin script (German + English + all Latin languages), bundled offline model
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-bundled-common:17.0.0")
 
     // CameraX (in-app receipt scanner)
     val cameraXVersion = "1.3.4"
@@ -160,8 +181,13 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
+    // JSON serialization for local backup/restore
+    implementation("com.google.code.gson:gson:2.10.1")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }

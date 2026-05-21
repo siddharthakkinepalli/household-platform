@@ -2,6 +2,7 @@ package com.household.app.ui.compose.state
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.ui.graphics.Color
 
 // ── Insight domain model ──────────────────────────────────────────────────
 
@@ -70,6 +71,17 @@ sealed class ActivityItem {
     ) : ActivityItem()
 }
 
+// ── Per-category budget model ─────────────────────────────────────────────
+
+@Immutable
+data class CategoryBudget(
+    val id: String,
+    val name: String,
+    val spent: Double,
+    val limit: Double,
+    val color: Color
+)
+
 // ── HomeScreen MVI ────────────────────────────────────────────────────────
 
 @Immutable
@@ -83,7 +95,8 @@ data class HomeState(
     val recentActivity: List<ActivityItem> = emptyList(),
     val salaryAnchorDay: Int = 25,
     val loading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val categoryBudgets: List<CategoryBudget> = emptyList()
 )
 
 sealed class HomeIntent {

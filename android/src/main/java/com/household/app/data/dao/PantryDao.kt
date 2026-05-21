@@ -28,4 +28,13 @@ interface PantryDao {
 
     @Query("DELETE FROM pantry_items WHERE vaultId = :vaultId AND isConfirmed = 0")
     suspend fun deleteStagedForVault(vaultId: Long)
+
+    @Query("SELECT * FROM pantry_items WHERE id = :id LIMIT 1")
+    suspend fun getItemById(id: Long): PantryEntity?
+
+    @Query("SELECT * FROM pantry_items ORDER BY addedAt DESC")
+    suspend fun getAllPantry(): List<PantryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertItemsIgnore(items: List<PantryEntity>)
 }

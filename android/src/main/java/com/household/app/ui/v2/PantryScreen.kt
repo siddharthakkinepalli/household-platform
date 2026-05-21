@@ -26,15 +26,24 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -54,15 +63,28 @@ import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.compose.theme.TextSecondary
 import com.household.app.ui.v2.components.EliteGlassCard
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class PantryBrowserViewModel(application: Application) : androidx.lifecycle.AndroidViewModel(application) {
-    private val repo = PantryRepositoryImpl(AppDatabase.getInstance(application).pantryDao())
+    private val db = AppDatabase.getInstance(application)
+    private val repo = PantryRepositoryImpl(db.pantryDao(), db.inventoryEventDao())
+    private val eventDao = db.inventoryEventDao()
 
     val items: StateFlow<List<PantryItem>> = repo.getConfirmedItems()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun consumeItem(id: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repo.consumeItem(id, 1)
+        }
+    }
+
+    suspend fun getConsumeCount(pantryItemId: Long): Int =
+        eventDao.getConsumeCountForItem(pantryItemId)
 
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
@@ -128,7 +150,7 @@ fun PantryScreen(onBack: () -> Unit = {}) {
                 PantryCategory.entries.forEach { cat ->
                     val catItems = grouped[cat] ?: return@forEach
                     item(key = cat.name) {
-                        PantryCategorySection(category = cat, items = catItems)
+                        PantryCategorySection(category = cat, items = catItems, vm = vm)
                     }
                 }
                 item { Spacer(Modifier.height(80.dp)) }
@@ -138,7 +160,7 @@ fun PantryScreen(onBack: () -> Unit = {}) {
 }
 
 @Composable
-private fun PantryCategorySection(category: PantryCategory, items: List<PantryItem>) {
+private fun PantryCategorySection(category: PantryCategory, items: List<PantryItem>, vm: PantryBrowserViewModel) {
     val color = categoryAccent(category)
     EliteGlassCard(glowColor = color, modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -150,41 +172,116 @@ private fun PantryCategorySection(category: PantryCategory, items: List<PantryIt
         )
         Spacer(Modifier.height(10.dp))
         items.forEach { item ->
-            PantryItemRow(item = item, accentColor = color)
+            PantryItemRow(item = item, accentColor = color, vm = vm)
             Spacer(Modifier.height(6.dp))
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PantryItemRow(item: PantryItem, accentColor: Color) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(accentColor.copy(alpha = 0.7f), CircleShape)
-            )
-            Text(item.name, style = MaterialTheme.typography.bodyMedium, color = TextMain)
-        }
-        if (item.quantity != 1f) {
-            Box(
-                modifier = Modifier
-                    .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = if (item.quantity % 1f == 0f) "×${item.quantity.toInt()}" else "×${"%.2f".format(item.quantity)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = accentColor
-                )
-            }
+private fun PantryItemRow(item: PantryItem, accentColor: Color, vm: PantryBrowserViewModel) {
+    val isConsumed = item.quantity <= 0f
+    val consumeCount by produceState(initialValue = 0, key1 = item.id) {
+        value = vm.getConsumeCount(item.id)
+    }
+
+    val dismissState = rememberSwipeToDismissBoxState()
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+            vm.consumeItem(item.id)
+            dismissState.reset()
         }
     }
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFEF4444).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 16.dp),
+                contentAlignment = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart)
+                    Alignment.CenterEnd else Alignment.CenterStart
+            ) {
+                Text(
+                    text = "Consumed",
+                    color = Color(0xFFEF4444),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        content = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (isConsumed) Modifier.background(Color.Transparent) else Modifier),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = if (isConsumed) Modifier.weight(1f) else Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                accentColor.copy(alpha = if (isConsumed) 0.3f else 0.7f),
+                                CircleShape
+                            )
+                    )
+                    if (isConsumed) {
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
+                                    append(item.name)
+                                }
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextMain.copy(alpha = 0.4f)
+                        )
+                    } else {
+                        Text(item.name, style = MaterialTheme.typography.bodyMedium, color = TextMain)
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (consumeCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFEF4444).copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Consumed ${consumeCount}×",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFEF4444)
+                            )
+                        }
+                    }
+                    if (item.quantity != 1f && !isConsumed) {
+                        Box(
+                            modifier = Modifier
+                                .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (item.quantity % 1f == 0f) "×${item.quantity.toInt()}" else "×${"%.2f".format(item.quantity)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    )
 }
 
 private fun categoryAccent(cat: PantryCategory): Color = when (cat) {

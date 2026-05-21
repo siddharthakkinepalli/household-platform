@@ -33,4 +33,22 @@ interface VaultDao {
 
     @Query("SELECT * FROM vault_entries ORDER BY dateEpoch DESC LIMIT :limit")
     suspend fun getRecentEntries(limit: Int): List<VaultEntity>
+
+    @Query("SELECT * FROM vault_entries WHERE category = :category ORDER BY dateEpoch DESC")
+    fun getEntriesByCategory(category: String): Flow<List<VaultEntity>>
+
+    @Query("UPDATE vault_entries SET category = :category, documentTitle = :title WHERE id = :id")
+    suspend fun updateDocumentMeta(id: Long, category: String, title: String?)
+
+    @Query("DELETE FROM vault_entries WHERE id IN (:ids)")
+    suspend fun deleteEntries(ids: List<Long>)
+
+    @Query("UPDATE vault_entries SET category = :category WHERE id IN (:ids)")
+    suspend fun moveEntries(ids: List<Long>, category: String)
+
+    @Query("SELECT * FROM vault_entries ORDER BY dateEpoch DESC")
+    suspend fun getAllEntriesList(): List<VaultEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertEntries(entries: List<VaultEntity>)
 }

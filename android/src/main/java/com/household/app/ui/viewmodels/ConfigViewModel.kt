@@ -6,8 +6,10 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.household.app.data.AppDatabase
 import com.household.app.data.DashboardPrefs
 import com.household.app.data.config.CsvParserService
@@ -15,6 +17,7 @@ import com.household.app.data.config.ImportErrorType
 import com.household.app.data.config.ImportParseResult
 import com.household.app.data.config.ImportSummary
 import com.household.app.data.config.RuleEngineService
+import com.household.app.domain.services.RetroactiveCategorizer
 import com.household.app.data.entities.CategoryThresholdEntity
 import com.household.app.data.entities.ImportAuditEntity
 import com.household.app.data.entities.MerchantRuleEntity
@@ -128,6 +131,12 @@ data class ConfigUiState(
 class ConfigViewModel(application: Application) : AndroidViewModel(application) {
     private val db by lazy { AppDatabase.getInstance(getApplication()) }
     private val parser = CsvParserService()
+    private val retroactiveCategorizer by lazy {
+        RetroactiveCategorizer(
+            merchantRuleDao = db.merchantRuleDao(),
+            walletTransactionDao = db.walletTransactionDao()
+        )
+    }
 
     private val _uiState = MutableStateFlow(ConfigUiState())
     val uiState: StateFlow<ConfigUiState> = _uiState.asStateFlow()
@@ -306,6 +315,8 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
                             salaryAnchorDate = _uiState.value.salaryAnchor
                         )
                     )
+                    // Apply merchant rules to newly imported transactions
+                    retroactiveCategorizer.recategorizeAll()
                 }
                 refreshState()
                 _uiState.update { it.copy(importWorkflow = ImportWorkflow.Success(current.summary.parsedCount)) }
@@ -448,10 +459,17 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.update { it.copy(connectedEmail = email, signInError = null) }
             refreshState()
         } else {
-            val code = (task.exception as? ApiException)?.statusCode ?: -1
-            _uiState.update {
-                it.copy(signInError = "Sign-in failed (error $code). Check SHA-1 is registered in Google Cloud Console.")
+            val apiEx = task.exception as? ApiException
+            val code = apiEx?.statusCode ?: -1
+            val codeName = CommonStatusCodes.getStatusCodeString(code)
+            Log.e("DriveAuth", "Sign-in failed: code=$code ($codeName)", task.exception)
+            val hint = when (code) {
+                10   -> "DEVELOPER_ERROR — check SHA-1 + package name in GCP OAuth client"
+                12500 -> "SIGN_IN_FAILED — ensure Drive API is enabled and OAuth consent screen is configured"
+                12501 -> "Sign-in cancelled"
+                else -> "error $code ($codeName)"
             }
+            _uiState.update { it.copy(signInError = "Sign-in failed: $hint") }
         }
     }
 
@@ -473,12 +491,10 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun defaultThresholds(): List<CategoryThreshold> {
         return listOf(
-            CategoryThreshold("groceries", "Groceries", 450f),
-            CategoryThreshold("housing", "Housing", 1200f),
-            CategoryThreshold("transport", "Transport", 280f),
-            CategoryThreshold("dining", "Dining Out", 240f),
-            CategoryThreshold("utilities", "Utilities", 320f),
-            CategoryThreshold("family", "Family", 300f)
+            CategoryThreshold("groceries", "Groceries", 600f),
+            CategoryThreshold("travel",    "Travel",    150f),
+            CategoryThreshold("dining",    "Dining / Eat Out", 120f),
+            CategoryThreshold("shopping",  "Shopping",  120f)
         )
     }
 
