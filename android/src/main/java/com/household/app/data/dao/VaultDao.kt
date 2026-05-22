@@ -46,9 +46,26 @@ interface VaultDao {
     @Query("UPDATE vault_entries SET category = :category WHERE id IN (:ids)")
     suspend fun moveEntries(ids: List<Long>, category: String)
 
+    @Query(
+        """
+        UPDATE vault_entries
+        SET category = :category, ownerMemberId = :ownerMemberId, subFolder = :subFolder
+        WHERE id IN (:ids)
+        """
+    )
+    suspend fun moveEntriesToFolder(
+        ids: List<Long>,
+        category: String,
+        ownerMemberId: Long?,
+        subFolder: String
+    )
+
     @Query("SELECT * FROM vault_entries ORDER BY dateEpoch DESC")
     suspend fun getAllEntriesList(): List<VaultEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEntries(entries: List<VaultEntity>)
+
+    @Query("UPDATE vault_entries SET ownerMemberId = NULL WHERE ownerMemberId = :memberId")
+    suspend fun clearOwnerFromEntries(memberId: Long)
 }

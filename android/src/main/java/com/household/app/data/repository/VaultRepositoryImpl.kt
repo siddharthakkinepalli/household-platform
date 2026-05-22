@@ -8,6 +8,8 @@ import com.household.app.data.entities.VaultEntity
 import com.household.app.data.service.FileStorageService
 import com.household.app.domain.models.RefinedScan
 import com.household.app.domain.models.vault.VaultCategory
+import com.household.app.domain.models.vault.VaultFolderPath
+import com.household.app.domain.models.vault.VaultSubFolder
 import com.household.app.domain.models.vault.VisionTextPayload
 import com.household.app.domain.repositories.VaultRepository
 import com.household.app.domain.services.ReceiptItemParser
@@ -73,7 +75,7 @@ class VaultRepositoryImpl(
     override suspend fun saveDocument(
         uri: Uri,
         mimeType: String,
-        category: VaultCategory,
+        folder: VaultFolderPath,
         title: String
     ): Long {
         val path = storageService.saveDocument(uri, mimeType)
@@ -83,7 +85,9 @@ class VaultRepositoryImpl(
             totalAmount = null,
             dateEpoch = LocalDate.now().toEpochDay(),
             rawOcrContent = "",
-            category = category.name,
+            category = folder.category.name,
+            ownerMemberId = folder.ownerMemberId,
+            subFolder = VaultSubFolder.normalizeId(folder.subFolder),
             documentTitle = title.trim().ifBlank { null },
             mimeType = mimeType
         )
@@ -104,6 +108,15 @@ class VaultRepositoryImpl(
 
     override suspend fun moveEntries(ids: List<Long>, category: VaultCategory) {
         vaultDao.moveEntries(ids, category.name)
+    }
+
+    override suspend fun moveEntriesToFolder(ids: List<Long>, folder: VaultFolderPath) {
+        vaultDao.moveEntriesToFolder(
+            ids = ids,
+            category = folder.category.name,
+            ownerMemberId = folder.ownerMemberId,
+            subFolder = VaultSubFolder.normalizeId(folder.subFolder)
+        )
     }
 
     private suspend fun stageReceiptItems(vaultId: Long, receiptText: String) {

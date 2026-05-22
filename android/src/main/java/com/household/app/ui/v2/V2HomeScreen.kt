@@ -243,8 +243,16 @@ fun V2HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         rowModules.forEach { module ->
+                            val subtitle = when (module.id) {
+                                "family" -> when (state.familyMemberCount) {
+                                    0 -> "Add household members"
+                                    1 -> "1 member"
+                                    else -> "${state.familyMemberCount} members"
+                                }
+                                else -> module.subtitle
+                            }
                             ModuleCard(
-                                module = module,
+                                module = module.copy(subtitle = subtitle),
                                 modifier = Modifier.weight(1f),
                                 onClick = { onNavigateToModule(module.route) }
                             )

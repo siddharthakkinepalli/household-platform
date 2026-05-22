@@ -35,9 +35,18 @@ sealed class Screen(
     }
     object Pantry : Screen("pantry", Icons.Rounded.ShoppingCart, "Pantry")
     object Family : Screen("family", Icons.Rounded.Group,                 "Family")
+    object FamilyMemberDetail : Screen("family_member/{memberId}", Icons.Rounded.Group, "Member") {
+        fun route(memberId: Long) = "family_member/$memberId"
+    }
     object Config : Screen("config", Icons.Rounded.Tune,                  "Config")
     object MerchantRules : Screen("merchant_rules", Icons.Rounded.Tune,   "Merchant Rules")
     object Documents : Screen("documents", Icons.Rounded.FolderOpen,      "Documents")
+    object DocumentsForOwner : Screen("documents/owner/{ownerId}", Icons.Rounded.FolderOpen, "Contracts") {
+        fun route(ownerId: Long) = "documents/owner/$ownerId"
+    }
+    object DocsForMember : Screen("docs/for_member/{memberId}", Icons.Rounded.FolderOpen, "Vault") {
+        fun route(memberId: Long) = "docs/for_member/$memberId"
+    }
     object QrHost : Screen("qr_host", Icons.Rounded.Tune, "Share My Data")
     object QrScan : Screen("qr_scan", Icons.Rounded.Tune, "Scan Partner's QR")
 

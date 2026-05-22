@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.household.app.data.entities.DocumentEntity
 import com.household.app.data.entities.DocumentType
+import com.household.app.domain.models.vault.VaultFolderTree
 import com.household.app.ui.compose.theme.LumeCyan
 import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.TextMain
@@ -54,7 +55,9 @@ import java.util.Locale
 @Composable
 fun AddDocumentSheet(
     onDismiss: () -> Unit,
-    onSave: (DocumentEntity) -> Unit
+    onSave: (DocumentEntity) -> Unit,
+    ownerMemberId: Long? = null,
+    ownerOptions: List<Pair<Long?, String>> = emptyList()
 ) {
     val sheetState = rememberModalBottomSheetState()
 
@@ -65,6 +68,8 @@ fun AddDocumentSheet(
     var monthlyCost by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var typeMenuExpanded by remember { mutableStateOf(false) }
+    var ownerMenuExpanded by remember { mutableStateOf(false) }
+    var selectedOwnerId by remember(ownerMemberId) { mutableStateOf(ownerMemberId) }
     var expiryError by remember { mutableStateOf(false) }
 
     val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -115,6 +120,41 @@ fun AddDocumentSheet(
                 colors = fieldColors,
                 singleLine = true
             )
+
+            if (ownerOptions.isNotEmpty()) {
+                val ownerLabel = ownerOptions.firstOrNull { it.first == selectedOwnerId }?.second
+                    ?: VaultFolderTree.HOUSEHOLD_LABEL
+                ExposedDropdownMenuBox(
+                    expanded = ownerMenuExpanded,
+                    onExpandedChange = { ownerMenuExpanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = ownerLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Owner") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = ownerMenuExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        colors = fieldColors
+                    )
+                    ExposedDropdownMenu(
+                        expanded = ownerMenuExpanded,
+                        onDismissRequest = { ownerMenuExpanded = false },
+                        modifier = Modifier.background(Color(0xFF10141D))
+                    ) {
+                        ownerOptions.forEach { (id, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label, color = TextMain) },
+                                onClick = {
+                                    selectedOwnerId = id
+                                    ownerMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             // Type dropdown
             ExposedDropdownMenuBox(
@@ -261,6 +301,7 @@ fun AddDocumentSheet(
                     val now = System.currentTimeMillis()
                     onSave(
                         DocumentEntity(
+                            ownerId = selectedOwnerId,
                             title = trimmedTitle,
                             type = selectedType,
                             expiryDate = expiryEpoch,

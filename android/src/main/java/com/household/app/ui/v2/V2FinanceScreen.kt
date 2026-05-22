@@ -1,6 +1,5 @@
 package com.household.app.ui.v2
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,14 +20,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.CardGiftcard
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Flight
 import androidx.compose.material.icons.rounded.LocalGroceryStore
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
-import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -57,11 +61,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -70,19 +70,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.household.app.ui.compose.theme.CriticalRed
 import com.household.app.ui.compose.theme.LumeAmber
+import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.LumePurple
 import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextSecondary
 import com.household.app.ui.v2.components.EliteGlassCard
 import com.household.app.ui.viewmodels.CategorySummary
 import com.household.app.ui.viewmodels.ExpensesViewModel
+import com.household.app.ui.viewmodels.PulseData
+import com.household.app.ui.viewmodels.PulseStatus
 import com.household.app.ui.viewmodels.Transaction
 import kotlin.math.abs
 
 private data class CategoryBlockUi(
     val name: String,
-    val amountLeft: Double,
+    val spent: Double,
+    val limit: Float,
     val color: Color,
     val icon: ImageVector
 )
@@ -107,20 +112,20 @@ fun V2FinanceScreen(
     val selectedCategory by viewModel.selectedCategory.observeAsState("All")
     val selectedTimeFilter by viewModel.selectedTimeFilter.observeAsState("Current Cycle")
     val activePeriodLabel by viewModel.activePeriodLabel.observeAsState("Current cycle")
-    val budgetLeft by viewModel.budgetLeft.observeAsState(0.0)
+    val householdPulse by viewModel.householdPulse.observeAsState()
+    val categoryLimits by viewModel.categoryLimits.observeAsState(emptyMap())
     var editingTransactionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
     val editingTransaction = remember(editingTransactionId, transactions) {
         transactions.firstOrNull { it.id == editingTransactionId }
     }
 
-    val categoryGrid = remember(categorySummary) {
+    val categoryGrid = remember(categorySummary, categoryLimits) {
         listOf(
-            CategoryBlockUi("Groceries", categoryAmountFor(categorySummary, "Groceries"), Color(0xFF14B8A6), Icons.Rounded.ShoppingCart),
-            CategoryBlockUi("Eat Out", categoryAmountFor(categorySummary, "Eat Out"), Color(0xFFF59E0B), Icons.Rounded.Restaurant),
-            CategoryBlockUi("Travel", categoryAmountFor(categorySummary, "Travel"), Color(0xFF3B82F6), Icons.Rounded.Flight),
-            CategoryBlockUi("Utilities", categoryAmountFor(categorySummary, "Utilities"), Color(0xFF8B5CF6), Icons.Rounded.Payments),
-            CategoryBlockUi("Transfers", categoryAmountFor(categorySummary, "Transfers"), Color(0xFF06B6D4), Icons.Rounded.Flight),
-            CategoryBlockUi("Shopping", categoryAmountFor(categorySummary, "Shopping"), Color(0xFFEC4899), Icons.Rounded.CardGiftcard)
+            CategoryBlockUi("Groceries", categoryAmountFor(categorySummary, "Groceries"), categoryLimits["Groceries"] ?: 600f, Color(0xFF14B8A6), Icons.Rounded.ShoppingCart),
+            CategoryBlockUi("Eat Out",   categoryAmountFor(categorySummary, "Eat Out"),   categoryLimits["Eat Out"]   ?: 100f, Color(0xFFF59E0B), Icons.Rounded.Restaurant),
+            CategoryBlockUi("Travel",    categoryAmountFor(categorySummary, "Travel"),    categoryLimits["Travel"]    ?: 195f, Color(0xFF3B82F6), Icons.Rounded.Flight),
+            CategoryBlockUi("Shopping",  categoryAmountFor(categorySummary, "Shopping"),  categoryLimits["Shopping"]  ?: 100f, Color(0xFFEC4899), Icons.Rounded.CardGiftcard)
         )
     }
 
@@ -133,8 +138,13 @@ fun V2FinanceScreen(
         }
     }
 
-    val groupedTransactions = remember(filteredTransactions) {
-        filteredTransactions.groupBy { it.date.ifBlank { "Unknown Date" } }
+    val searchFilteredTransactions = remember(filteredTransactions, searchQuery) {
+        if (searchQuery.isBlank()) filteredTransactions
+        else filteredTransactions.filter { it.description.contains(searchQuery, ignoreCase = true) }
+    }
+
+    val groupedTransactions = remember(searchFilteredTransactions) {
+        searchFilteredTransactions.groupBy { it.date.ifBlank { "Unknown Date" } }
     }
 
     Box(
@@ -181,7 +191,7 @@ fun V2FinanceScreen(
             }
 
             item {
-                WalletHeroCard(budgetLeft, filteredTransactions.take(14).map { abs(it.amount).toFloat() })
+                householdPulse?.let { HouseholdPulseCard(it) }
             }
 
             item {
@@ -199,6 +209,10 @@ fun V2FinanceScreen(
                     selectedFilter = selectedTimeFilter,
                     onFilterSelect = viewModel::selectTimeFilter
                 )
+            }
+
+            item {
+                WalletSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
             }
 
             item {
@@ -228,85 +242,128 @@ fun V2FinanceScreen(
 }
 
 @Composable
-private fun WalletHeroCard(totalBudgetLeft: Double, sparklineValues: List<Float>) {
-    EliteGlassCard(glowColor = LumePurple.copy(alpha = 0.40f), modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(194.dp)
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.height(54.dp))
-                Text(
-                    "BUDGET OVERVIEW",
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 2.sp,
-                    color = TextMain.copy(alpha = 0.62f)
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(
-                            SpanStyle(
-                                color = TextMain.copy(alpha = 0.72f),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        ) {
-                            append("EUR ")
-                        }
-                        withStyle(
-                            SpanStyle(
-                                color = TextMain,
-                                fontSize = MaterialTheme.typography.displayLarge.fontSize,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        ) {
-                            append("${"%.2f".format(totalBudgetLeft)}")
-                        }
-                    },
-                    lineHeight = MaterialTheme.typography.displayLarge.lineHeight
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "TOTAL BUDGET LEFT",
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 2.sp,
-                    color = TextMain.copy(alpha = 0.40f)
-                )
-            }
-
-            Surface(
-                color = LumeAmber.copy(alpha = 0.15f),
-                shape = CircleShape,
-                border = BorderStroke(1.dp, LumeAmber.copy(alpha = 0.45f)),
-                modifier = Modifier.align(Alignment.TopEnd)
+private fun HouseholdPulseCard(pulse: PulseData) {
+    val statusColor = when (pulse.status) {
+        PulseStatus.SAFE -> LumeEmerald
+        PulseStatus.WARNING -> LumeAmber
+        PulseStatus.CRITICAL -> CriticalRed
+    }
+    val statusLabel = when (pulse.status) {
+        PulseStatus.SAFE -> "● Safe"
+        PulseStatus.WARNING -> "◐ Watch"
+        PulseStatus.CRITICAL -> "⚠ Alert"
+    }
+    EliteGlassCard(glowColor = statusColor.copy(alpha = 0.28f), modifier = Modifier.fillMaxWidth()) {
+        Column {
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    "HOUSEHOLD PULSE",
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 2.sp,
+                    color = TextMain.copy(alpha = 0.55f)
+                )
+                Surface(
+                    color = statusColor.copy(alpha = 0.14f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.38f))
                 ) {
-                    Icon(Icons.Rounded.Star, null, tint = LumeAmber, modifier = Modifier.size(12.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Star Member", color = LumeAmber, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        statusLabel,
+                        color = statusColor,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 42.dp)
-            ) {
-                LumeSparkline(
-                    values = sparklineValues,
-                    glowColor = LumePurple.copy(alpha = 0.30f),
-                    lineColor = Color.White,
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(60.dp)
+            Spacer(Modifier.height(14.dp))
+
+            // Primary metric
+            Text(
+                pulse.headline,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = statusColor
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = TextMain.copy(alpha = 0.65f), fontSize = 16.sp, fontWeight = FontWeight.Bold)) {
+                        append("€")
+                    }
+                    withStyle(SpanStyle(color = TextMain, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)) {
+                        append("%.0f".format(pulse.projectedAmount))
+                    }
+                    withStyle(SpanStyle(color = TextMain.copy(alpha = 0.42f), fontSize = 13.sp)) {
+                        append("  ${pulse.projectedLabel}")
+                    }
+                }
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+            Spacer(Modifier.height(14.dp))
+
+            // Insight rows
+            val hasAnyInsight = pulse.topRisk != null || pulse.upcoming != null || pulse.suggestion != null
+            if (!hasAnyInsight) {
+                Text(
+                    "No concerns this cycle. Keep it up.",
+                    color = TextMain.copy(alpha = 0.40f),
+                    style = MaterialTheme.typography.bodySmall
                 )
+            } else {
+                pulse.topRisk?.let {
+                    PulseInsightRow(Icons.Rounded.TrendingUp, "Top risk", it, LumeAmber)
+                    Spacer(Modifier.height(10.dp))
+                }
+                pulse.upcoming?.let {
+                    PulseInsightRow(Icons.Rounded.CalendarToday, "Upcoming", it, TextMain.copy(alpha = 0.60f))
+                    Spacer(Modifier.height(10.dp))
+                }
+                pulse.suggestion?.let {
+                    PulseSuggestionRow(it)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PulseInsightRow(icon: ImageVector, label: String, value: String, iconTint: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Icon(icon, null, tint = iconTint, modifier = Modifier.size(14.dp).padding(top = 2.dp))
+        Column {
+            Text(
+                label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.sp,
+                color = TextMain.copy(alpha = 0.38f)
+            )
+            Text(value, style = MaterialTheme.typography.bodyMedium, color = TextMain, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun PulseSuggestionRow(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(LumePurple.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
+            .border(1.dp, LumePurple.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(Icons.Rounded.AutoAwesome, null, tint = LumePurple, modifier = Modifier.size(14.dp))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = TextMain.copy(alpha = 0.85f))
     }
 }
 
@@ -327,7 +384,7 @@ private fun CategoryGrid(
                         data = category,
                         modifier = Modifier.weight(1f),
                         isSelected = selectedCategory == category.name,
-                        isFeatured = selectedCategory == "All" && category.name == "Groceries",
+                        isFeatured = false,
                         onClick = { onCategoryClick(category.name) }
                     )
                 }
@@ -345,45 +402,57 @@ private fun CategoryGridItem(
     onClick: () -> Unit
 ) {
     val active = isSelected || isFeatured
-    Box(
+    val utilization = if (data.limit > 0) (data.spent / data.limit).coerceIn(0.0, 1.0).toFloat() else 0f
+    val barColor = when {
+        utilization >= 1f   -> CriticalRed
+        utilization >= 0.75f -> LumeAmber
+        else                -> data.color
+    }
+    Column(
         modifier = modifier
-            .height(112.dp)
             .background(
                 color = if (active) data.color.copy(alpha = 0.14f) else Color(0xFFB7C6E6).copy(alpha = 0.05f),
                 shape = RoundedCornerShape(24.dp)
             )
             .border(
                 width = if (active) 2.dp else 1.dp,
-                brush = if (active) {
-                    Brush.linearGradient(
-                        listOf(
-                            data.color,
-                            data.color.copy(alpha = 0.20f)
-                        )
-                    )
-                } else {
-                    SolidColor(Color.White.copy(alpha = 0.10f))
-                },
+                brush = if (active) Brush.linearGradient(listOf(data.color, data.color.copy(alpha = 0.20f)))
+                        else SolidColor(Color.White.copy(alpha = 0.10f)),
                 shape = RoundedCornerShape(24.dp)
             )
             .clickable(onClick = onClick)
-            .padding(14.dp)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Icon(
-                imageVector = data.icon,
-                contentDescription = data.name,
-                tint = if (active) data.color else TextMain.copy(alpha = 0.65f),
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.weight(1f))
-            Text(data.name, style = MaterialTheme.typography.labelMedium, color = TextMain.copy(alpha = 0.70f))
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "EUR ${"%.2f".format(data.amountLeft)}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextMain
+        Icon(
+            imageVector = data.icon,
+            contentDescription = data.name,
+            tint = if (active) data.color else TextMain.copy(alpha = 0.65f),
+            modifier = Modifier.size(18.dp)
+        )
+        Text(data.name, style = MaterialTheme.typography.labelSmall, color = TextMain.copy(alpha = 0.65f))
+        Text(
+            "€${"%.0f".format(data.spent)}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (utilization >= 1f) CriticalRed else TextMain
+        )
+        Text(
+            "of €${data.limit.toInt()}",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMain.copy(alpha = 0.40f)
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(2.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(utilization)
+                    .height(3.dp)
+                    .background(barColor, RoundedCornerShape(2.dp))
             )
         }
     }
@@ -421,6 +490,49 @@ private fun LumeFilterPill(
                     style = MaterialTheme.typography.labelMedium
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WalletSearchBar(query: String, onQueryChange: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Rounded.Search, null, tint = TextMain.copy(alpha = 0.45f), modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(10.dp))
+        Box(modifier = Modifier.weight(1f)) {
+            if (query.isEmpty()) {
+                Text(
+                    "Search transactions…",
+                    color = TextMain.copy(alpha = 0.35f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextMain),
+                cursorBrush = SolidColor(LumePurple),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        if (query.isNotEmpty()) {
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.Rounded.Close,
+                null,
+                tint = TextMain.copy(alpha = 0.45f),
+                modifier = Modifier
+                    .size(16.dp)
+                    .clickable { onQueryChange("") }
+            )
         }
     }
 }
@@ -590,40 +702,6 @@ private fun TransactionEditSheet(
     }
 }
 
-@Composable
-private fun LumeSparkline(
-    values: List<Float>,
-    glowColor: Color,
-    lineColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val points = if (values.isEmpty()) listOf(0.2f, 0.6f, 0.35f, 0.72f, 0.45f) else values
-    Canvas(modifier = modifier) {
-        val max = points.maxOrNull()?.coerceAtLeast(1f) ?: 1f
-        val min = points.minOrNull() ?: 0f
-        val span = (max - min).coerceAtLeast(1f)
-        val step = size.width / (points.size - 1).coerceAtLeast(1)
-        val path = Path()
-
-        points.forEachIndexed { index, value ->
-            val x = index * step
-            val norm = (value - min) / span
-            val y = size.height - (norm * size.height)
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-
-        drawPath(
-            path = path,
-            color = glowColor,
-            style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.cornerPathEffect(12f))
-        )
-        drawPath(
-            path = path,
-            color = lineColor,
-            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.cornerPathEffect(12f))
-        )
-    }
-}
 
 private fun categoryAmountFor(summary: List<CategorySummary>, target: String): Double {
     return summary

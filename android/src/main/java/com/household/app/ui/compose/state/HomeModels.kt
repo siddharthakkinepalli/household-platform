@@ -96,7 +96,8 @@ data class HomeState(
     val salaryAnchorDay: Int = 25,
     val loading: Boolean = false,
     val error: String? = null,
-    val categoryBudgets: List<CategoryBudget> = emptyList()
+    val categoryBudgets: List<CategoryBudget> = emptyList(),
+    val familyMemberCount: Int = 0
 )
 
 sealed class HomeIntent {

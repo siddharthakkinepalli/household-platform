@@ -133,7 +133,8 @@ fun V2ConfigHubScreen(
     onBack: () -> Unit = {},
     onNavigateToMerchantRules: () -> Unit = {},
     onNavigateToQrHost: () -> Unit = {},
-    onNavigateToQrScan: () -> Unit = {}
+    onNavigateToQrScan: () -> Unit = {},
+    onNavigateToFamily: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: ConfigViewModel = viewModel(
@@ -270,6 +271,11 @@ fun V2ConfigHubScreen(
             // 7 — Merchant Rules navigation entry
             item {
                 MerchantRulesNavCard(onClick = onNavigateToMerchantRules)
+            }
+
+            // 7b — Household members
+            item {
+                FamilyNavCard(onClick = onNavigateToFamily)
             }
 
             // 8 — Pair with partner device
@@ -1129,6 +1135,50 @@ private fun MerchantRulesNavCard(onClick: () -> Unit) {
                 )
                 Text(
                     text = "Manage pattern-based auto-categorization rules",
+                    color = LumeWhite.copy(alpha = 0.55f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = LumeWhite.copy(alpha = 0.55f),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FamilyNavCard(onClick: () -> Unit) {
+    EliteGlassCard(
+        glowColor = LumeAmber.copy(alpha = 0.14f),
+        borderAlpha = 0.14f
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "HOUSEHOLD",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LumeWhite.copy(alpha = 0.6f),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Family members",
+                    color = TextMain,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Add people for document folders and identity filing",
                     color = LumeWhite.copy(alpha = 0.55f),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp)

@@ -491,10 +491,10 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun defaultThresholds(): List<CategoryThreshold> {
         return listOf(
-            CategoryThreshold("groceries", "Groceries", 600f),
-            CategoryThreshold("travel",    "Travel",    150f),
-            CategoryThreshold("dining",    "Dining / Eat Out", 120f),
-            CategoryThreshold("shopping",  "Shopping",  120f)
+            CategoryThreshold("groceries", "Groceries",       600f),
+            CategoryThreshold("travel",    "Travel",          195f),
+            CategoryThreshold("dining",    "Dining / Eat Out", 100f),
+            CategoryThreshold("shopping",  "Shopping",        100f)
         )
     }
 

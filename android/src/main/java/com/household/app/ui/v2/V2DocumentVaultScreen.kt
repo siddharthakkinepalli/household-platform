@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -105,7 +106,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.household.app.data.entities.VaultEntity
+import com.household.app.domain.models.vault.VaultBrowseState
 import com.household.app.domain.models.vault.VaultCategory
+import com.household.app.domain.models.vault.VaultFolderPath
+import com.household.app.domain.models.vault.VaultFolderTree
 import com.household.app.ui.compose.theme.ConfigAccent
 import com.household.app.ui.compose.theme.EliteNavy
 import com.household.app.ui.compose.theme.LumeAmber
@@ -117,6 +121,10 @@ import com.household.app.ui.compose.theme.TextMuted
 import com.household.app.ui.v2.components.ConfirmScanSheet
 import com.household.app.ui.v2.components.EliteGlassCard
 import com.household.app.ui.v2.components.ScanConfirmationState
+import com.household.app.ui.v2.components.VaultFolderBreadcrumb
+import com.household.app.ui.v2.components.VaultFolderList
+import com.household.app.ui.v2.components.VaultFolderPickerSheet
+import com.household.app.ui.v2.components.VaultMoveToFolderSheet
 import com.household.app.ui.viewmodels.VaultUiState
 import com.household.app.ui.viewmodels.VaultViewModel
 import kotlinx.coroutines.Dispatchers
@@ -128,7 +136,8 @@ import kotlinx.coroutines.withContext
 fun V2DocumentVaultScreen(
     onScanClick: () -> Unit = {},
     onStagingRequested: (vaultId: Long) -> Unit = {},
-    onPantryClick: () -> Unit = {}
+    onPantryClick: () -> Unit = {},
+    onNavigateToFamily: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val activity = context as ComponentActivity
@@ -140,7 +149,10 @@ fun V2DocumentVaultScreen(
     )
     val vaultUiState by viewModel.uiState.collectAsStateWithLifecycle()
     val vaultEntries by viewModel.vaultEntries.collectAsStateWithLifecycle()
-    val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
+    val browseState by viewModel.browseState.collectAsStateWithLifecycle()
+    val folderRows by viewModel.folderRows.collectAsStateWithLifecycle()
+    val showFolderBrowser by viewModel.showFolderBrowser.collectAsStateWithLifecycle()
+    val familyMembers by viewModel.familyMembers.collectAsStateWithLifecycle()
 
     var fabExpanded by remember { mutableStateOf(false) }
     var selectedEntry by remember { mutableStateOf<VaultEntity?>(null) }
@@ -174,6 +186,14 @@ fun V2DocumentVaultScreen(
             }
     }
 
+    BackHandler(enabled = browseState !is VaultBrowseState.Root) {
+        viewModel.navigateBack()
+    }
+
+    val breadcrumb = remember(browseState, familyMembers) {
+        VaultFolderTree.breadcrumb(browseState, familyMembers)
+    }
+
     Scaffold(
         topBar = { VaultTopBar(onPantryClick = onPantryClick) },
         floatingActionButton = {
@@ -191,18 +211,23 @@ fun V2DocumentVaultScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            CategoryFilterRow(
-                selected = selectedCategory,
-                onSelect = { viewModel.selectCategory(it) }
+            VaultFolderBreadcrumb(
+                segments = breadcrumb,
+                onNavigate = { viewModel.navigateTo(it) }
             )
 
-            // Scrim lives INSIDE the Scaffold content so the FAB layer stays above it
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     vaultUiState is VaultUiState.Loading -> LoadingGlow()
-                    vaultEntries.isEmpty()               -> EmptyVaultPrompt(selectedCategory)
-                    else                                 -> VaultGallery(
+                    showFolderBrowser -> VaultFolderList(
+                        rows = folderRows,
+                        onRowClick = { viewModel.navigateTo(it) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    vaultEntries.isEmpty() -> EmptyVaultPrompt(browseState)
+                    else -> VaultGallery(
                         entries = vaultEntries,
+                        members = familyMembers,
                         selectedIds = selectedIds,
                         onEntryClick = { entry ->
                             if (selectedIds.isNotEmpty()) {
@@ -257,15 +282,23 @@ fun V2DocumentVaultScreen(
     }
 
     if (showUploadSheet && pendingUri != null) {
-        UploadDocumentSheet(
-            uri = pendingUri!!,
-            mimeType = pendingMime,
-            onSave = { category, title ->
-                viewModel.saveDocument(pendingUri!!, pendingMime, category, title)
+        VaultFolderPickerSheet(
+            title = "Save document",
+            members = familyMembers,
+            initialFolder = viewModel.defaultSaveFolder(),
+            onDismiss = { showUploadSheet = false; pendingUri = null },
+            onConfirm = { folder, title ->
+                viewModel.saveDocument(pendingUri!!, pendingMime, folder, title)
                 showUploadSheet = false
                 pendingUri = null
             },
-            onDismiss = { showUploadSheet = false; pendingUri = null }
+            onAddMember = onNavigateToFamily?.let { navigate ->
+                {
+                    showUploadSheet = false
+                    pendingUri = null
+                    navigate()
+                }
+            }
         )
     }
 
@@ -281,37 +314,14 @@ fun V2DocumentVaultScreen(
     }
 
     if (showMoveDialog) {
-        AlertDialog(
-            onDismissRequest = { showMoveDialog = false },
-            title = { Text("Move to category", color = TextMain) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    VaultCategory.entries.forEach { cat ->
-                        TextButton(
-                            onClick = {
-                                viewModel.moveEntries(selectedIds.toList(), cat)
-                                selectedIds.clear()
-                                showMoveDialog = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "${cat.emoji}  ${cat.label}",
-                                color = categoryColor(cat),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showMoveDialog = false }) {
-                    Text("Cancel", color = TextMuted)
-                }
-            },
-            containerColor = EliteNavy
+        VaultMoveToFolderSheet(
+            members = familyMembers,
+            onDismiss = { showMoveDialog = false },
+            onConfirm = { folder ->
+                viewModel.moveEntriesToFolder(selectedIds.toList(), folder)
+                selectedIds.clear()
+                showMoveDialog = false
+            }
         )
     }
 }
@@ -405,56 +415,6 @@ private fun VaultTopBar(onPantryClick: () -> Unit = {}) {
     )
 }
 
-// ── Category filter chips ──────────────────────────────────────────────────────
-
-@Composable
-private fun CategoryFilterRow(
-    selected: VaultCategory?,
-    onSelect: (VaultCategory?) -> Unit
-) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        item {
-            CategoryChip(
-                label = "All",
-                isSelected = selected == null,
-                onClick = { onSelect(null) }
-            )
-        }
-        items(VaultCategory.entries) { cat ->
-            CategoryChip(
-                label = cat.label,
-                isSelected = selected == cat,
-                onClick = { onSelect(if (selected == cat) null else cat) }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CategoryChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = isSelected,
-        onClick = onClick,
-        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = LumeAmber,
-            selectedLabelColor = EliteNavy,
-            containerColor = LumeWhite.copy(alpha = 0.08f),
-            labelColor = LumeWhite.copy(alpha = 0.7f)
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = isSelected,
-            borderColor = LumeWhite.copy(alpha = 0.15f),
-            selectedBorderColor = LumeAmber
-        )
-    )
-}
-
 // ── Expandable FAB ────────────────────────────────────────────────────────────
 
 @Composable
@@ -539,137 +499,6 @@ private fun VaultFab(
     }
 }
 
-// ── Upload sheet ──────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun UploadDocumentSheet(
-    uri: Uri,
-    mimeType: String,
-    onSave: (VaultCategory, String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState()
-    var title by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(VaultCategory.OTHER) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = EliteNavy,
-        dragHandle = null
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Text(
-                text = "Save Document",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextMain
-            )
-
-            // File preview hint
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(LumeWhite.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
-                    .padding(12.dp)
-            ) {
-                Icon(
-                    imageVector = if (mimeType.contains("pdf")) Icons.Rounded.PictureAsPdf else Icons.Rounded.Description,
-                    contentDescription = null,
-                    tint = LumeAmber,
-                    modifier = Modifier.size(28.dp)
-                )
-                Text(
-                    text = mimeType.substringAfterLast("/").uppercase(),
-                    color = LumeAmber,
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-
-            // Title input
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Document title (optional)", color = TextMuted) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = TextMain,
-                    unfocusedTextColor = TextMain,
-                    focusedBorderColor = LumeAmber,
-                    unfocusedBorderColor = LumeWhite.copy(alpha = 0.2f),
-                    cursorColor = LumeAmber
-                )
-            )
-
-            // Category picker
-            Text(
-                text = "Category",
-                style = MaterialTheme.typography.labelMedium,
-                color = LumeWhite.copy(alpha = 0.6f),
-                letterSpacing = 1.sp
-            )
-            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.heightIn(max = 200.dp)
-            ) {
-                items(VaultCategory.entries.size) { i ->
-                    val cat = VaultCategory.entries[i]
-                    val isSelected = cat == selectedCategory
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) LumeAmber.copy(alpha = 0.2f)
-                                else LumeWhite.copy(alpha = 0.06f)
-                            )
-                            .border(
-                                1.dp,
-                                if (isSelected) LumeAmber else LumeWhite.copy(alpha = 0.12f),
-                                RoundedCornerShape(12.dp)
-                            )
-                            .clickable { selectedCategory = cat }
-                            .padding(vertical = 10.dp, horizontal = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(cat.emoji, fontSize = 20.sp)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = cat.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) LumeAmber else TextMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
-
-            Button(
-                onClick = { onSave(selectedCategory, title) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = LumeAmber)
-            ) {
-                Text("Save to Vault", color = EliteNavy, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
 // ── Gallery states ─────────────────────────────────────────────────────────────
 
 @Composable
@@ -706,7 +535,13 @@ private fun LoadingGlow() {
 }
 
 @Composable
-private fun EmptyVaultPrompt(filter: VaultCategory?) {
+private fun EmptyVaultPrompt(browse: VaultBrowseState) {
+    val (title, hint) = when (browse) {
+        is VaultBrowseState.Folder -> "No documents in this folder" to "Tap + to upload here."
+        is VaultBrowseState.Category -> "No ${browse.category.label} yet" to "Open a person folder or upload a document."
+        is VaultBrowseState.MemberScope -> "No documents for ${browse.memberLabel}" to "Pick a subfolder or upload."
+        is VaultBrowseState.Root -> "Vault is empty" to "Tap + to upload or scan a receipt."
+    }
     Box(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
@@ -716,18 +551,13 @@ private fun EmptyVaultPrompt(filter: VaultCategory?) {
                 Icon(Icons.Rounded.FolderOpen, null, tint = LumeAmber, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = if (filter != null) "No ${filter.label} yet" else "Vault is empty",
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
                     color = TextMain,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    text = if (filter != null) "Upload a document or scan a receipt to get started."
-                           else "Tap + to upload a document or scan a receipt.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted
-                )
+                Text(text = hint, style = MaterialTheme.typography.bodySmall, color = TextMuted)
             }
         }
     }
@@ -738,6 +568,7 @@ private fun EmptyVaultPrompt(filter: VaultCategory?) {
 @Composable
 private fun VaultGallery(
     entries: List<VaultEntity>,
+    members: List<com.household.app.data.entities.FamilyMemberEntity>,
     selectedIds: List<Long>,
     onEntryClick: (VaultEntity) -> Unit,
     onEntryLongClick: (VaultEntity) -> Unit
@@ -752,6 +583,7 @@ private fun VaultGallery(
         items(entries, key = { it.id }) { entry ->
             DocumentCard(
                 entry = entry,
+                members = members,
                 isSelected = selectedIds.contains(entry.id),
                 onClick = { onEntryClick(entry) },
                 onLongClick = { onEntryLongClick(entry) }
@@ -766,6 +598,7 @@ private fun VaultGallery(
 @Composable
 private fun DocumentCard(
     entry: VaultEntity,
+    members: List<com.household.app.data.entities.FamilyMemberEntity>,
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit
@@ -819,16 +652,17 @@ private fun DocumentCard(
                 .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             Text(
-                text = "${category.emoji} ${category.label}",
+                text = VaultFolderTree.displayPath(entry, members),
                 style = MaterialTheme.typography.labelSmall,
                 color = glowColor,
-                fontSize = 10.sp
+                fontSize = 10.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
         Spacer(Modifier.height(6.dp))
 
-        // Title / merchant
         Text(
             text = entry.documentTitle ?: entry.merchantName ?: "Untitled",
             style = MaterialTheme.typography.bodyMedium,
@@ -1091,6 +925,7 @@ private fun categoryColor(category: VaultCategory): Color = when (category) {
     VaultCategory.RECEIPT      -> LumeAmber
     VaultCategory.IDENTITY     -> LumePurple
     VaultCategory.CONTRACT     -> Color(0xFF60A5FA)
+    VaultCategory.PROPERTY     -> Color(0xFFF59E0B)
     VaultCategory.UTILITY_BILL -> Color(0xFF34D399)
     VaultCategory.INSURANCE    -> Color(0xFFFB7185)
     VaultCategory.MEDICAL      -> Color(0xFF4ADE80)

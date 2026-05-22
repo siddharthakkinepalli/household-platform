@@ -61,6 +61,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.household.app.data.AppDatabase
@@ -88,7 +90,10 @@ import kotlin.math.abs
 
 // ── ViewModel ────────────────────────────────────────────────────────────────
 
-class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
+class DocumentsViewModel(
+    app: Application,
+    private val ownerIdFilter: Long? = null
+) : AndroidViewModel(app) {
 
     private val db = AppDatabase.getInstance(app)
     private val repo = DocumentRepositoryImpl(
@@ -96,9 +101,13 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
         documentAlertDao = db.documentAlertDao()
     )
 
-    val documents: StateFlow<List<DocumentEntity>> = repo
-        .getAllDocuments()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val documents: StateFlow<List<DocumentEntity>> = (
+        if (ownerIdFilter != null) {
+            db.documentDao().getDocumentsForOwner(ownerIdFilter)
+        } else {
+            repo.getAllDocuments()
+        }
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun addDocument(doc: DocumentEntity) {
         viewModelScope.launch { repo.insertDocument(doc) }
@@ -119,7 +128,18 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun DocumentsScreen(
     navController: NavController,
-    viewModel: DocumentsViewModel = viewModel()
+    ownerId: Long? = null,
+    screenTitle: String = "Documents",
+    viewModel: DocumentsViewModel = viewModel(
+        key = "documents-${ownerId ?: "all"}",
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val app = navController.context.applicationContext as Application
+                return DocumentsViewModel(app, ownerId) as T
+            }
+        }
+    )
 ) {
     val documents by viewModel.documents.collectAsStateWithLifecycle()
     var showAddSheet by remember { mutableStateOf(false) }
@@ -140,7 +160,7 @@ fun DocumentsScreen(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Documents",
+                    text = screenTitle,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = TextMain

@@ -68,7 +68,7 @@ import com.household.app.data.entities.InventoryEventEntity
         DocumentEntity::class,
         DocumentAlertEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -365,6 +365,17 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE vault_entries ADD COLUMN ownerMemberId INTEGER")
+                db.execSQL("ALTER TABLE vault_entries ADD COLUMN subFolder TEXT NOT NULL DEFAULT 'unfiled'")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_vault_entries_folder " +
+                        "ON vault_entries(category, ownerMemberId, subFolder)"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -375,7 +386,10 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "household_app.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(
+                        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10
+                    )
                     .build()
                 INSTANCE = instance
                 instance

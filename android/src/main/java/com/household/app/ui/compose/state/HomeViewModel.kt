@@ -97,6 +97,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val budgetLeft = (monthlyBudget - spent).coerceAtLeast(0.0)
 
                     val unlinkedCount = db.vaultDao().getUnlinkedCount()
+                    val familyCount   = db.familyMemberDao().getAllMembersList().size
                     val recentVault   = db.vaultDao().getRecentEntries(5)
                     val recentTx = merged
                         .filter { !it.excluded && it.amount < 0 }
@@ -164,6 +165,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             unlinkedVaultCount = unlinkedCount,
                             recentActivity     = activity,
                             categoryBudgets    = categoryBudgets,
+                            familyMemberCount  = familyCount,
                             loading            = false
                         )
                     }
