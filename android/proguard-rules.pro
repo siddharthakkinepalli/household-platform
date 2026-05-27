@@ -4,3 +4,6 @@
 -keepclassmembers class * {
     @androidx.lifecycle.* *;
 }
+
+# PdfBox-Android: JP2/JPEG2000 decoder is optional; not shipped on Android
+-dontwarn com.gemalto.jp2.JP2Decoder
