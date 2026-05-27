@@ -16,6 +16,7 @@ private val Context.driveDataStore: DataStore<Preferences> by preferencesDataSto
 object DriveDataStore {
     private val KEY_DRIVE_ENABLED = booleanPreferencesKey("drive_enabled")
     private val KEY_JUGAAD_FOLDER_ID = stringPreferencesKey("jugaad_folder_id")
+    private val KEY_INCOME_TAX_FOLDER_ID = stringPreferencesKey("income_tax_folder_id")
 
     fun observeDriveEnabled(context: Context): Flow<Boolean> =
         context.driveDataStore.data.map { it[KEY_DRIVE_ENABLED] ?: false }
@@ -34,10 +35,18 @@ object DriveDataStore {
         context.driveDataStore.edit { it[KEY_JUGAAD_FOLDER_ID] = folderId }
     }
 
+    suspend fun getIncomeTaxFolderId(context: Context): String? =
+        context.driveDataStore.data.map { it[KEY_INCOME_TAX_FOLDER_ID] }.first()
+
+    suspend fun setIncomeTaxFolderId(context: Context, folderId: String) {
+        context.driveDataStore.edit { it[KEY_INCOME_TAX_FOLDER_ID] = folderId }
+    }
+
     suspend fun clearOnSignOut(context: Context) {
         context.driveDataStore.edit {
             it[KEY_DRIVE_ENABLED] = false
             it.remove(KEY_JUGAAD_FOLDER_ID)
+            it.remove(KEY_INCOME_TAX_FOLDER_ID)
         }
     }
 }

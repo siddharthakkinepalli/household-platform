@@ -59,4 +59,7 @@ interface DocumentAlertDao {
 
     @Query("SELECT COUNT(*) FROM document_alerts WHERE daysUntil <= 7 AND isAcknowledged = 0")
     fun getUrgentCount(): Flow<Int>
+
+    @Query("SELECT * FROM document_alerts WHERE daysUntil <= :thresholdDays AND isAcknowledged = 0 ORDER BY daysUntil ASC")
+    suspend fun getAlertsDueWithinDaysList(thresholdDays: Int): List<DocumentAlertEntity>
 }

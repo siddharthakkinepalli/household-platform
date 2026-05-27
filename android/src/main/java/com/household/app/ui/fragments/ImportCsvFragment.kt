@@ -13,16 +13,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
-import com.household.app.R
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-
-import com.household.app.data.TransactionCategorizer
+import com.household.app.R
 import com.household.app.data.WalletDataLoader
 import com.household.app.data.WalletUserDataStore
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.household.app.data.config.CsvParserService
+import com.household.app.data.config.ImportParseResult
+import com.household.app.data.config.ParsedTransactionCandidate
+import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
 class ImportCsvFragment : Fragment() {
@@ -39,6 +37,7 @@ class ImportCsvFragment : Fragment() {
     private lateinit var previewContainer: LinearLayout
 
     private var preview: ImportPreview? = null
+    private val csvParserService = CsvParserService()
 
     private val pickCsvLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -100,14 +99,42 @@ class ImportCsvFragment : Fragment() {
             WalletDataLoader(requireContext()).loadTransactions()
         )
         val startingId = (baseTransactions.maxOfOrNull { it.id } ?: 0) + 1
-        val parsedPreview = parseCsv(csvText, fileName, startingId)
+        val fileHash = csvText.hashCode().toString()
 
-        preview = parsedPreview
-        textDetectedBank.text = "Detected bank: ${parsedPreview.detectedBank}"
-        textImportStatus.text = "Ready to import ${parsedPreview.parsed.size} transactions (${parsedPreview.skippedRows} skipped)."
-        buttonImportCsv.isEnabled = parsedPreview.parsed.isNotEmpty()
-        renderPreview(parsedPreview.parsed)
+        when (val result = csvParserService.parse(csvText, fileName, fileHash, startingId)) {
+            is ImportParseResult.Success -> {
+                val summary = result.summary
+                val walletTransactions = summary.transactions.map { it.toWalletTransaction() }
+                preview = ImportPreview(
+                    detectedBank = summary.detectedBank,
+                    parsed = walletTransactions,
+                    skippedRows = summary.skippedCount
+                )
+                textDetectedBank.text = "Detected bank: ${summary.detectedBank}"
+                textImportStatus.text = "Ready to import ${walletTransactions.size} transactions (${summary.skippedCount} skipped, ${summary.warningCount} uncategorized)."
+                buttonImportCsv.isEnabled = walletTransactions.isNotEmpty()
+                renderPreview(walletTransactions)
+            }
+            is ImportParseResult.Error -> {
+                textImportStatus.text = "Parse error: ${result.error}"
+                buttonImportCsv.isEnabled = false
+                renderPreview(emptyList())
+            }
+        }
     }
+
+    private fun ParsedTransactionCandidate.toWalletTransaction() = WalletDataLoader.WalletTransaction(
+        id = id,
+        title = title,
+        category = category,
+        amount = amount,
+        date = date,
+        paymentType = "Bank",
+        trip = null,
+        note = note,
+        bankName = bankName,
+        excluded = category == "Excluded"
+    )
 
     private fun renderPreview(transactions: List<WalletDataLoader.WalletTransaction>) {
         previewContainer.removeAllViews()
@@ -138,168 +165,6 @@ class ImportCsvFragment : Fragment() {
             )
             params.bottomMargin = 8
             layoutParams = params
-        }
-    }
-
-    private fun parseCsv(csvText: String, fileName: String, startingId: Int): ImportPreview {
-        val lines = csvText
-            .lineSequence()
-            .map { it.trim('\uFEFF', ' ', '\t') }
-            .filter { it.isNotBlank() }
-            .toList()
-        if (lines.size < 2) {
-            return ImportPreview("Unknown", emptyList(), 0)
-        }
-
-        val delimiter = detectDelimiter(lines.first())
-        val headers = splitCsvLine(lines.first(), delimiter)
-        val headerMap = headers.mapIndexed { index, raw ->
-            normalizeHeader(raw) to index
-        }.toMap()
-
-        val idxDate = pickIndex(headerMap, listOf("date", "bookingdate", "value date", "buchung", "valuta"))
-        val idxTitle = pickIndex(headerMap, listOf("title", "description", "purpose", "merchant", "name", "verwendungszweck", "details"))
-        val idxAmount = pickIndex(headerMap, listOf("amount", "betrag", "umsatz", "value", "sum"))
-        val idxCategory = pickIndex(headerMap, listOf("category", "budgetcategory"))
-        val idxBank = pickIndex(headerMap, listOf("bank", "account", "konto"))
-
-        val detectedBank = detectBank(lines, fileName, headers)
-        val categorizer = TransactionCategorizer()
-
-        var nextId = startingId
-        var skipped = 0
-        val parsed = mutableListOf<WalletDataLoader.WalletTransaction>()
-
-        lines.drop(1).forEach { line ->
-            val cols = splitCsvLine(line, delimiter)
-            val title = cols.getOrNull(idxTitle)?.trim().orEmpty()
-            val amount = parseAmount(cols.getOrNull(idxAmount).orEmpty())
-            val date = parseDate(cols.getOrNull(idxDate).orEmpty())
-
-            if (title.isBlank() || amount == null || date == null) {
-                skipped += 1
-                return@forEach
-            }
-
-            val bank = cols.getOrNull(idxBank)?.trim().orEmpty().ifBlank { detectedBank }
-            val sourceCategory = cols.getOrNull(idxCategory)?.trim().orEmpty().ifBlank { "Other" }
-            val classifiedCategory = categorizer.classifyCategory(title, sourceCategory)
-
-            parsed.add(
-                WalletDataLoader.WalletTransaction(
-                    id = nextId++,
-                    title = title,
-                    category = classifiedCategory,
-                    amount = amount,
-                    date = date,
-                    paymentType = "Bank",
-                    trip = null,
-                    note = "Imported from CSV",
-                    bankName = bank,
-                    excluded = false
-                )
-            )
-        }
-
-        return ImportPreview(
-            detectedBank = detectedBank,
-            parsed = parsed,
-            skippedRows = skipped
-        )
-    }
-
-    private fun detectDelimiter(headerLine: String): Char {
-        val comma = headerLine.count { it == ',' }
-        val semicolon = headerLine.count { it == ';' }
-        val tab = headerLine.count { it == '\t' }
-        return when {
-            semicolon >= comma && semicolon >= tab -> ';'
-            tab >= comma -> '\t'
-            else -> ','
-        }
-    }
-
-    private fun splitCsvLine(line: String, delimiter: Char): List<String> {
-        val out = mutableListOf<String>()
-        val current = StringBuilder()
-        var inQuotes = false
-        line.forEach { ch ->
-            when {
-                ch == '"' -> inQuotes = !inQuotes
-                ch == delimiter && !inQuotes -> {
-                    out.add(current.toString().trim())
-                    current.clear()
-                }
-                else -> current.append(ch)
-            }
-        }
-        out.add(current.toString().trim())
-        return out
-    }
-
-    private fun normalizeHeader(raw: String): String {
-        return raw
-            .lowercase(Locale.getDefault())
-            .replace("_", " ")
-            .replace("-", " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-    }
-
-    private fun pickIndex(headerMap: Map<String, Int>, candidates: List<String>): Int {
-        candidates.forEach { candidate ->
-            headerMap.entries.firstOrNull { it.key.contains(candidate) }?.let { return it.value }
-        }
-        return -1
-    }
-
-    private fun parseAmount(raw: String): Double? {
-        if (raw.isBlank()) return null
-        val cleaned = raw
-            .replace("€", "")
-            .replace("EUR", "", ignoreCase = true)
-            .replace(" ", "")
-            .trim()
-
-        val normalized = when {
-            cleaned.contains(",") && cleaned.contains(".") -> cleaned.replace(".", "").replace(",", ".")
-            cleaned.contains(",") -> cleaned.replace(",", ".")
-            else -> cleaned
-        }
-        return normalized.toDoubleOrNull()
-    }
-
-    private fun parseDate(raw: String): LocalDate? {
-        val value = raw.trim()
-        if (value.isBlank()) return null
-
-        val patterns = listOf(
-            DateTimeFormatter.ISO_DATE,
-            DateTimeFormatter.ofPattern("dd.MM.yyyy"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-            DateTimeFormatter.ofPattern("MM/dd/yyyy")
-        )
-
-        patterns.forEach { formatter ->
-            val parsed = runCatching { LocalDate.parse(value, formatter) }.getOrNull()
-            if (parsed != null) return parsed
-        }
-        return null
-    }
-
-    private fun detectBank(lines: List<String>, fileName: String, headers: List<String>): String {
-        val signal = (headers.joinToString(" ") + " " + fileName + " " + lines.take(12).joinToString(" "))
-            .lowercase(Locale.getDefault())
-
-        return when {
-            signal.contains("n26") -> "N26"
-            signal.contains("commerz") -> "Commerzbank"
-            signal.contains("deutsche bank") -> "Deutsche Bank"
-            signal.contains("dkb") -> "DKB"
-            signal.contains("sparkasse") -> "Sparkasse"
-            signal.contains("revolut") -> "Revolut"
-            signal.contains("paypal") -> "PayPal"
-            else -> "Unknown"
         }
     }
 

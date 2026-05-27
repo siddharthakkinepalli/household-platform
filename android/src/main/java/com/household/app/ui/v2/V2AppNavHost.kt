@@ -105,7 +105,8 @@ fun V2AppNavHost(
                         launchSingleTop = true
                         restoreState = true
                     }
-                }
+                },
+                onNavigateToSteuerKlar = { navController.navigate(Screen.SteuerKlar.route) }
             )
         }
 
@@ -127,7 +128,8 @@ fun V2AppNavHost(
                         launchSingleTop = true
                         restoreState = true
                     }
-                }
+                },
+                onNavigateToSubscriptionHub = { navController.navigate(Screen.SubscriptionHub.route) }
             )
         }
 
@@ -207,7 +209,8 @@ fun V2AppNavHost(
                         launchSingleTop = true
                         restoreState = true
                     }
-                }
+                },
+                onNavigateToSubscriptionHub = { navController.navigate(Screen.SubscriptionHub.route) }
             )
         }
 
@@ -217,6 +220,20 @@ fun V2AppNavHost(
 
         composable(route = Screen.QrScan.route) {
             QrScanScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(route = Screen.SteuerKlar.route) {
+            SteuerKlarScreen(
+                onNavigateToTaxSummary = { navController.navigate(Screen.TaxSummary.route) }
+            )
+        }
+
+        composable(route = Screen.SubscriptionHub.route) {
+            SubscriptionHubScreen()
+        }
+
+        composable(route = Screen.TaxSummary.route) {
+            TaxSummaryScreen(onBack = { navController.popBackStack() })
         }
     }
 }

@@ -31,6 +31,7 @@ import com.household.app.domain.usecases.GetPaperclipCandidatesUseCase
 import com.household.app.domain.usecases.LinkReceiptToExpenseUseCase
 import com.household.app.vault.DriveDataStore
 import com.household.app.vault.DriveSyncWorker
+import com.household.app.vault.workers.PipelineManager
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
@@ -119,6 +120,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
+    val upcomingAlerts: StateFlow<List<com.household.app.data.entities.DocumentAlertEntity>> =
+        db.documentAlertDao()
+            .getAlertsDueWithinDays(90)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         viewModelScope.launch {
             vaultRepository.getVaultEntries().collect { _allEntries.value = it }
@@ -178,7 +184,12 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     fun saveDocument(uri: android.net.Uri, mimeType: String, folder: VaultFolderPath, title: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val id = vaultRepository.saveDocument(uri, mimeType, folder, title)
-            if (DriveDataStore.isDriveEnabled(appContext)) enqueueDriveSync(id)
+            PipelineManager.enqueueVaultDocumentParse(appContext, id)
+            PipelineManager.enqueueReceiptMatch(appContext, id)
+            if (DriveDataStore.isDriveEnabled(appContext)) {
+                enqueueDriveSync(id)
+                PipelineManager.enqueueDriveTaxRoute(appContext, id)
+            }
             _uiState.value = VaultUiState.Idle
             if (VaultFolderTree.categoryUsesMemberLevel(folder.category)) {
                 navigateTo(VaultBrowseState.Folder(folder))
@@ -241,6 +252,8 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 pantryRepo.stageParsedItems(pantryItems)
             }
 
+            PipelineManager.enqueueVaultDocumentParse(appContext, id)
+            PipelineManager.enqueueReceiptMatch(appContext, id)
             if (DriveDataStore.isDriveEnabled(appContext)) {
                 enqueueDriveSync(id)
             }

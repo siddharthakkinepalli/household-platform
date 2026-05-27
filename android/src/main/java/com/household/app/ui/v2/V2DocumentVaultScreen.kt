@@ -18,6 +18,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -47,6 +48,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.Icons
@@ -87,6 +89,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -105,19 +108,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.household.app.data.entities.TaxTagEntity
 import com.household.app.data.entities.VaultEntity
 import com.household.app.domain.models.vault.VaultBrowseState
 import com.household.app.domain.models.vault.VaultCategory
 import com.household.app.domain.models.vault.VaultFolderPath
 import com.household.app.domain.models.vault.VaultFolderTree
 import com.household.app.ui.compose.theme.ConfigAccent
+import com.household.app.ui.compose.theme.CriticalRed
 import com.household.app.ui.compose.theme.EliteNavy
 import com.household.app.ui.compose.theme.LumeAmber
+import com.household.app.ui.compose.theme.LumeCyan
 import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.LumePurple
 import com.household.app.ui.compose.theme.LumeWhite
 import com.household.app.ui.compose.theme.TextMain
 import com.household.app.ui.compose.theme.TextMuted
+import com.household.app.ui.compose.theme.TextSecondary
 import com.household.app.ui.v2.components.ConfirmScanSheet
 import com.household.app.ui.v2.components.EliteGlassCard
 import com.household.app.ui.v2.components.ScanConfirmationState
@@ -129,6 +136,7 @@ import com.household.app.ui.viewmodels.VaultUiState
 import com.household.app.ui.viewmodels.VaultViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,7 +145,8 @@ fun V2DocumentVaultScreen(
     onScanClick: () -> Unit = {},
     onStagingRequested: (vaultId: Long) -> Unit = {},
     onPantryClick: () -> Unit = {},
-    onNavigateToFamily: (() -> Unit)? = null
+    onNavigateToFamily: (() -> Unit)? = null,
+    onNavigateToSubscriptionHub: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val activity = context as ComponentActivity
@@ -153,6 +162,7 @@ fun V2DocumentVaultScreen(
     val folderRows by viewModel.folderRows.collectAsStateWithLifecycle()
     val showFolderBrowser by viewModel.showFolderBrowser.collectAsStateWithLifecycle()
     val familyMembers by viewModel.familyMembers.collectAsStateWithLifecycle()
+    val upcomingAlerts by viewModel.upcomingAlerts.collectAsStateWithLifecycle()
 
     var fabExpanded by remember { mutableStateOf(false) }
     var selectedEntry by remember { mutableStateOf<VaultEntity?>(null) }
@@ -215,6 +225,14 @@ fun V2DocumentVaultScreen(
                 segments = breadcrumb,
                 onNavigate = { viewModel.navigateTo(it) }
             )
+
+            if (upcomingAlerts.isNotEmpty()) {
+                DocumentExpiryTimelineCard(alerts = upcomingAlerts)
+            }
+
+            if (onNavigateToSubscriptionHub != null) {
+                SubscriptionHubShortcutCard(onClick = onNavigateToSubscriptionHub)
+            }
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
@@ -728,6 +746,16 @@ private fun DocumentDetailSheet(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showTaxTagPicker by remember { mutableStateOf(false) }
+    var currentTag by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(entry.id) {
+        val existing = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.household.app.data.AppDatabase.getInstance(context).taxTagDao().getTagsFor("vault_doc", entry.id)
+        }
+        currentTag = existing.firstOrNull()?.taxCategory
+    }
 
     val category = runCatching { VaultCategory.valueOf(entry.category) }.getOrDefault(VaultCategory.OTHER)
     val isReceipt = category == VaultCategory.RECEIPT
@@ -838,6 +866,16 @@ private fun DocumentDetailSheet(
                     }
                 }
                 Button(
+                    onClick = { showTaxTagPicker = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = LumeEmerald.copy(alpha = 0.12f)),
+                    contentPadding = PaddingValues(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Add, null, tint = LumeEmerald, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(currentTag ?: "Tag", color = LumeEmerald, maxLines = 1)
+                }
+                Button(
                     onClick = { showDeleteConfirm = true },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4B4B).copy(alpha = 0.12f)),
@@ -863,6 +901,52 @@ private fun DocumentDetailSheet(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = TextMuted) }
+            },
+            containerColor = Color(0xFF0E1117)
+        )
+    }
+
+    if (showTaxTagPicker) {
+        val taxCategories = listOf("Arbeitsmittel", "Homeoffice", "Krankenkosten", "Spendenquittung", "Fahrtkosten", "Andere")
+        val year = LocalDate.ofEpochDay(entry.dateEpoch).year
+        AlertDialog(
+            onDismissRequest = { showTaxTagPicker = false },
+            title = { Text("Tag for Tax", color = TextMain) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    taxCategories.forEach { cat ->
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        com.household.app.data.AppDatabase.getInstance(context).taxTagDao().upsert(
+                                            TaxTagEntity(
+                                                entityType = "vault_doc",
+                                                entityId = entry.id,
+                                                taxCategory = cat,
+                                                year = year
+                                            )
+                                        )
+                                    }
+                                    currentTag = cat
+                                }
+                                showTaxTagPicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (cat == currentTag) "✓ $cat" else cat,
+                                color = if (cat == currentTag) LumeEmerald else TextSecondary
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showTaxTagPicker = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
             },
             containerColor = Color(0xFF0E1117)
         )
@@ -915,6 +999,137 @@ private fun AsyncReceiptImage(imagePath: String, modifier: Modifier = Modifier) 
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Rounded.Description, null, tint = TextMuted, modifier = Modifier.size(36.dp))
+        }
+    }
+}
+
+// ── Document Expiry Timeline Card ─────────────────────────────────────────────
+
+@Composable
+private fun DocumentExpiryTimelineCard(
+    alerts: List<com.household.app.data.entities.DocumentAlertEntity>
+) {
+    val sorted = alerts.sortedBy { it.daysUntil }
+    val visible = sorted.take(5)
+    val overflow = sorted.size - 5
+
+    EliteGlassCard(
+        glowColor = LumeAmber.copy(alpha = 0.3f),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        // Header
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.CalendarMonth,
+                contentDescription = null,
+                tint = LumeAmber,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = "Next 90 Days",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = TextMain
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Alert rows
+        visible.forEach { alert ->
+            val dotColor = when {
+                alert.daysUntil <= 7  -> CriticalRed
+                alert.daysUntil <= 30 -> LumeAmber
+                else                  -> LumeEmerald
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(dotColor, CircleShape)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = alert.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMain,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "in ${alert.daysUntil} days",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        // Overflow indicator
+        if (overflow > 0) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "+ $overflow more",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
+            )
+        }
+    }
+}
+
+// ── Subscription Hub Shortcut Card ────────────────────────────────────────────
+
+@Composable
+private fun SubscriptionHubShortcutCard(onClick: () -> Unit) {
+    EliteGlassCard(
+        glowColor = LumeCyan.copy(alpha = 0.14f),
+        borderAlpha = 0.14f,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "RECURRING",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LumeWhite.copy(alpha = 0.6f),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Subscription Hub",
+                    color = TextMain,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Fixed costs, contracts and monthly commitments",
+                    color = LumeWhite.copy(alpha = 0.55f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = LumeWhite.copy(alpha = 0.55f),
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }

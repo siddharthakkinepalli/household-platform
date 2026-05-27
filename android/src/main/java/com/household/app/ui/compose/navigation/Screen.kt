@@ -49,6 +49,9 @@ sealed class Screen(
     }
     object QrHost : Screen("qr_host", Icons.Rounded.Tune, "Share My Data")
     object QrScan : Screen("qr_scan", Icons.Rounded.Tune, "Scan Partner's QR")
+    object SteuerKlar : Screen("steuer_klar", Icons.Rounded.Tune, "SteuerKlar")
+    object SubscriptionHub : Screen("subscription_hub", Icons.Rounded.Tune, "Subscription Hub")
+    object TaxSummary : Screen("tax_summary", Icons.Rounded.Tune, "Tax Summary")
 
     companion object {
         /** Ordered list used to build primary rail items and NavHost destinations. */

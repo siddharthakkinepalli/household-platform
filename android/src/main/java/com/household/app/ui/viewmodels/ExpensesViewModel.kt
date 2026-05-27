@@ -15,11 +15,36 @@ import com.household.app.data.entities.MerchantRuleEntity
 import com.household.app.domain.utils.FiscalDateUtils
 import com.household.app.domain.utils.MerchantNameCleaner
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import kotlin.math.abs
+
+data class MonthlySpend(
+    val label: String,
+    val categories: Map<String, Double>,
+    val total: Double
+)
+
+data class SalaryAllocationData(
+    val salaryAmount: Double,
+    val salaryDateLabel: String,
+    val fixedTotal: Double,
+    val fixedBills: List<Pair<String, Double>>,
+    val discretionaryTotal: Double,
+    val remaining: Double,
+    val fixedPercent: Float,
+    val discretionaryPercent: Float,
+    val remainingPercent: Float
+)
 
 data class Transaction(
     val id: String,
@@ -35,6 +60,22 @@ data class CategorySummary(
     val category: String,
     val totalAmount: Double,
     val transactionCount: Int
+)
+
+data class CategorySparkline(
+    val category: String,
+    val prevPrevAmount: Float,
+    val prevAmount: Float,
+    val currentAmount: Float,
+    val delta: Double  // current - prev (positive = more spent)
+)
+
+data class FinancialAlert(
+    val emoji: String,
+    val label: String,
+    val detail: String,
+    val amount: Double?,
+    val tintKey: String
 )
 
 enum class PulseStatus { SAFE, WARNING, CRITICAL }
@@ -58,9 +99,81 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
     private var allTransactions: List<Transaction> = emptyList()
     private var monthlyBudget: Int = 3000
     private var salaryAnchorDay: Int = 25
+    private var currentSalarySource: com.household.app.data.entities.SalarySourceEntity? = null
+    private var currentActiveBills: List<com.household.app.data.entities.RecurringBillEntity> = emptyList()
 
     private val _recentTransactions = MutableLiveData<List<Transaction>>()
     val recentTransactions: LiveData<List<Transaction>> = _recentTransactions
+
+    private val _ftsResults = MutableStateFlow<List<Transaction>?>(null)
+    val ftsResults: StateFlow<List<Transaction>?> = _ftsResults.asStateFlow()
+
+    fun searchFts(query: String) {
+        if (query.length < 2) { _ftsResults.value = null; return }
+        viewModelScope.launch(Dispatchers.IO) {
+            val ftsQuery = "${query.trim()}*"
+            val entities = runCatching { db.walletTransactionDao().searchTransactionsFts(ftsQuery) }
+                .getOrDefault(emptyList())
+            _ftsResults.value = entities.map { e ->
+                Transaction(
+                    id = e.id.toString(),
+                    localId = e.id,
+                    description = MerchantNameCleaner.clean(e.title),
+                    amount = e.amount,
+                    category = e.category,
+                    date = e.date.toString(),
+                    bookedOn = e.date
+                )
+            }
+        }
+    }
+
+    fun clearFtsSearch() { _ftsResults.value = null }
+
+    private val _spendingTrends = MutableStateFlow<List<MonthlySpend>>(emptyList())
+    val spendingTrends: StateFlow<List<MonthlySpend>> = _spendingTrends.asStateFlow()
+
+    private fun computeSpendingTrends(transactions: List<Transaction>) {
+        val excluded = setOf("income", "salary", "excluded", "transfers")
+        val cutoff = YearMonth.now().minusMonths(5)
+        val groups = transactions
+            .filter { tx ->
+                tx.amount < 0 &&
+                tx.category.lowercase() !in excluded &&
+                !tx.category.equals("Excluded", ignoreCase = true) &&
+                YearMonth.from(tx.bookedOn) >= cutoff
+            }
+            .groupBy { YearMonth.from(it.bookedOn) }
+
+        val months = (0L..5L).map { YearMonth.now().minusMonths(5 - it) }
+        _spendingTrends.value = months.map { ym ->
+            val txForMonth = groups[ym] ?: emptyList()
+            val byCategory = txForMonth
+                .groupBy { canonicalTrendCategory(it.category) }
+                .mapValues { (_, list) -> list.sumOf { -it.amount } }
+            MonthlySpend(
+                label = ym.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                categories = byCategory,
+                total = byCategory.values.sum()
+            )
+        }
+    }
+
+    private fun canonicalTrendCategory(raw: String): String {
+        val key = raw.lowercase()
+        return when {
+            "grocer" in key -> "Groceries"
+            "dining" in key || "takeaway" in key || "mensa" in key || "school lunch" in key -> "Dining"
+            "long-distance" in key || "local transit" in key -> "Transport"
+            "travel" in key || "transport" in key -> "Transport"
+            "gas & fuel" in key || "carsharing" in key -> "Transport"
+            "shopping" in key || "clothing" in key || "home & furniture" in key || "diy" in key || "electronics" in key -> "Shopping"
+            "housing" in key || "utilities" in key || "broadcasting" in key || "internet" in key -> "Utilities"
+            "insurance" in key || "pharmacy" in key -> "Insurance"
+            "income" in key -> "Income"
+            else -> "Other"
+        }
+    }
 
     private val _categorySummary = MutableLiveData<List<CategorySummary>>()
     val categorySummary: LiveData<List<CategorySummary>> = _categorySummary
@@ -74,6 +187,9 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
     private val _selectedTimeFilter = MutableLiveData("Current Cycle")
     val selectedTimeFilter: LiveData<String> = _selectedTimeFilter
 
+    private val _customYearMonth = MutableLiveData<YearMonth?>(null)
+    val customYearMonth: LiveData<YearMonth?> = _customYearMonth
+
     private val _activePeriodLabel = MutableLiveData("")
     val activePeriodLabel: LiveData<String> = _activePeriodLabel
 
@@ -83,8 +199,20 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
     private val _householdPulse = MutableLiveData<PulseData>()
     val householdPulse: LiveData<PulseData> = _householdPulse
 
+    private val _salaryAllocation = MutableLiveData<SalaryAllocationData?>()
+    val salaryAllocation: LiveData<SalaryAllocationData?> = _salaryAllocation
+
+    private val _incomeTransactions = MutableLiveData<List<Transaction>>(emptyList())
+    val incomeTransactions: LiveData<List<Transaction>> = _incomeTransactions
+
+    private val _smartAlerts = MutableStateFlow<List<FinancialAlert>>(emptyList())
+    val smartAlerts: StateFlow<List<FinancialAlert>> = _smartAlerts.asStateFlow()
+
     private val _categoryLimits = MutableLiveData(defaultCategoryLimits())
     val categoryLimits: LiveData<Map<String, Float>> = _categoryLimits
+
+    private val _categorySparklines = MutableLiveData<List<CategorySparkline>>(emptyList())
+    val categorySparklines: LiveData<List<CategorySparkline>> = _categorySparklines
 
     init {
         refreshTransactions()
@@ -131,6 +259,15 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                     }
                     .sortedByDescending { it.bookedOn }
 
+                computeSpendingTrends(allTransactions)
+                currentSalarySource = withContext(Dispatchers.IO) { db.salarySourceDao().getSalarySource() }
+                currentActiveBills = withContext(Dispatchers.IO) { db.recurringBillDao().getActiveBills() }
+
+                val cycleRange = com.household.app.domain.utils.FiscalDateUtils.getFiscalCycleRange(LocalDate.now(), salaryAnchorDay)
+                val cycleTransactions = allTransactions.filter {
+                    !it.bookedOn.isBefore(cycleRange.first) && !it.bookedOn.isAfter(cycleRange.second)
+                }
+                computeSmartAlerts(cycleTransactions)
                 publishVisibleState()
                 _errorMessage.value = null
             } catch (error: Exception) {
@@ -144,10 +281,17 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun selectTimeFilter(filter: String) {
+        if (filter != "Custom") _customYearMonth.value = null
         _selectedTimeFilter.value = when (filter) {
             "This Month" -> "Current Cycle"
             else -> filter
         }
+        publishVisibleState()
+    }
+
+    fun selectCustomMonth(ym: YearMonth) {
+        _customYearMonth.value = ym
+        _selectedTimeFilter.value = "Custom"
         publishVisibleState()
     }
 
@@ -191,13 +335,93 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    private val taxDeductibleCategories = setOf(
+        "school fees & education", "school lunch / mensa", "local activities & sports",
+        "insurance", "pharmacy & health", "broadcasting license"
+    )
+
+    private suspend fun computeSmartAlerts(cycleTransactions: List<Transaction>) {
+        val alerts = mutableListOf<FinancialAlert>()
+        val today = LocalDate.now()
+
+        // 1. New subscriptions — spotted exactly twice (just became recurring)
+        currentActiveBills.filter { it.cycleCount == 2 && it.isActive }.take(2).forEach { bill ->
+            alerts.add(FinancialAlert(
+                emoji = "🔔",
+                label = "New subscription",
+                detail = "${bill.merchantPattern.replaceFirstChar { it.uppercase() }} · €${"%.2f".format(bill.normalizedAmount)}/mo",
+                amount = bill.normalizedAmount,
+                tintKey = "amber"
+            ))
+        }
+
+        // 2. Upcoming bills in next 10 days based on 30-day cadence from lastSeenDate
+        currentActiveBills.filter { it.isActive }.forEach { bill ->
+            val lastSeen = LocalDate.ofEpochDay(bill.lastSeenDate / 86_400_000L)
+            val nextExpected = lastSeen.plusDays(30)
+            val daysUntil = ChronoUnit.DAYS.between(today, nextExpected).toInt()
+            if (daysUntil in 0..10) {
+                alerts.add(FinancialAlert(
+                    emoji = "📅",
+                    label = if (daysUntil == 0) "Due today" else "Due in $daysUntil day${if (daysUntil == 1) "" else "s"}",
+                    detail = "${bill.merchantPattern.replaceFirstChar { it.uppercase() }} · €${"%.0f".format(bill.normalizedAmount)}",
+                    amount = bill.normalizedAmount,
+                    tintKey = if (daysUntil <= 3) "red" else "amber"
+                ))
+            }
+        }
+
+        // 3. Upcoming document expiry alerts (unacknowledged, within 30 days)
+        runCatching {
+            withContext(Dispatchers.IO) { db.documentAlertDao().getAlertsDueWithinDaysList(30) }
+        }.getOrNull()?.take(2)?.forEach { alert ->
+            alerts.add(FinancialAlert(
+                emoji = "📄",
+                label = "Expires in ${alert.daysUntil}d",
+                detail = alert.message.take(50),
+                amount = null,
+                tintKey = if (alert.daysUntil <= 7) "red" else "cyan"
+            ))
+        }
+
+        // 4. Tax-deductible spending this cycle
+        val taxTotal = cycleTransactions
+            .filter { it.amount < 0 && it.category.lowercase() in taxDeductibleCategories }
+            .sumOf { abs(it.amount) }
+        if (taxTotal >= 20.0) {
+            alerts.add(FinancialAlert(
+                emoji = "💶",
+                label = "Tax-deductible",
+                detail = "€${"%.0f".format(taxTotal)} trackable this cycle",
+                amount = taxTotal,
+                tintKey = "emerald"
+            ))
+        }
+
+        // 5. Uncategorized nudge
+        val uncategorizedCount = cycleTransactions.count {
+            it.category.equals("Uncategorized", ignoreCase = true)
+        }
+        if (uncategorizedCount > 0) {
+            alerts.add(FinancialAlert(
+                emoji = "❓",
+                label = "$uncategorizedCount uncategorized",
+                detail = "Tap a transaction to assign a category",
+                amount = null,
+                tintKey = "purple"
+            ))
+        }
+
+        _smartAlerts.value = alerts
+    }
+
     private fun publishVisibleState() {
         val timeFilteredTransactions = filterByTime(allTransactions)
         _recentTransactions.value = timeFilteredTransactions
         _categorySummary.value = buildCategorySummary(timeFilteredTransactions)
         _activePeriodLabel.value = buildActivePeriodLabel()
 
-        val budgetCategoryNames = setOf("Groceries", "Eat Out", "Travel", "Shopping")
+        val budgetCategoryNames = setOf("Groceries", "Dining", "Travel", "Shopping")
         val categorySpent = timeFilteredTransactions
             .filter { !it.category.equals("Excluded", ignoreCase = true) && it.amount < 0 }
             .filter { canonicalCategoryVM(it.category) in budgetCategoryNames }
@@ -205,6 +429,65 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
         val totalCategoryLimit = (_categoryLimits.value ?: defaultCategoryLimits()).values.sum().toDouble()
         _budgetLeft.value = totalCategoryLimit - categorySpent
         _householdPulse.value = computePulse(timeFilteredTransactions, categorySpent, totalCategoryLimit)
+
+        // Income transactions this cycle (positive amounts categorised as Income)
+        val incomeThisCycle = timeFilteredTransactions.filter { it.category.equals("Income", ignoreCase = true) }
+        _incomeTransactions.value = incomeThisCycle
+
+        // Salary allocation bar
+        val salary = currentSalarySource
+        if (salary != null) {
+            val fixedTotal = currentActiveBills.sumOf { it.normalizedAmount }
+            val bills = currentActiveBills
+                .sortedByDescending { it.normalizedAmount }
+                .take(5)
+                .map { it.merchantPattern.replaceFirstChar { c -> c.uppercase() } to it.normalizedAmount }
+            val salaryAmt = salary.lastAmount
+            val total = salaryAmt.coerceAtLeast(1.0)
+            val dateLabel = java.time.Instant.ofEpochMilli(salary.confirmedAt)
+                .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                .format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.getDefault()))
+            _salaryAllocation.value = SalaryAllocationData(
+                salaryAmount = salaryAmt,
+                salaryDateLabel = dateLabel,
+                fixedTotal = fixedTotal,
+                fixedBills = bills,
+                discretionaryTotal = categorySpent,
+                remaining = (salaryAmt - fixedTotal - categorySpent).coerceAtLeast(0.0),
+                fixedPercent = (fixedTotal / total).toFloat().coerceIn(0f, 1f),
+                discretionaryPercent = (categorySpent / total).toFloat().coerceIn(0f, 1f),
+                remainingPercent = ((salaryAmt - fixedTotal - categorySpent).coerceAtLeast(0.0) / total).toFloat().coerceIn(0f, 1f)
+            )
+        } else {
+            _salaryAllocation.value = null
+        }
+
+        // 3-cycle sparklines for category tiles
+        val today = LocalDate.now()
+        val currentRange = FiscalDateUtils.getFiscalCycleRange(today, salaryAnchorDay)
+        val prevRange = FiscalDateUtils.getPreviousFiscalCycleRange(today, salaryAnchorDay)
+        val prevPrevRange = FiscalDateUtils.getPreviousFiscalCycleRange(prevRange.first.minusDays(1), salaryAnchorDay)
+
+        fun amountForCategory(range: Pair<LocalDate, LocalDate>, cat: String): Float {
+            return allTransactions
+                .filter { !it.bookedOn.isBefore(range.first) && !it.bookedOn.isAfter(range.second) }
+                .filter { canonicalCategoryVM(it.category) == cat && it.amount < 0 }
+                .sumOf { abs(it.amount) }
+                .toFloat()
+        }
+
+        val sparkCategories = listOf("Groceries", "Dining", "Travel", "Shopping")
+        _categorySparklines.value = sparkCategories.map { cat ->
+            val prev = amountForCategory(prevRange, cat)
+            val current = amountForCategory(currentRange, cat)
+            CategorySparkline(
+                category = cat,
+                prevPrevAmount = amountForCategory(prevPrevRange, cat),
+                prevAmount = prev,
+                currentAmount = current,
+                delta = (current - prev).toDouble()
+            )
+        }
     }
 
     private fun filterByTime(transactions: List<Transaction>): List<Transaction> {
@@ -213,6 +496,16 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
             "All Time" -> transactions
             "Previous Cycle" -> {
                 val range = FiscalDateUtils.getPreviousFiscalCycleRange(today, salaryAnchorDay)
+                transactions.filter { !it.bookedOn.isBefore(range.first) && !it.bookedOn.isAfter(range.second) }
+            }
+            "Custom" -> {
+                val ym = _customYearMonth.value
+                val range = if (ym != null) {
+                    val startDate = ym.atDay(salaryAnchorDay.coerceIn(1, ym.lengthOfMonth()))
+                    FiscalDateUtils.getFiscalCycleRange(startDate, salaryAnchorDay)
+                } else {
+                    FiscalDateUtils.getFiscalCycleRange(today, salaryAnchorDay)
+                }
                 transactions.filter { !it.bookedOn.isBefore(range.first) && !it.bookedOn.isAfter(range.second) }
             }
             else -> {
@@ -229,6 +522,18 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
             "Previous Cycle" -> {
                 val range = FiscalDateUtils.getPreviousFiscalCycleRange(today, salaryAnchorDay)
                 "Previous cycle • ${FiscalDateUtils.formatRangeLabel(range)}"
+            }
+            "Custom" -> {
+                val ym = _customYearMonth.value
+                if (ym == null) {
+                    val range = FiscalDateUtils.getFiscalCycleRange(today, salaryAnchorDay)
+                    "Current cycle • ${FiscalDateUtils.formatRangeLabel(range)}"
+                } else {
+                    val startDate = ym.atDay(salaryAnchorDay.coerceIn(1, ym.lengthOfMonth()))
+                    val range = FiscalDateUtils.getFiscalCycleRange(startDate, salaryAnchorDay)
+                    val fmt = DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault())
+                    "${ym.format(fmt)} cycle • ${FiscalDateUtils.formatRangeLabel(range)}"
+                }
             }
             else -> {
                 val range = FiscalDateUtils.getFiscalCycleRange(today, salaryAnchorDay)
@@ -350,7 +655,7 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
 
     private fun defaultCategoryLimits() = mapOf(
         "Groceries" to 600f,
-        "Eat Out"   to 100f,
+        "Dining"    to 100f,
         "Travel"    to 195f,
         "Shopping"  to 100f
     )
@@ -359,7 +664,7 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
         val persisted = entities.associateBy { it.categoryId }
         return mapOf(
             "Groceries" to (persisted["groceries"]?.limitAmount ?: 600f),
-            "Eat Out"   to (persisted["dining"]?.limitAmount    ?: 100f),
+            "Dining"    to (persisted["dining"]?.limitAmount    ?: 100f),
             "Travel"    to (persisted["travel"]?.limitAmount    ?: 195f),
             "Shopping"  to (persisted["shopping"]?.limitAmount  ?: 100f)
         )
@@ -369,11 +674,12 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
         val key = category.lowercase()
         return when {
             "grocer" in key -> "Groceries"
-            "eat" in key || "food" in key || "restaurant" in key || "dining" in key -> "Dining"
-            "travel" in key || "transport" in key -> "Travel"
-            "utilit" in key || "rent" in key || "bill" in key -> "Utilities"
+            "dining" in key || "takeaway" in key || "mensa" in key || "school lunch" in key -> "Dining"
+            "transport" in key || "transit" in key || "travel" in key || "gas & fuel" in key || "carsharing" in key -> "Travel"
+            "utilit" in key || "housing" in key || "rent" in key || "broadcasting" in key || "internet" in key || "mobile" in key -> "Utilities"
             "transfer" in key || "sepa" in key || "interbank" in key -> "Transfers"
-            "shop" in key -> "Shopping"
+            "shop" in key || "clothing" in key || "home & furniture" in key || "diy" in key || "electronics" in key || "discount" in key -> "Shopping"
+            "insurance" in key || "pharmacy" in key || "health" in key -> "Insurance"
             else -> "Other"
         }
     }

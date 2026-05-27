@@ -18,9 +18,23 @@ class DriveAuthManager(context: Context) {
 
     private val googleSignInClient = GoogleSignIn.getClient(appContext, gso)
 
+    private val gsoFull = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestEmail()
+        .requestScopes(Scope(DriveScopes.DRIVE_FILE), Scope(DriveScopes.DRIVE))
+        .build()
+
+    private val googleSignInClientFull = GoogleSignIn.getClient(appContext, gsoFull)
+
     fun signInIntent(): Intent = googleSignInClient.signInIntent
 
+    fun fullDriveSignInIntent(): Intent = googleSignInClientFull.signInIntent
+
     fun lastSignedInAccount(): GoogleSignInAccount? = GoogleSignIn.getLastSignedInAccount(appContext)
+
+    fun hasFullDriveScope(): Boolean {
+        val account = lastSignedInAccount() ?: return false
+        return GoogleSignIn.hasPermissions(account, Scope(DriveScopes.DRIVE))
+    }
 
     fun signOut() {
         googleSignInClient.signOut()

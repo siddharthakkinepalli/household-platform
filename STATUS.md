@@ -1,10 +1,10 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-05-21 ~09:00  
-**DB version:** 9  
-**Build status:** ✅ BUILD SUCCESSFUL (19s, warnings only)  
+**Last updated:** 2026-05-27  
+**DB version:** 17  
+**Build status:** ✅ BUILD SUCCESSFUL  
 **APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`  
-**Next action:** `git add -p && git commit` (user to run locally)
+**Next action:** Phase D remainder (D3 Salary Allocation Bar, D4 Recurring Detection)
 
 ---
 
@@ -129,17 +129,354 @@ Changed SQL to `ABS(amount) BETWEEN :minAmount AND :maxAmount` — expenses stor
 
 ---
 
-## Phase C — Multi-Device Sync (after B is stable)
+## Phase C3 — Family + Vault + Wallet Pulse — COMPLETE ✅
 
-### C1 — Google Drive Sync [ ]
-### C2 — QR Pairing + Child Device Import [ ]
-### C3 — WiFi Sync (fast path) [ ]
+**Committed.** See PLATFORM.md for full change log.
+
+Key items:
+- Family module (FamilyMemberDetailScreen, FamilyViewModel, VaultFolderBrowser)
+- Household Pulse card (SAFE/WARNING/CRITICAL, projected surplus, top risk, AI suggestion)
+- Category grid — 4 tracked categories with €spent/€limit utilisation bars
+- Projected surplus fixed: uses sum of 4 category limits (€995) not hardcoded €3000
+- Wallet search bar (BasicTextField, ✕ clear)
+- FamilyMemberDetailScreen shaking bug fixed (remember(memberId))
 
 ---
 
-## Phase D — Home Dashboard Upgrade
+## Phase D+ — CSV Redesign, Smart Budget, Receipt OCR — COMPLETE ✅
 
-### D1 — Unified Timeline [ ]
+### D+ — Transaction Categorizer Expansion ✅ DONE
+
+**Modified:** `data/TransactionCategorizer.kt`
+- Rebuilt from 6 → **24 categories** (Ulm-localized checked first: SWU Nahverkehr, SWU Energie, DING tickets, Stadt Ulm, Studierendenwerk, SSV Ulm, UWS)
+- National chains: Telekom, Vodafone, O2, 1&1, Congstar, Vattenfall, E.ON, EnBW
+- Full grocery/drugstore/discount/DIY/electronics/dining/pharmacy/fuel coverage
+- Added `isIncome()` method — detects salary/benefit keywords in raw description
+- Fallback now `"Uncategorized"` (was `"Shopping"`)
+
+### D+ — PayPal SEPA Merchant Extraction ✅ DONE
+
+**Modified:** `domain/utils/MerchantNameCleaner.kt`
+- 5-pattern cascade in priority order: "ihr einkauf bei…" → "PP..PP," format → "PayPal *merchant" → "PP *merchant" → SVWZ+ SEPA field
+- Removed the blunt `if (contains("paypal")) return "PayPal"` fallback — actual merchant name preserved
+
+### D+ — ING CSV Support + Income Logic Fix ✅ DONE
+
+**Modified:** `data/config/CsvParserService.kt`
+- ING detection: `ing-diba`, `ing diba`, `ing.de`, or `buchungsdatum + auftraggeber` header combo
+- ING column aliases: `buchungsdatum`, `auftraggeber`, `beguenstigter`, `betrag eur`
+- Income classification: `isIncome(rawDescription)` checked first (German salary keywords), then amount > 0 fallback
+- Warning count triggers on `"Uncategorized"` not `"Other"`
+
+### D+ — FTS Crash Fix (MIGRATION_16_17) ✅ DONE
+
+**Modified:** `data/AppDatabase.kt` — version 16 → 17
+- `MIGRATION_16_17`: drops and recreates `wallet_transactions_fts` without `tokenize=unicode61`
+  (Room's `@Fts4` annotation expects no tokenizer option; crash on existing installs)
+- `MIGRATION_15_16`: also fixed for clean installs (same tokenizer removal)
+- `MIGRATION_16_17` triggers `INSERT INTO wallet_transactions_fts(…) VALUES('rebuild')` to re-index
+
+### D+ — Smart Alert Feed ✅ DONE
+
+**Modified:** `ui/viewmodels/ExpensesViewModel.kt`
+- `FinancialAlert` data class: `emoji, label, detail, amount, tintKey`
+- `_smartAlerts: MutableStateFlow<List<FinancialAlert>>` + `smartAlerts: StateFlow`
+- `computeSmartAlerts()` — new subscriptions (cycleCount == 2), upcoming bills (lastSeen + 30d within 10 days), document alerts (`.getAlertsDueWithinDaysList(30).take(2)`), tax-deductible totals, uncategorized nudge
+
+**Modified:** `ui/v2/V2FinanceScreen.kt`
+- `SmartAlertFeed` composable — horizontally scrollable `LazyRow` of alert chips
+- `SmartAlertChip` composable — 172.dp wide cards with tint, emoji, label, detail, optional amount
+- Layout reorder: SalaryAllocationCard → SmartAlertFeed → HouseholdPulseCard → CategoryGrid
+- Category edit dropdown expanded to 27 categories
+
+### D+ — Android 13 Notification Permission ✅ DONE
+
+**Modified:** `ui/v2/V2AppShell.kt`
+- `POST_NOTIFICATIONS` runtime request via `rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission())`
+- Fires once after onboarding completes (only on API 33+, only if not already granted)
+
+### D+ — Receipt OCR Engine (ML Kit + Spatial Reconstruction) ✅ DONE
+
+**New files:**
+- `vault/parser/LocalReceiptScannerEngine.kt`
+  - `ImagePreProcessor.optimizeForOcr()` — grayscale + 1.7× contrast via `ColorMatrix` before ML Kit
+  - `LocalReceiptScanner.processMlKitPayload()` — delegates text parsing to `ReceiptTextParser`; uses bounding-box Y-center clustering only for amount extraction
+  - `reconstructAdaptiveRows()` — clusters `TextLinePayload` by `(height * 0.40f).coerceAtLeast(12f)` Y tolerance; sorts left→right; merges item name (left column) + price (right column) that ML Kit splits into separate blocks
+  - `fixOcrCharacterGlitch()` — fixes O→0, l→1, `,B2`→`,82`, `,S0`→`,50`
+  - `cleanGermanFloat()` — refund-aware (negative for Gutschrift/Erstattung rows)
+
+- `vault/parser/ReceiptTextParser.kt`
+  - `ParsedReceipt(merchant, date, totalAmount, category, isInvoice, lineItems)`
+  - `LineItem(rawText, name, price, quantity)`
+  - `checkIsInvoice()` — 2+ invoice keywords (Rechnung, Rechnungsnummer, Fälligkeit…)
+  - `extractGermanAmount()` — invoice-aware patterns → retail total/sum patterns → largest price fallback; applies `fixOcrCharacterGlitch()`
+  - `extractGermanDate()` — `\b(\d{2}\.\d{2}\.(?:20)?\d{2})\b`
+  - `extractLineItems()` — quantity lines `\d+ [xX×] name price`, price-at-end lines `name  price B`; skips total/tax/header words
+  - `identifyMerchantAndCategory()` — Ulm-local → national chains → dining → pharmacy → fuel → first OCR line fallback
+
+**Modified files:**
+- `vault/scan/MlKitOcrEngine.kt` — `recognizeFromBitmap()` now applies `ImagePreProcessor.optimizeForOcr(bitmap)` before creating `InputImage`
+- `data/dao/VaultDao.kt` — added `updateReceiptMeta(id, merchant, amount, dateEpoch)`
+- `vault/workers/VaultDocumentParserWorker.kt` — two-path OCR (image uses spatial scan, PDF uses string parser); updates `merchantName`/`totalAmount`/`dateEpoch`; pushes grocery/drugstore line items to `PantryEntity` as `isConfirmed = false`
+
+### D+ — Onboarding Expanded (3 → 7 Steps) ✅ DONE
+
+**New file:** `ui/v2/OnboardingScreen.kt`
+
+| Step | Feature | Color |
+|------|---------|-------|
+| 1 | Smart Budget & Cash Flow pulse overview | LumePurple |
+| 2 | Import Transactions (CSV, multi-bank) | LumePurple |
+| 3 | Subscription Hub (recurring bills) | LumeEmerald |
+| 4 | Scan & Vault (documents, expiry tracking) | LumeCyan |
+| 5 | Receipt Scanning + Pantry (OCR, line items) | LumeAmber |
+| 6 | Tax Checklist + Google Drive Backup | LumeEmerald |
+| 7 | Expiry Alerts & Notifications | LumeAmber |
+
+Step counter ("3 / 7") shown below dot indicators.
+
+---
+
+## Phase D — CSV Redesign + Salary-Based Budgeting — IN PROGRESS 🔄
+
+### D1 — Salary Detection from CSV ✅ DONE
+
+**DB:** Migration 10→11 adds `salary_sources` table (singleton).
+
+**New files:**
+- `data/entities/DashboardEntities.kt` — added `SalarySourceEntity`
+- `data/dao/SalarySourceDao.kt` — `getSalarySource()`, `upsert()`, `clear()`
+
+**Modified files:**
+- `data/AppDatabase.kt` — version 10→11, `MIGRATION_10_11`, `salarySourceDao()` abstract method
+- `ui/viewmodels/ConfigViewModel.kt`:
+  - `SalaryCandidate` data class
+  - `ImportWorkflow.SalaryConfirmation(candidates, pendingSummary)` state
+  - `ConfigIntent.ConfirmSalary(transactionId)` + `ConfigIntent.SkipSalary`
+  - `resolveSalaryWorkflow()` — detects credits within ±7 days of anchor day; auto-matches against stored pattern+amount range; falls through to confirmation UI if no match
+  - `handleConfirmSalary()` — stores SalarySourceEntity (±20% amount window)
+  - `handleSkipSalary()` — advances to NeedsReview without storing
+- `ui/v2/V2ConfigHubScreen.kt` — `SalaryConfirmationState` composable (candidate list, emerald glow, "None of these — skip")
+
+**Behaviour:**
+- First import after salary detection: shows up to 5 credit candidates near anchor day for user to pick
+- Subsequent imports: auto-matches by merchant prefix OR amount ±20% → silently confirms, no UI shown
+- Build: ✅ SUCCESSFUL
+
+---
+
+### D2 — Credit & Transfer Categorization Fix ✅ DONE
+
+**Problem:** Credits (Bundesagentur, Caleda Brian) were landing in "Shopping". Revolut transfers were not being excluded.
+
+**Modified files:**
+- `data/TransactionCategorizer.kt` — added `"revolut"` to Transfers keyword list
+- `data/config/CsvParserService.kt` — amount-sign logic applied after classification:
+  - `amount > 0` + non-Transfers → `"Income"`
+  - `amount > 0` + Transfers → `"Excluded"` (credit self-transfer)
+  - `amount < 0` + Transfers → `"Excluded"` (N26, ING, Revolut, own-name debits)
+  - `shouldExclude()` match → `"Excluded"` (Commerzbank fees, etc.)
+
+**Result:** Income transactions appear as a positive "Income" row in the category summary, correct positive amount in the transaction list, and are never counted against any budget (existing `amount < 0` filter in `publishVisibleState` handles this automatically).
+
+**Build:** ✅ SUCCESSFUL
+
+---
+
+### D3 — Salary Allocation Bar in Pulse [ ] PLANNED
+
+Expand the Pulse card with a salary context layer above the existing 4 category tiles.
+
+**Layout:**
+```
+HOUSEHOLD PULSE                           SAFE ●
+─────────────────────────────────────────────────
+Salary €2,850  ·  15 May
+
+[███████░░░░░░░░░░░░░░░░]
+  Fixed    Discretionary    Remaining
+  €900        €570            €1,380
+   32%         20%             48%
+
+▼ Fixed costs (tap to expand)
+  Miete       €800
+  Strom        €65
+  Telekom      €35
+
+[ Groceries ]  [ Eat Out ]  [ Travel ]  [ Shopping ]
+  €380/600      €85/100     €60/195      €45/100
+```
+
+**Implementation:**
+- Bar segments: Fixed (red) | Discretionary spent (amber) | Remaining (green)
+- Salary amount + date sourced from `SalarySourceEntity.lastAmount` + `confirmedAt`
+- Fixed total = sum of `RecurringBillEntity` amounts detected in D4
+- Discretionary total = sum of spend across 4 tracked categories this cycle
+- Remaining = salary − fixed − discretionary
+- "Fixed costs" row is tappable → collapses/expands the recurring bill list inline
+- 4 category tiles below are unchanged
+
+**Dependency:** D4 (recurring detection) powers the Fixed costs list. Can ship D3 UI with empty/manual fixed list first, D4 fills it automatically once done.
+
+---
+
+### D4 — Recurring Bills Detection [ ] PLANNED
+
+- Post-import worker groups transactions by normalized merchant, flags those appearing ≥2 consecutive cycles ±15% amount as `"Recurring"`
+- New `RecurringBillEntity` table
+- Pulse "Upcoming" section expands to show individual upcoming bills (Miete, Telekom, ARD, etc.)
+- Recurring excluded from discretionary spend calculation
+
+---
+
+### D5 — Import Review Screen for Uncategorized [ ] PLANNED
+
+After salary confirmation step, show uncategorized transactions (`category == "Other"` or unconfident "Shopping") in a review screen. Inline category picker + "make this a rule" per transaction. Pre-categorized shown in collapsed "✓ N auto-classified" chip.
+
+---
+
+### D6 — PayPal Transaction Intelligence [ ] PLANNED (quick win)
+
+In `MerchantNameCleaner`: detect `PAYPAL *<merchant>` pattern, extract actual merchant name, run standard categorizer on it.
+```
+"PAYPAL *NETFLIX INTERNAT" → title="Netflix", category="Utilities"
+"PAYPAL *LIEFERANDO"       → title="Lieferando", category="Eat Out"
+```
+
+---
+
+### D7 — Income Summary Section [ ] PLANNED
+
+Collapsible section above transaction list showing total income this cycle with each Income transaction listed.
+
+---
+
+## Phase E — Pipeline Architecture + SteuerKlar Tax Mode — PLANNED 🔲
+
+### Architecture Decision: Google Drive as Single Source of Truth
+
+**Key insight:** Install Google Drive for Desktop on Windows. `C:\Income Tax\` becomes the synced Drive folder. `tax_api.py` reads `C:\Income Tax\` unchanged. Android app reads the same folder via Drive API. Both stay in sync automatically — no duplication, no manual handoff.
+
+**Drive scope change required:** Current app uses `DRIVE_FILE` (app-created files only). Tax folder needs `DRIVE` scope. UX mitigation: "Link Tax Folder" onboarding step uses Drive folder picker — user selects the `Income Tax` folder once, app stores its Drive ID and only operates within it.
+
+---
+
+### E1 — WorkManager Pipeline Registry [ ] PLANNED
+
+Central `PipelineManager` object. Every significant event enqueues a named Work chain.
+
+**Trigger → Chain mapping:**
+
+| Trigger | Worker chain |
+|---------|-------------|
+| CSV imported | Categorize → RecurringDetect → ReceiptMatch → BankStatDriveUpload → TaxChecklist |
+| Receipt scanned | ReceiptMatch → PantryUpdate → TaxDocClassify → DriveTaxRoute |
+| Document uploaded | DocClassify → DriveTaxRoute → TaxChecklist |
+| Doc tagged tax-relevant | DriveTaxRoute → TaxChecklist |
+| Daily 7am (scheduled) | DocExpiryCheck → TaxChecklist → RecurringDetect → PulseRefresh |
+| Weekly Sunday | FullDriveTaxScan → DocumentExpiryReport |
+
+**Workers to build:**
+
+| Worker | Purpose |
+|--------|---------|
+| `CategorizationWorker` | Re-applies all merchant rules to all transactions |
+| `RecurringDetectionWorker` | Groups by merchant, flags ≥2 consecutive cycles ±15% as Recurring |
+| `ReceiptMatchingWorker` | Fuzzy-links vault receipts to wallet transactions (merchant + date ±1d + amount ±2%) |
+| `BankStatementDriveWorker` | Uploads imported CSV to `Drive/IncomeTax/{year}/BankStatements/` |
+| `DriveTaxRouteWorker` | Routes vault documents to correct Drive tax subfolder by doc type |
+| `TaxChecklistWorker` | Scans linked Drive tax folder, updates local `TaxCheckEntity`, sends notifications |
+| `DailyAnalysisWorker` | PulseRefresh + expiry checks + recurring refresh (scheduled periodic) |
+| `DocumentExpiryWorker` | Fires notifications for docs expiring within 30/7/1 days |
+
+---
+
+### E2 — SteuerKlar: Tax Mode in the App [ ] PLANNED
+
+Native port of `tax_api.py` CHECKS logic in Kotlin, reading from Drive.
+
+**UI (new tab in Vault or Config):**
+```
+STEUERKLÄR 2025               ● 5 of 8 OK
+──────────────────────────────────────────
+✅  Tax Excel                  1 file
+✅  Payslips (Siddharth)      12/12
+✅  Lohnsteuerbescheinigung    1 file
+🔴  Lohnsteuer (Chithra)      MISSING  [+Upload]
+✅  Kita documents             4 files
+🟡  Bank Statements            9/12
+⚪  Donation receipts          0 files
+✅  Utility bills              8 files
+──────────────────────────────────────────
+[Mark 2025 Complete]   [Open in Drive]
+```
+
+`[+Upload]` on missing items opens vault camera/picker, pre-routed to correct Drive subfolder.
+
+**Document → Drive routing table:**
+
+| Vault doc type | Drive subfolder |
+|----------------|-----------------|
+| Payslip (Brutto-Netto) | `Payslips/` |
+| Lohnsteuerbescheinigung | `Payslips/` |
+| Kita / Childcare receipt | `Kita/` |
+| Utility bill (Strom, Gas, Wasser) | `Currentbills/` |
+| Bank statement PDF | `BankStatements/` |
+| Donation receipt (Spendenquittung) | `Donation/` |
+| CSV bank import (auto) | `BankStatements/` |
+
+**Data:** New `TaxCheckEntity` table caches last scan result locally. Works offline (shows last known state with "Last synced Xm ago").
+
+---
+
+### E3 — Document Expiry Timeline [ ] PLANNED
+
+`TimelineCard` at top of Vault home — aggregates `DocumentAlertEntity` into a 90-day view:
+```
+NEXT 90 DAYS
+🔴  Passport           expires  3 Jun  (8 days)
+🟡  Car Insurance      renewal  15 Jun (20 days)
+🟢  Health Insurance   renewal  1 Aug  (67 days)
+```
+Data already exists in `document_alerts` table — pure UI layer.
+
+---
+
+### E4 — Subscription & Recurring Cost Hub [ ] PLANNED
+
+Cross-reference Vault (contracts tagged subscription) + Wallet (Recurring transactions from D4):
+```
+MONTHLY COMMITMENTS
+Miete              €800     ← wallet recurring
+Telekom            €35      ← wallet recurring
+Netflix            €18      ← wallet (PayPal *Netflix)
+ARD Beitrag        €18      ← wallet recurring
+──────────────────────────
+Total fixed costs  €871/month   (30.6% of salary)
+```
+
+---
+
+## Phase F — Tax Preparation + Full Intelligence Suite — PLANNED 🔲
+
+### F1 — Tax Tagging Layer [ ] PLANNED
+Long-press transaction or vault doc → "Mark as tax-relevant". Stored in `tax_tags` table. German categories: Arbeitsmittel, Homeoffice Pauschale, Krankenkosten, Spendenquittungen.
+
+### F2 — Annual Tax Summary Export [ ] PLANNED
+"Generate Tax Summary" → groups tagged items, shows totals by German tax category, exports PDF/CSV. Closes the loop with SteuerKlar checklist.
+
+### F3 — Receipt ↔ Wallet Transaction Linking [ ] PLANNED
+`linkedVaultEntryId` column already exists on `wallet_transactions`. `ReceiptMatchingWorker` (E1) populates it. Transaction list shows 📄 icon; tapping opens receipt image.
+
+### F4 — Spending Trend Mini-Charts [ ] PLANNED
+3-cycle sparkline per category tile. Previous cycle data computed in parallel in `ExpensesViewModel`. "↑ +€42 vs last cycle" label under each tile.
+
+---
+
+## Phase D — Home Dashboard Upgrade (old plan, superseded)
+
+~~### D1 — Unified Timeline [ ]~~
+Superseded by Phase E3 (Expiry Timeline in Vault) and Phase D4 (Recurring bills in Pulse).
 
 ---
 

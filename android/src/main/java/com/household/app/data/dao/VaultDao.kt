@@ -68,4 +68,13 @@ interface VaultDao {
 
     @Query("UPDATE vault_entries SET ownerMemberId = NULL WHERE ownerMemberId = :memberId")
     suspend fun clearOwnerFromEntries(memberId: Long)
+
+    @Query("UPDATE vault_entries SET category = :category, subFolder = :subFolder, documentTitle = :title WHERE id = :id")
+    suspend fun updateParsedMeta(id: Long, category: String, subFolder: String, title: String?)
+
+    @Query("UPDATE vault_entries SET rawOcrContent = :content WHERE id = :id")
+    suspend fun updateRawOcr(id: Long, content: String)
+
+    @Query("UPDATE vault_entries SET merchantName = :merchant, totalAmount = :amount, dateEpoch = :dateEpoch WHERE id = :id")
+    suspend fun updateReceiptMeta(id: Long, merchant: String, amount: Double, dateEpoch: Long)
 }

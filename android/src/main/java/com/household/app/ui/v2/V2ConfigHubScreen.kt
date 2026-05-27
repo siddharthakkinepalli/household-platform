@@ -52,6 +52,11 @@ import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloatAsState
@@ -102,8 +107,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.household.app.data.AppDatabase
 import com.household.app.data.config.ImportErrorType
+import com.household.app.vault.DriveDataStore
+import com.household.app.vault.workers.PipelineManager
 import com.household.app.data.config.ImportSummary
 import com.household.app.BuildConfig
 import com.household.app.domain.services.HouseholdExportService
@@ -125,8 +134,10 @@ import com.household.app.ui.viewmodels.CategoryThreshold
 import com.household.app.ui.viewmodels.ConfigIntent
 import com.household.app.ui.viewmodels.ConfigUiState
 import com.household.app.ui.viewmodels.ConfigViewModel
+import com.household.app.ui.viewmodels.PipelineStatus
 import com.household.app.ui.viewmodels.ImportAuditRecord
 import com.household.app.ui.viewmodels.ImportWorkflow
+import com.household.app.ui.viewmodels.SalaryCandidate
 
 @Composable
 fun V2ConfigHubScreen(
@@ -134,7 +145,8 @@ fun V2ConfigHubScreen(
     onNavigateToMerchantRules: () -> Unit = {},
     onNavigateToQrHost: () -> Unit = {},
     onNavigateToQrScan: () -> Unit = {},
-    onNavigateToFamily: () -> Unit = {}
+    onNavigateToFamily: () -> Unit = {},
+    onNavigateToSteuerKlar: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: ConfigViewModel = viewModel(
@@ -145,6 +157,7 @@ fun V2ConfigHubScreen(
         }
     )
     val uiState by viewModel.uiState.collectAsState()
+    val pipelineStatus by viewModel.pipelineStatus.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -236,6 +249,14 @@ fun V2ConfigHubScreen(
                 )
             }
 
+            // 4b — Data pipeline runner
+            item {
+                DataPipelineCard(
+                    status = pipelineStatus,
+                    onRunClick = { viewModel.runPipeline() }
+                )
+            }
+
             // 5 — Budget thresholds header
             item {
                 Text(
@@ -278,6 +299,11 @@ fun V2ConfigHubScreen(
                 FamilyNavCard(onClick = onNavigateToFamily)
             }
 
+            // 7c — Tax mode
+            item {
+                SteuerKlarNavCard(onClick = onNavigateToSteuerKlar)
+            }
+
             // 8 — Pair with partner device
             item {
                 PairDeviceCard(
@@ -298,7 +324,12 @@ fun V2ConfigHubScreen(
                 LocalBackupCard()
             }
 
-            // 10 — About
+            // 10 — Drive DB backup
+            item {
+                DriveBackupCard()
+            }
+
+            // 11 — About
             item {
                 AboutCard()
             }
@@ -616,6 +647,8 @@ private fun CsvIngestCard(
 ) {
     val glowColor = when (uiState.importWorkflow) {
         is ImportWorkflow.NeedsReview -> ConfigAccent
+        is ImportWorkflow.SalaryConfirmation -> LumeEmerald.copy(alpha = 0.72f)
+        is ImportWorkflow.ReviewUncategorized -> LumeAmber.copy(alpha = 0.72f)
         ImportWorkflow.DuplicateDetected -> Color(0xFFF59E0B)
         is ImportWorkflow.Success -> Color(0xFF22C55E)
         is ImportWorkflow.Failed -> CriticalRed
@@ -624,6 +657,8 @@ private fun CsvIngestCard(
     val clickable = when (uiState.importWorkflow) {
         is ImportWorkflow.Hashing,
         is ImportWorkflow.Parsing,
+        is ImportWorkflow.SalaryConfirmation,
+        is ImportWorkflow.ReviewUncategorized,
         ImportWorkflow.Committing,
         is ImportWorkflow.NeedsReview -> false
         else -> true
@@ -658,6 +693,12 @@ private fun CsvIngestCard(
                     ImportWorkflow.Idle -> UploadIdleState()
                     is ImportWorkflow.Hashing -> LoadingState(0f, "Reading file…")
                     is ImportWorkflow.Parsing -> LoadingState(workflow.progress, workflow.stage)
+                    is ImportWorkflow.SalaryConfirmation -> SalaryConfirmationState(workflow.candidates, onIntent)
+                    is ImportWorkflow.ReviewUncategorized -> ReviewUncategorizedState(
+                        workflow = workflow,
+                        onAssign = { txId, category -> onIntent(ConfigIntent.AssignCategory(txId, category)) },
+                        onConfirm = { makeRules -> onIntent(ConfigIntent.ConfirmReview(makeRules)) }
+                    )
                     is ImportWorkflow.NeedsReview -> ReviewState(workflow.summary, uiState.salaryAnchor, onIntent)
                     ImportWorkflow.DuplicateDetected -> WarningState("Duplicate import detected from audit trail")
                     ImportWorkflow.Committing -> LoadingState(0.95f, "Saving to database…")
@@ -730,6 +771,220 @@ private fun LoadingState(progress: Float, stage: String) {
             color = ConfigAccent,
             trackColor = LumeWhite.copy(alpha = 0.1f)
         )
+    }
+}
+
+@Composable
+private fun SalaryConfirmationState(
+    candidates: List<SalaryCandidate>,
+    onIntent: (ConfigIntent) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Rounded.EuroSymbol, null, tint = LumeEmerald, modifier = Modifier.size(20.dp))
+            Text(
+                text = "Which credit is your salary?",
+                color = LumeWhite,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+        Text(
+            text = "We found large credit transactions near your anchor day. Tap the one that is your monthly salary — we'll remember it for future imports.",
+            color = LumeWhite.copy(alpha = 0.65f),
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        candidates.forEach { candidate ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LumeEmerald.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+                    .border(1.dp, LumeEmerald.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+                    .clickable { onIntent(ConfigIntent.ConfirmSalary(candidate.transactionId)) }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = candidate.title,
+                        color = TextMain,
+                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = candidate.date,
+                        color = TextMuted,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                Text(
+                    text = "+€${"%.2f".format(candidate.amount)}",
+                    color = LumeEmerald,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
+        TextButton(
+            onClick = { onIntent(ConfigIntent.SkipSalary) },
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("None of these — skip", color = LumeWhite.copy(alpha = 0.45f), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+@Composable
+private fun ReviewUncategorizedState(
+    workflow: ImportWorkflow.ReviewUncategorized,
+    onAssign: (txId: Int, category: String) -> Unit,
+    onConfirm: (makeRules: List<Pair<String, String>>) -> Unit
+) {
+    val categories = listOf("Grocery", "Eat out", "Travel", "Utilities", "Shopping", "Excluded")
+    val localSelections = remember { androidx.compose.runtime.mutableStateMapOf<Int, String>() }
+    val makeRuleSet = remember { androidx.compose.runtime.mutableStateMapOf<Int, Boolean>() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Rounded.WarningAmber, null, tint = LumeAmber, modifier = Modifier.size(20.dp))
+            Text(
+                text = "Review ${workflow.pending.size} transactions",
+                color = LumeWhite,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+        Text(
+            text = "These could not be auto-categorized. Assign a category to each.",
+            color = LumeWhite.copy(alpha = 0.65f),
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        workflow.pending.forEach { tx ->
+            val currentAssignment = localSelections[tx.id] ?: workflow.allAssignments[tx.id]
+            var expanded by remember { mutableStateOf(false) }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LumeAmber.copy(alpha = 0.05f), RoundedCornerShape(14.dp))
+                    .border(1.dp, LumeAmber.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = tx.title,
+                            color = TextMain,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "€${"%.2f".format(tx.amount)} • ${tx.date}",
+                            color = TextMuted,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Box {
+                        OutlinedButton(
+                            onClick = { expanded = true },
+                            modifier = Modifier.width(140.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (currentAssignment != null) LumeAmber else LumeWhite.copy(alpha = 0.55f)
+                            )
+                        ) {
+                            Text(
+                                text = currentAssignment ?: "Pick category",
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.background(EliteNavy)
+                        ) {
+                            categories.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat, color = LumeWhite, style = MaterialTheme.typography.bodySmall) },
+                                    onClick = {
+                                        localSelections[tx.id] = cat
+                                        onAssign(tx.id, cat)
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Checkbox(
+                        checked = makeRuleSet[tx.id] == true,
+                        onCheckedChange = { checked ->
+                            if (checked) makeRuleSet[tx.id] = true else makeRuleSet.remove(tx.id)
+                        },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = LumeAmber,
+                            uncheckedColor = LumeWhite.copy(alpha = 0.35f)
+                        ),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Make this a rule",
+                        color = LumeWhite.copy(alpha = 0.55f),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+
+        FilledTonalButton(
+            onClick = {
+                val rules = workflow.pending
+                    .filter { makeRuleSet[it.id] == true }
+                    .mapNotNull { tx ->
+                        val cat = localSelections[tx.id] ?: workflow.allAssignments[tx.id]
+                        if (cat != null) {
+                            tx.title.take(12).lowercase().trim() to cat
+                        } else null
+                    }
+                onConfirm(rules)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = LumeAmber.copy(alpha = 0.18f),
+                contentColor = LumeAmber
+            )
+        ) {
+            Text(
+                text = "Done — import ${workflow.fullSummary.parsedCount} transactions",
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 
@@ -1072,6 +1327,70 @@ private fun RecentImportsCard(audits: List<ImportAuditRecord>) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
+private fun DataPipelineCard(
+    status: PipelineStatus,
+    onRunClick: () -> Unit
+) {
+    val isRunning = status is PipelineStatus.Running
+    EliteGlassCard(glowColor = LumeAmber.copy(alpha = 0.10f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "DATA PIPELINE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LumeAmber,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        "Re-categorize · Detect recurring",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted
+                    )
+                }
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = onRunClick,
+                    enabled = !isRunning,
+                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                        containerColor = LumeAmber.copy(alpha = 0.18f),
+                        contentColor = LumeAmber
+                    )
+                ) {
+                    if (isRunning) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = LumeAmber,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Run Now", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                }
+            }
+            when (status) {
+                is PipelineStatus.Done ->
+                    Text(
+                        "✓ Done — ${status.recurringFound} recurring bill${if (status.recurringFound != 1) "s" else ""} detected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LumeEmerald
+                    )
+                is PipelineStatus.Error ->
+                    Text(
+                        "✗ ${status.message}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CriticalRed
+                    )
+                else -> {}
+            }
+        }
+    }
+}
+
+@Composable
 private fun AboutCard() {
     EliteGlassCard(glowColor = LumeWhite.copy(alpha = 0.06f), borderAlpha = 0.1f) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1179,6 +1498,50 @@ private fun FamilyNavCard(onClick: () -> Unit) {
                 )
                 Text(
                     text = "Add people for document folders and identity filing",
+                    color = LumeWhite.copy(alpha = 0.55f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = LumeWhite.copy(alpha = 0.55f),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SteuerKlarNavCard(onClick: () -> Unit) {
+    EliteGlassCard(
+        glowColor = LumeEmerald.copy(alpha = 0.14f),
+        borderAlpha = 0.14f
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "TAX",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LumeWhite.copy(alpha = 0.6f),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "SteuerKlar",
+                    color = TextMain,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Tax document checklist linked to your Google Drive Income Tax folder",
                     color = LumeWhite.copy(alpha = 0.55f),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp)
@@ -1370,6 +1733,83 @@ private fun LocalBackupCard() {
                         Spacer(Modifier.width(6.dp))
                         Text("Import Data", color = LumeAmber, fontWeight = FontWeight.Medium)
                     }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drive DB Backup card
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DriveBackupCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var driveEnabled by remember { mutableStateOf(false) }
+    var isBusy by remember { mutableStateOf(false) }
+    var statusText by remember { mutableStateOf("") }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        driveEnabled = DriveDataStore.isDriveEnabled(context)
+        val infos = WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork("db_backup_drive").get()
+        val last = infos.lastOrNull()
+        statusText = when (last?.state) {
+            WorkInfo.State.SUCCEEDED -> "Last backup: completed"
+            WorkInfo.State.RUNNING -> "Backup in progress…"
+            WorkInfo.State.FAILED -> "Last backup failed"
+            else -> if (driveEnabled) "Scheduled weekly" else "Drive not connected"
+        }
+    }
+
+    EliteGlassCard(glowColor = LumeEmerald.copy(alpha = 0.10f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            androidx.compose.material3.Text(
+                text = "DRIVE BACKUP",
+                style = MaterialTheme.typography.labelSmall,
+                color = LumeWhite.copy(alpha = 0.6f),
+                letterSpacing = 1.sp
+            )
+            androidx.compose.material3.Text(
+                text = "Automatic DB Backup",
+                color = TextMain,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            androidx.compose.material3.Text(
+                text = "Your database is backed up weekly to Google Drive (last 3 copies kept). " +
+                    "Requires Drive to be connected.",
+                color = LumeWhite.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.bodySmall
+            )
+            androidx.compose.material3.Text(
+                text = statusText,
+                color = if (driveEnabled) LumeEmerald else TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+            if (driveEnabled) {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        isBusy = true
+                        scope.launch {
+                            PipelineManager.scheduleDbBackup(context)
+                            statusText = "Scheduled — backup will run shortly"
+                            isBusy = false
+                        }
+                    },
+                    enabled = !isBusy,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = LumeEmerald.copy(alpha = 0.20f)
+                    )
+                ) {
+                    androidx.compose.material3.Text(
+                        text = if (isBusy) "Scheduling…" else "Back up now",
+                        color = LumeEmerald,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }

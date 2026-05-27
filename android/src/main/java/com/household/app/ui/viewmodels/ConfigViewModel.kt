@@ -17,14 +17,18 @@ import com.household.app.data.config.ImportErrorType
 import com.household.app.data.config.ImportParseResult
 import com.household.app.data.config.ImportSummary
 import com.household.app.data.config.RuleEngineService
+import com.household.app.data.service.RecurringDetectionService
 import com.household.app.domain.services.RetroactiveCategorizer
 import com.household.app.data.entities.CategoryThresholdEntity
 import com.household.app.data.entities.ImportAuditEntity
 import com.household.app.data.entities.MerchantRuleEntity
+import com.household.app.data.entities.RecurringBillEntity
+import com.household.app.data.entities.SalarySourceEntity
 import com.household.app.data.entities.WalletTransactionEntity
 import com.household.app.domain.utils.FiscalDateUtils
 import com.household.app.vault.DriveAuthManager
 import com.household.app.vault.DriveDataStore
+import com.household.app.vault.workers.PipelineManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +44,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+sealed class PipelineStatus {
+    object Idle : PipelineStatus()
+    object Running : PipelineStatus()
+    data class Done(val recurringFound: Int) : PipelineStatus()
+    data class Error(val message: String) : PipelineStatus()
+}
+
 data class CategoryThreshold(
     val id: String,
     val name: String,
@@ -54,6 +65,13 @@ data class MerchantRule(
     val isExclusion: Boolean,
     val priority: Int,
     val collisionCount: Int = 0
+)
+
+data class SalaryCandidate(
+    val transactionId: Int,
+    val title: String,
+    val amount: Double,
+    val date: String
 )
 
 data class ImportAuditRecord(
@@ -79,12 +97,25 @@ sealed class ConfigIntent {
     object ToggleCloudSync : ConfigIntent()
     data class HandleSignInResult(val data: Intent?) : ConfigIntent()
     object SignOutGoogle : ConfigIntent()
+    data class ConfirmSalary(val transactionId: Int) : ConfigIntent()
+    object SkipSalary : ConfigIntent()
+    data class AssignCategory(val transactionId: Int, val category: String) : ConfigIntent()
+    data class ConfirmReview(val makeRules: List<Pair<String, String>>) : ConfigIntent() // pattern→category pairs
 }
 
 sealed class ImportWorkflow {
     object Idle : ImportWorkflow()
     data class Hashing(val fileName: String) : ImportWorkflow()
     data class Parsing(val progress: Float, val stage: String = "") : ImportWorkflow()
+    data class SalaryConfirmation(
+        val candidates: List<SalaryCandidate>,
+        val pendingSummary: ImportSummary
+    ) : ImportWorkflow()
+    data class ReviewUncategorized(
+        val pending: List<com.household.app.data.config.ParsedTransactionCandidate>,
+        val allAssignments: Map<Int, String>,   // txId → category (starts empty)
+        val fullSummary: ImportSummary
+    ) : ImportWorkflow()
     data class NeedsReview(val summary: ImportSummary) : ImportWorkflow()
     object DuplicateDetected : ImportWorkflow()
     object Committing : ImportWorkflow()
@@ -141,6 +172,33 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
     private val _uiState = MutableStateFlow(ConfigUiState())
     val uiState: StateFlow<ConfigUiState> = _uiState.asStateFlow()
 
+    private val _pipelineStatus = MutableStateFlow<PipelineStatus>(PipelineStatus.Idle)
+    val pipelineStatus: StateFlow<PipelineStatus> = _pipelineStatus
+
+    fun runPipeline() {
+        if (_pipelineStatus.value is PipelineStatus.Running) return
+        viewModelScope.launch {
+            _pipelineStatus.value = PipelineStatus.Running
+            try {
+                val anchorDay = withContext(Dispatchers.IO) {
+                    DashboardPrefs.getSalaryAnchorDay(getApplication())
+                }
+                withContext(Dispatchers.IO) {
+                    retroactiveCategorizer.recategorizeAll()
+                    RecurringDetectionService(
+                        walletTransactionDao = db.walletTransactionDao(),
+                        recurringBillDao = db.recurringBillDao(),
+                        salaryAnchorDay = anchorDay
+                    ).detectAndStore()
+                }
+                val count = withContext(Dispatchers.IO) { db.recurringBillDao().getActiveBills().size }
+                _pipelineStatus.value = PipelineStatus.Done(count)
+            } catch (e: Exception) {
+                _pipelineStatus.value = PipelineStatus.Error(e.message ?: "Pipeline failed")
+            }
+        }
+    }
+
     init {
         refreshState()
     }
@@ -160,6 +218,10 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
             ConfigIntent.ToggleCloudSync -> toggleCloudSync()
             is ConfigIntent.HandleSignInResult -> handleSignInResult(intent.data)
             ConfigIntent.SignOutGoogle -> signOutGoogle()
+            is ConfigIntent.ConfirmSalary -> handleConfirmSalary(intent.transactionId)
+            ConfigIntent.SkipSalary -> handleSkipSalary()
+            is ConfigIntent.AssignCategory -> handleAssignCategory(intent.transactionId, intent.category)
+            is ConfigIntent.ConfirmReview -> handleConfirmReview(intent.makeRules)
         }
     }
 
@@ -262,7 +324,11 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
                 is ImportParseResult.Success -> {
-                    _uiState.update { it.copy(importWorkflow = ImportWorkflow.NeedsReview(parseResult.summary)) }
+                    val summary = parseResult.summary
+                    val nextWorkflow = withContext(Dispatchers.IO) {
+                        resolveSalaryWorkflow(summary)
+                    }
+                    _uiState.update { it.copy(importWorkflow = nextWorkflow) }
                 }
                 is ImportParseResult.Error -> {
                     _uiState.update {
@@ -273,6 +339,144 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
             }
+        }
+    }
+
+    private fun advanceFromSalary(summary: ImportSummary): ImportWorkflow {
+        val uncategorized = summary.transactions.filter { it.category == "Other" }
+        return if (uncategorized.isNotEmpty()) {
+            ImportWorkflow.ReviewUncategorized(
+                pending = uncategorized,
+                allAssignments = emptyMap(),
+                fullSummary = summary
+            )
+        } else {
+            ImportWorkflow.NeedsReview(summary)
+        }
+    }
+
+    private suspend fun resolveSalaryWorkflow(summary: ImportSummary): ImportWorkflow {
+        val anchor = _uiState.value.salaryAnchor
+        val stored = db.salarySourceDao().getSalarySource()
+
+        // Credit transactions near the anchor day (within ±7 days)
+        val creditCandidates = summary.transactions.filter { tx ->
+            if (tx.amount <= 0.0) return@filter false
+            val dayOfMonth = tx.date.dayOfMonth
+            val dist = minOf(
+                abs(dayOfMonth - anchor),
+                abs(dayOfMonth - anchor + 31),
+                abs(dayOfMonth - anchor - 31)
+            )
+            dist <= 7
+        }.sortedByDescending { it.amount }
+
+        if (stored != null && creditCandidates.isNotEmpty()) {
+            val autoMatch = creditCandidates.firstOrNull { tx ->
+                val pattern = stored.merchantPattern.take(8).lowercase()
+                val titleLow = tx.title.lowercase()
+                val titleMatch = pattern.isNotBlank() && (titleLow.contains(pattern) || pattern.contains(titleLow.take(8)))
+                val amountMatch = tx.amount in stored.minAmount..stored.maxAmount
+                titleMatch || amountMatch
+            }
+            if (autoMatch != null) {
+                db.salarySourceDao().upsert(
+                    stored.copy(
+                        lastAmount = autoMatch.amount,
+                        minAmount = autoMatch.amount * 0.80,
+                        maxAmount = autoMatch.amount * 1.20,
+                        confirmedAt = System.currentTimeMillis()
+                    )
+                )
+                return advanceFromSalary(summary)
+            }
+        }
+
+        if (creditCandidates.isEmpty()) {
+            return advanceFromSalary(summary)
+        }
+
+        val salaryCandidates = creditCandidates.take(5).map { tx ->
+            SalaryCandidate(
+                transactionId = tx.id,
+                title = tx.title,
+                amount = tx.amount,
+                date = tx.date.toString()
+            )
+        }
+        return ImportWorkflow.SalaryConfirmation(salaryCandidates, summary)
+    }
+
+    private fun handleConfirmSalary(transactionId: Int) {
+        val current = _uiState.value.importWorkflow as? ImportWorkflow.SalaryConfirmation ?: return
+        val picked = current.candidates.firstOrNull { it.transactionId == transactionId } ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val pattern = picked.title.take(12).lowercase().trim()
+                db.salarySourceDao().upsert(
+                    SalarySourceEntity(
+                        merchantPattern = pattern,
+                        lastAmount = picked.amount,
+                        minAmount = picked.amount * 0.80,
+                        maxAmount = picked.amount * 1.20
+                    )
+                )
+                db.recurringBillDao().upsertAll(listOf(
+                    RecurringBillEntity(
+                        merchantPattern = pattern,
+                        normalizedAmount = picked.amount,
+                        minAmount = picked.amount * 0.80,
+                        maxAmount = picked.amount * 1.20,
+                        category = "SALARY",
+                        lastSeenDate = System.currentTimeMillis(),
+                        cycleCount = 1,
+                        isActive = true
+                    )
+                ))
+            }
+            _uiState.update { it.copy(importWorkflow = advanceFromSalary(current.pendingSummary)) }
+        }
+    }
+
+    private fun handleSkipSalary() {
+        val current = _uiState.value.importWorkflow as? ImportWorkflow.SalaryConfirmation ?: return
+        _uiState.update { it.copy(importWorkflow = advanceFromSalary(current.pendingSummary)) }
+    }
+
+    private fun handleAssignCategory(txId: Int, category: String) {
+        val current = _uiState.value.importWorkflow as? ImportWorkflow.ReviewUncategorized ?: return
+        _uiState.update {
+            it.copy(importWorkflow = current.copy(allAssignments = current.allAssignments + (txId to category)))
+        }
+    }
+
+    private fun handleConfirmReview(makeRules: List<Pair<String, String>>) {
+        val current = _uiState.value.importWorkflow as? ImportWorkflow.ReviewUncategorized ?: return
+        viewModelScope.launch {
+            if (makeRules.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    val now = java.time.LocalDate.now().toString()
+                    makeRules.forEach { (pattern, category) ->
+                        db.merchantRuleDao().upsertRule(
+                            MerchantRuleEntity(
+                                merchantPattern = pattern,
+                                targetCategoryId = category,
+                                isExclusion = false,
+                                isEnabled = true,
+                                priority = 0,
+                                updatedAt = now
+                            )
+                        )
+                    }
+                }
+            }
+            // Apply user's category assignments to the full summary
+            val updatedTransactions = current.fullSummary.transactions.map { tx ->
+                val assigned = current.allAssignments[tx.id]
+                if (assigned != null) tx.copy(category = assigned) else tx
+            }
+            val updatedSummary = current.fullSummary.copy(transactions = updatedTransactions)
+            _uiState.update { it.copy(importWorkflow = ImportWorkflow.NeedsReview(updatedSummary)) }
         }
     }
 
@@ -319,6 +523,14 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
                     retroactiveCategorizer.recategorizeAll()
                 }
                 refreshState()
+                PipelineManager.enqueueCsvImportChain(getApplication())
+                if (DriveDataStore.isDriveEnabled(getApplication())) {
+                    PipelineManager.enqueueBankStatementUpload(
+                        getApplication(),
+                        current.summary.fileName,
+                        "Imported ${current.summary.parsedCount} transactions from ${current.summary.detectedBank} (${current.summary.fileName})"
+                    )
+                }
                 _uiState.update { it.copy(importWorkflow = ImportWorkflow.Success(current.summary.parsedCount)) }
                 // Auto-reset to Idle after 1.5 seconds so user can import again
                 kotlinx.coroutines.delay(1500L)

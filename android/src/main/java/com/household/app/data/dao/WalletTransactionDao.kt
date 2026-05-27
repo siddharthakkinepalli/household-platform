@@ -58,4 +58,13 @@ interface WalletTransactionDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTransactionsIgnore(transactions: List<WalletTransactionEntity>)
+
+    @Query("""
+        SELECT wallet_transactions.* FROM wallet_transactions_fts
+        JOIN wallet_transactions ON wallet_transactions.id = wallet_transactions_fts.rowid
+        WHERE wallet_transactions_fts MATCH :query
+        ORDER BY wallet_transactions.date DESC
+        LIMIT 100
+    """)
+    suspend fun searchTransactionsFts(query: String): List<WalletTransactionEntity>
 }

@@ -26,7 +26,16 @@ import com.household.app.data.dao.DocumentAlertDao
 import com.household.app.data.dao.DocumentDao
 import com.household.app.data.dao.FamilyMemberDao
 import com.household.app.data.dao.InventoryEventDao
+import com.household.app.data.dao.RecurringBillDao
+import com.household.app.data.dao.SalarySourceDao
+import com.household.app.data.dao.TaxCheckDao
+import com.household.app.data.dao.TaxTagDao
 import com.household.app.data.entities.CategoryThresholdEntity
+import com.household.app.data.entities.RecurringBillEntity
+import com.household.app.data.entities.WalletTransactionFts
+import com.household.app.data.entities.SalarySourceEntity
+import com.household.app.data.entities.TaxCheckEntity
+import com.household.app.data.entities.TaxTagEntity
 import com.household.app.data.entities.DashboardPrefsEntity
 import com.household.app.data.entities.DocumentEntity
 import com.household.app.data.entities.DocumentAlertEntity
@@ -66,9 +75,14 @@ import com.household.app.data.entities.InventoryEventEntity
         InventoryEventEntity::class,
         FamilyMemberEntity::class,
         DocumentEntity::class,
-        DocumentAlertEntity::class
+        DocumentAlertEntity::class,
+        SalarySourceEntity::class,
+        RecurringBillEntity::class,
+        TaxCheckEntity::class,
+        TaxTagEntity::class,
+        WalletTransactionFts::class
     ],
-    version = 10,
+    version = 17,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -92,6 +106,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun familyMemberDao(): FamilyMemberDao
     abstract fun documentDao(): DocumentDao
     abstract fun documentAlertDao(): DocumentAlertDao
+    abstract fun salarySourceDao(): SalarySourceDao
+    abstract fun recurringBillDao(): RecurringBillDao
+    abstract fun taxCheckDao(): TaxCheckDao
+    abstract fun taxTagDao(): TaxTagDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -376,6 +394,112 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS salary_sources (
+                        id INTEGER NOT NULL,
+                        merchantPattern TEXT NOT NULL,
+                        lastAmount REAL NOT NULL,
+                        minAmount REAL NOT NULL,
+                        maxAmount REAL NOT NULL,
+                        confirmedAt INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS recurring_bills (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        merchantPattern TEXT NOT NULL,
+                        normalizedAmount REAL NOT NULL,
+                        minAmount REAL NOT NULL,
+                        maxAmount REAL NOT NULL,
+                        category TEXT NOT NULL,
+                        lastSeenDate INTEGER NOT NULL,
+                        cycleCount INTEGER NOT NULL,
+                        isActive INTEGER NOT NULL DEFAULT 1
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_bills_isActive ON recurring_bills(isActive)")
+            }
+        }
+
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tax_checks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        year INTEGER NOT NULL,
+                        driveIncomeTaxFolderId TEXT,
+                        payslipsFound INTEGER NOT NULL DEFAULT 0,
+                        lohnsteuerFound INTEGER NOT NULL DEFAULT 0,
+                        lohnsteuerChitraFound INTEGER NOT NULL DEFAULT 0,
+                        kitaDocsFound INTEGER NOT NULL DEFAULT 0,
+                        taxExcelFound INTEGER NOT NULL DEFAULT 0,
+                        bankStatementsFound INTEGER NOT NULL DEFAULT 0,
+                        donationDocsFound INTEGER NOT NULL DEFAULT 0,
+                        utilityBillsFound INTEGER NOT NULL DEFAULT 0,
+                        isComplete INTEGER NOT NULL DEFAULT 0,
+                        lastSyncedAt INTEGER NOT NULL DEFAULT 0,
+                        syncStatus TEXT NOT NULL DEFAULT 'OFFLINE'
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tax_checks_year ON tax_checks(year)")
+            }
+        }
+
+        private val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS `wallet_transactions_fts` " +
+                    "USING fts4(content=`wallet_transactions`, `title`, `category`, `note`, `bankName`)"
+                )
+                db.execSQL("INSERT INTO wallet_transactions_fts(wallet_transactions_fts) VALUES('rebuild')")
+            }
+        }
+
+        // Fixes FTS table created with tokenize=unicode61 in 15→16 — Room expects no tokenize option
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS `wallet_transactions_fts`")
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS `wallet_transactions_fts` " +
+                    "USING fts4(content=`wallet_transactions`, `title`, `category`, `note`, `bankName`)"
+                )
+                db.execSQL("INSERT INTO wallet_transactions_fts(wallet_transactions_fts) VALUES('rebuild')")
+            }
+        }
+
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE recurring_bills ADD COLUMN source TEXT NOT NULL DEFAULT 'AUTO'")
+            }
+        }
+
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tax_tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        entityType TEXT NOT NULL,
+                        entityId INTEGER NOT NULL,
+                        taxCategory TEXT NOT NULL,
+                        year INTEGER NOT NULL,
+                        note TEXT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tax_tags_entityType_entityId ON tax_tags (entityType, entityId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tax_tags_year ON tax_tags (year)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -388,7 +512,9 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10
+                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+                        MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
+                        MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17
                     )
                     .build()
                 INSTANCE = instance

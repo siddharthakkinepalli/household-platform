@@ -1,6 +1,7 @@
 package com.household.app.vault.scan
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.core.net.toUri
 import com.google.mlkit.vision.common.InputImage
@@ -8,6 +9,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.household.app.data.refiner.toVisionTextPayload
 import com.household.app.domain.models.vault.VisionTextPayload
+import com.household.app.vault.parser.ImagePreProcessor
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -29,6 +31,16 @@ class MlKitOcrEngine : OcrEngine {
 
     override suspend fun recognize(context: Context, imageUri: Uri): VisionTextPayload {
         val inputImage = InputImage.fromFilePath(context, imageUri)
+        return suspendCancellableCoroutine { cont ->
+            recognizer.process(inputImage)
+                .addOnSuccessListener { text -> cont.resume(text.toVisionTextPayload()) }
+                .addOnFailureListener { e -> cont.resumeWithException(e) }
+                .addOnCanceledListener { cont.cancel() }
+        }
+    }
+
+    suspend fun recognizeFromBitmap(bitmap: Bitmap): VisionTextPayload {
+        val inputImage = InputImage.fromBitmap(ImagePreProcessor.optimizeForOcr(bitmap), 0)
         return suspendCancellableCoroutine { cont ->
             recognizer.process(inputImage)
                 .addOnSuccessListener { text -> cont.resume(text.toVisionTextPayload()) }

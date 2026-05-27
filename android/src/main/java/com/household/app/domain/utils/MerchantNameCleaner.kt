@@ -5,6 +5,36 @@ object MerchantNameCleaner {
         val normalizedRaw = raw.replace(Regex("\\s+"), " ").trim()
         if (normalizedRaw.isBlank()) return raw.trim()
 
+        val lowered = normalizedRaw.lowercase()
+
+        // Pattern 1: German SEPA "Ihr Einkauf bei <merchant>"
+        Regex("""(?i)ihr einkauf bei\s+([^,.\n]+)""").find(normalizedRaw)?.groupValues?.get(1)
+            ?.trim()?.takeIf { it.length > 2 }
+            ?.let { return it.replaceFirstChar { c -> c.uppercase() } }
+
+        // Pattern 2: "PP.*.PP , <merchant>" (PayPal SEPA reference format)
+        Regex("""(?i)pp\..*?\.pp\s*,\s*([^,.\n]+)""").find(normalizedRaw)?.groupValues?.get(1)
+            ?.trim()?.takeIf { it.length > 2 }
+            ?.let { return it.replaceFirstChar { c -> c.uppercase() } }
+
+        // Pattern 3: "PAYPAL *Merchant Name" (multi-word)
+        Regex("""(?i)paypal\s*[*]\s*([^,.\n]+)""").find(normalizedRaw)?.groupValues?.get(1)
+            ?.trim()?.takeIf { it.length > 2 }
+            ?.let { return it.replaceFirstChar { c -> c.uppercase() } }
+
+        // Pattern 4: "PP*MerchantName"
+        Regex("""(?i)pp\s*[*]\s*([^,.\n]+)""").find(normalizedRaw)?.groupValues?.get(1)
+            ?.trim()?.takeIf { it.length > 2 }
+            ?.let { return it.replaceFirstChar { c -> c.uppercase() } }
+
+        // Pattern 5: German SEPA SVWZ+ remittance field — "SVWZ+<text> ABWA+" or end
+        Regex("""SVWZ\+(.*?)(?:\s[A-Z]{4}\+|$)""").find(normalizedRaw)?.groupValues?.get(1)
+            ?.trim()?.takeIf { it.length > 2 }
+            ?.let { return it.replaceFirstChar { c -> c.uppercase() } }
+
+        if (lowered.contains("wise")) return "Wise"
+        if (lowered.contains("stadt ulm")) return "Stadt Ulm"
+
         val chunks = normalizedRaw
             .split("/", "\n")
             .map { it.trim() }
@@ -16,11 +46,6 @@ object MerchantNameCleaner {
         }
 
         candidate = stripNoise(candidate)
-
-        val lowered = normalizedRaw.lowercase()
-        if (lowered.contains("paypal")) return "PayPal"
-        if (lowered.contains("wise")) return "Wise"
-        if (lowered.contains("stadt ulm")) return "Stadt Ulm"
 
         return candidate.ifBlank { normalizedRaw }
     }

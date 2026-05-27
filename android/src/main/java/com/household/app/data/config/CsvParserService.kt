@@ -58,11 +58,14 @@ class CsvParserService(
             val headers = splitCsvLine(lines.first(), delimiter)
             val headerMap = headers.mapIndexed { index, raw -> normalizeHeader(raw) to index }.toMap()
 
-            val idxDate = pickIndex(headerMap, listOf("date", "datum", "booking", "valuta", "wertstellung"))
-            val idxTitle = pickIndex(headerMap, listOf("title", "description", "purpose", "merchant", "name", "verwendungszweck", "details", "partner", "empfänger", "text", "booking"))
-            val idxAmount = pickIndex(headerMap, listOf("amount", "betrag", "umsatz", "value", "sum", "wert"))
+            val idxDate = pickIndex(headerMap, listOf("date", "datum", "buchungsdatum", "booking", "valuta", "wertstellung"))
+            val idxTitle = pickIndex(headerMap, listOf(
+                "title", "description", "purpose", "merchant", "verwendungszweck",
+                "auftraggeber", "beguenstigter", "empfänger", "name", "details", "partner", "text", "booking"
+            ))
+            val idxAmount = pickIndex(headerMap, listOf("amount", "betrag eur", "betrag", "umsatz", "value", "sum", "wert"))
             val idxCategory = pickIndex(headerMap, listOf("category", "budgetcategory", "kategorie"))
-            val idxBank = pickIndex(headerMap, listOf("bank", "account", "konto", "iban"))
+            val idxBank = pickIndex(headerMap, listOf("bank", "account", "konto", "iban", "glaeubiger"))
 
             if (idxDate < 0 || idxTitle < 0 || idxAmount < 0) {
                 return ImportParseResult.Error(ImportErrorType.MissingColumns)
@@ -88,8 +91,21 @@ class CsvParserService(
 
                 val bank = cols.getOrNull(idxBank)?.trim().orEmpty().ifBlank { detectedBank }
                 val sourceCategory = cols.getOrNull(idxCategory)?.trim().orEmpty().ifBlank { "Other" }
-                val classifiedCategory = categorizer.classifyCategory(title, sourceCategory)
-                if (classifiedCategory == "Other") {
+
+                val rawDescription = cols.getOrNull(idxTitle)?.trim().orEmpty()
+                val classifiedCategory = when {
+                    categorizer.shouldExclude(title) || categorizer.shouldExclude(rawDescription) -> "Excluded"
+                    categorizer.isIncome(rawDescription) || categorizer.isIncome(title) -> "Income"
+                    amount > 0 -> {
+                        val raw = categorizer.classifyCategory(title, sourceCategory)
+                        if (raw == "Transfers") "Excluded" else "Income"
+                    }
+                    else -> {
+                        val raw = categorizer.classifyCategory(title, sourceCategory)
+                        if (raw == "Transfers") "Excluded" else raw
+                    }
+                }
+                if (classifiedCategory == "Uncategorized") {
                     warningCount += 1
                 }
 
@@ -215,6 +231,8 @@ class CsvParserService(
             signal.contains("deutsche bank") -> "Deutsche Bank"
             signal.contains("dkb") -> "DKB"
             signal.contains("sparkasse") -> "Sparkasse"
+            signal.contains("ing-diba") || signal.contains("ing diba") || signal.contains("ing.de")
+                    || (signal.contains("buchungsdatum") && signal.contains("auftraggeber")) -> "ING"
             signal.contains("revolut") -> "Revolut"
             signal.contains("paypal") -> "PayPal"
             else -> "Unknown"

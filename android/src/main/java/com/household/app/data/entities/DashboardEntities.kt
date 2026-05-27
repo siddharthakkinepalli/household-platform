@@ -1,6 +1,8 @@
 package com.household.app.data.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "transaction_overrides")
@@ -65,6 +67,16 @@ data class MerchantRuleEntity(
     val updatedAt: String = System.currentTimeMillis().toString()
 )
 
+@Entity(tableName = "salary_sources")
+data class SalarySourceEntity(
+    @PrimaryKey val id: Int = 1,
+    val merchantPattern: String,
+    val lastAmount: Double,
+    val minAmount: Double,
+    val maxAmount: Double,
+    val confirmedAt: Long = System.currentTimeMillis()
+)
+
 @Entity(tableName = "import_audits")
 data class ImportAuditEntity(
     @PrimaryKey(autoGenerate = true)
@@ -79,4 +91,50 @@ data class ImportAuditEntity(
     val warningCount: Int,
     val salaryAnchorDate: Int,
     val parserVersion: Int = 1
+)
+
+@Entity(tableName = "recurring_bills", indices = [Index("isActive")])
+data class RecurringBillEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val merchantPattern: String,
+    val normalizedAmount: Double,
+    val minAmount: Double,
+    val maxAmount: Double,
+    val category: String,
+    val lastSeenDate: Long,
+    val cycleCount: Int,
+    @ColumnInfo(defaultValue = "1") val isActive: Boolean = true,
+    // "AUTO" = pipeline-detected, "CONFIRMED" = user-validated, "MANUAL" = user-created, "DISMISSED" = user-rejected
+    @ColumnInfo(defaultValue = "'AUTO'") val source: String = "AUTO"
+)
+
+@Entity(tableName = "tax_checks", indices = [Index("year")])
+data class TaxCheckEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val year: Int,
+    val driveIncomeTaxFolderId: String? = null,
+    @ColumnInfo(defaultValue = "0") val payslipsFound: Int = 0,
+    @ColumnInfo(defaultValue = "0") val lohnsteuerFound: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val lohnsteuerChitraFound: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val kitaDocsFound: Int = 0,
+    @ColumnInfo(defaultValue = "0") val taxExcelFound: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val bankStatementsFound: Int = 0,
+    @ColumnInfo(defaultValue = "0") val donationDocsFound: Int = 0,
+    @ColumnInfo(defaultValue = "0") val utilityBillsFound: Int = 0,
+    @ColumnInfo(defaultValue = "0") val isComplete: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val lastSyncedAt: Long = 0L,
+    @ColumnInfo(defaultValue = "'OFFLINE'") val syncStatus: String = "OFFLINE"
+)
+
+@Entity(
+    tableName = "tax_tags",
+    indices = [Index("entityType", "entityId"), Index("year")]
+)
+data class TaxTagEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val entityType: String,   // "transaction" or "vault_doc"
+    val entityId: Long,
+    val taxCategory: String,  // e.g. "Arbeitsmittel", "Homeoffice", "Krankenkosten", "Spendenquittung", "Fahrtkosten", "Andere"
+    val year: Int,
+    val note: String? = null
 )
