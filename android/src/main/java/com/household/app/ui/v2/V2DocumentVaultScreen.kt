@@ -20,7 +20,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -768,6 +771,16 @@ private fun DocumentDetailSheet(
         currentTag = existing.firstOrNull()?.taxCategory
     }
 
+    var extractedEntities by remember { mutableStateOf<List<com.household.app.data.entities.VaultDocumentEntityRecord>>(emptyList()) }
+
+    LaunchedEffect(entry.id) {
+        extractedEntities = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                com.household.app.data.AppDatabase.getInstance(context).documentEntityDao().getForDocument(entry.id)
+            }.getOrDefault(emptyList())
+        }
+    }
+
     val category = runCatching { VaultCategory.valueOf(entry.category) }.getOrDefault(VaultCategory.OTHER)
     val isReceipt = category == VaultCategory.RECEIPT
     val glowColor = if (entry.isLinkedToExpense) LumeEmerald else categoryColor(category)
@@ -860,6 +873,8 @@ private fun DocumentDetailSheet(
                     }
                 }
             }
+
+            ExtractedInfoSection(extractedEntities)
 
             Spacer(Modifier.height(4.dp))
 
@@ -1156,4 +1171,132 @@ private fun categoryColor(category: VaultCategory): Color = when (category) {
     VaultCategory.INSURANCE    -> Color(0xFFFB7185)
     VaultCategory.MEDICAL      -> Color(0xFF4ADE80)
     VaultCategory.OTHER        -> LumeWhite.copy(alpha = 0.5f)
+}
+
+// ── Extracted Info Section ────────────────────────────────────────────────────
+
+@Composable
+private fun ExtractedInfoSection(entities: List<com.household.app.data.entities.VaultDocumentEntityRecord>) {
+    if (entities.isEmpty()) return
+
+    // Filter to the most useful display entities, highest confidence first
+    val displayTypes = setOf(
+        "FULL_NAME", "DATE_OF_BIRTH", "EXPIRY_DATE", "ISSUE_DATE",
+        "PASSPORT_NUMBER", "AADHAAR_NUMBER", "PAN_NUMBER", "VOTER_ID_NUMBER",
+        "DRIVING_LICENCE_NUMBER", "OCI_NUMBER", "DOCUMENT_NUMBER",
+        "NATIONALITY", "STEUERNUMMER", "STEUER_ID", "IBAN", "POLICY_NUMBER",
+        "MONTHLY_COST", "EMPLOYER_NAME", "ADDRESS"
+    )
+
+    val displayEntities = entities
+        .filter { it.entityType in displayTypes }
+        .sortedByDescending { it.confidence }
+        .distinctBy { it.entityType }   // one row per type, highest confidence wins
+        .take(8)                         // cap at 8 rows to avoid overwhelming the sheet
+
+    if (displayEntities.isEmpty()) return
+
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        // Header row — tappable to expand/collapse
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.AutoAwesome,
+                    contentDescription = null,
+                    tint = LumeCyan,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    "Extracted Info",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LumeCyan,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "(${displayEntities.size} fields)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+            }
+            Icon(
+                if (expanded) Icons.Rounded.KeyboardArrowUp
+                else Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        if (expanded) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Color.White.copy(alpha = 0.04f),
+                        androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                    )
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                displayEntities.forEach { entity ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = formatEntityType(entity.entityType),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted,
+                            modifier = Modifier.weight(0.42f)
+                        )
+                        Text(
+                            text = entity.normalizedValue.ifBlank { entity.rawValue },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMain,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(0.58f),
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatEntityType(raw: String): String = when (raw) {
+    "FULL_NAME"              -> "Name"
+    "DATE_OF_BIRTH"          -> "Date of Birth"
+    "EXPIRY_DATE"            -> "Expiry Date"
+    "ISSUE_DATE"             -> "Issue Date"
+    "PASSPORT_NUMBER"        -> "Passport No."
+    "AADHAAR_NUMBER"         -> "Aadhaar No."
+    "PAN_NUMBER"             -> "PAN No."
+    "VOTER_ID_NUMBER"        -> "Voter ID"
+    "DRIVING_LICENCE_NUMBER" -> "DL Number"
+    "OCI_NUMBER"             -> "OCI No."
+    "DOCUMENT_NUMBER"        -> "Doc Number"
+    "NATIONALITY"            -> "Nationality"
+    "STEUERNUMMER"           -> "Steuernummer"
+    "STEUER_ID"              -> "Steuer-ID"
+    "IBAN"                   -> "IBAN"
+    "POLICY_NUMBER"          -> "Policy No."
+    "MONTHLY_COST"           -> "Monthly Cost"
+    "EMPLOYER_NAME"          -> "Employer"
+    "ADDRESS"                -> "Address"
+    else -> raw.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
 }

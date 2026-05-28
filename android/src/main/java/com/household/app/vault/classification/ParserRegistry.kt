@@ -2,12 +2,19 @@ package com.household.app.vault.classification
 
 import com.household.app.vault.classification.parsers.AadhaarParser
 import com.household.app.vault.classification.parsers.AufenthaltstitelParser
+import com.household.app.vault.classification.parsers.EmploymentLetterParser
 import com.household.app.vault.classification.parsers.GenericFallbackParser
+import com.household.app.vault.classification.parsers.GermanDrivingLicenceParser
 import com.household.app.vault.classification.parsers.GermanPassportParser
+import com.household.app.vault.classification.parsers.IndianDrivingLicenceParser
 import com.household.app.vault.classification.parsers.IndianPassportParser
 import com.household.app.vault.classification.parsers.InsuranceDocParser
 import com.household.app.vault.classification.parsers.MeldebescheinigungParser
+import com.household.app.vault.classification.parsers.OciParser
 import com.household.app.vault.classification.parsers.PanParser
+import com.household.app.vault.classification.parsers.RentalContractParser
+import com.household.app.vault.classification.parsers.TaxDocParser
+import com.household.app.vault.classification.parsers.VoterIdParser
 import com.household.app.vault.extraction.ExtractionResult
 
 /**
@@ -29,10 +36,17 @@ object ParserRegistry {
         IndianPassportParser,
         AadhaarParser,
         PanParser,
+        IndianDrivingLicenceParser,
+        VoterIdParser,
+        OciParser,
         GermanPassportParser,
         AufenthaltstitelParser,
         MeldebescheinigungParser,
+        GermanDrivingLicenceParser,
         InsuranceDocParser,
+        TaxDocParser,
+        RentalContractParser,
+        EmploymentLetterParser,
         GenericFallbackParser       // always last
     )
 
@@ -61,7 +75,10 @@ object ParserRegistry {
             "republic of india", "passport", "reisepass", "bundesrepublik deutschland",
             "uidai", "government of india", "income tax", "aufenthaltstitel",
             "meldebescheinigung", "einwohnermeldeamt", "versicherung", "insurance",
-            "führerschein", "driving licence", "election commission"
+            "führerschein", "driving licence", "election commission",
+            "voter", "overseas citizen", "oci",
+            "fahrerlaubnis",
+            "steuernummer", "finanzamt", "mietvertrag", "arbeitsvertrag"
         )
         keywordsToScan.forEach { kw -> if (fullLower.contains(kw)) anchors.add(kw) }
 

@@ -41,6 +41,25 @@ class VaultDocumentParserWorker(
         val db = AppDatabase.getInstance(applicationContext)
         val entry = db.vaultDao().getEntryById(vaultId) ?: return@withContext Result.failure()
 
+        // Create/update page tracking row for this vault entry
+        val pageDao = db.documentPageDao()
+        val existingPage = runCatching { pageDao.getPagesForDocument(vaultId).firstOrNull() }.getOrNull()
+        val pageId: Long = if (existingPage == null) {
+            runCatching {
+                pageDao.insert(
+                    com.household.app.data.entities.DocumentPageEntity(
+                        vaultEntryId    = vaultId,
+                        pageIndex       = 0,
+                        pageHash        = "",           // will be updated by OcrCacheManager when available
+                        processingState = "OCR_QUEUED"
+                    )
+                )
+            }.getOrNull() ?: 0L
+        } else {
+            runCatching { pageDao.updateState(existingPage.id, "OCR_QUEUED") }.getOrNull()
+            existingPage.id
+        }
+
         // Step 1: resolve OCR text
         var ocrText = entry.rawOcrContent
         var spatialScanned: LocalReceiptScanner.ScannedReceipt? = null
@@ -63,7 +82,10 @@ class VaultDocumentParserWorker(
                             }.getOrNull()
                         }
                     }
-                    if (ocrText.isNotBlank()) db.vaultDao().updateRawOcr(vaultId, ocrText)
+                    if (ocrText.isNotBlank()) {
+                        db.vaultDao().updateRawOcr(vaultId, ocrText)
+                        runCatching { pageDao.updateState(pageId, "OCR_DONE") }.getOrNull()
+                    }
                 } catch (_: Exception) {
                     // extraction failed — proceed with title-only classification
                 } finally {
@@ -186,6 +208,7 @@ class VaultDocumentParserWorker(
             subFolder = effectiveSubFolder,
             title     = meta.suggestedTitle ?: entry.documentTitle
         )
+        runCatching { pageDao.updateState(pageId, "INDEXED") }.getOrNull()
 
         // Step 4: if expiry date found, create a DocumentEntity + alert so the
         //         existing upcoming-alerts UI picks it up automatically.

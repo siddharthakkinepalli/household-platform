@@ -69,7 +69,8 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             vaultDao = db.vaultDao(),
             pantryDao = db.pantryDao(),
             storageService = FileStorageService(appContext),
-            refiner = WeightedReceiptRefiner()
+            refiner = WeightedReceiptRefiner(),
+            context = appContext
         )
     }
     private val linkReceiptUseCase by lazy {

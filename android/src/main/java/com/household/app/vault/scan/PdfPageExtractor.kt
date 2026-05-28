@@ -16,11 +16,16 @@ object PdfPageExtractor {
     private const val MIN_DIGITAL_TEXT_LENGTH = 50
     private const val RASTER_SCALE = 2f
 
-    suspend fun extractText(@Suppress("UNUSED_PARAMETER") context: Context, pdfFile: File, engine: MlKitOcrEngine): String =
+    suspend fun extractText(
+        @Suppress("UNUSED_PARAMETER") context: Context,
+        pdfFile: File,
+        engine: MlKitOcrEngine,
+        cacheManager: OcrCacheManager? = null
+    ): String =
         withContext(Dispatchers.IO) {
             val nativeText = tryNativeExtract(pdfFile)
             if (nativeText.length >= MIN_DIGITAL_TEXT_LENGTH) return@withContext nativeText
-            rasterAndOcr(context, pdfFile, engine)
+            rasterAndOcr(context, pdfFile, engine, cacheManager)
         }
 
     private fun tryNativeExtract(pdfFile: File): String = try {
@@ -34,7 +39,8 @@ object PdfPageExtractor {
     private suspend fun rasterAndOcr(
         context: Context,
         pdfFile: File,
-        engine: MlKitOcrEngine
+        engine: MlKitOcrEngine,
+        cacheManager: OcrCacheManager? = null
     ): String = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
         val fd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
@@ -48,9 +54,19 @@ object PdfPageExtractor {
                         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                         page.render(bitmap, null, Matrix().apply { setScale(RASTER_SCALE, RASTER_SCALE) }, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                         val pageText = try {
-                            engine.recognizeFromBitmap(bitmap).fullText
-                        } catch (_: Exception) {
-                            ""
+                            val hash = cacheManager?.computeHash(bitmap)
+                            val cached = if (hash != null) cacheManager.getCached(hash) else null
+                            if (cached != null) {
+                                cached
+                            } else {
+                                val ocrResult = try {
+                                    engine.recognizeFromBitmap(bitmap).fullText
+                                } catch (_: Exception) {
+                                    ""
+                                }
+                                if (hash != null) cacheManager.store(hash, ocrResult)
+                                ocrResult
+                            }
                         } finally {
                             bitmap.recycle()
                         }

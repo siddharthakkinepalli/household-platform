@@ -91,7 +91,7 @@ import com.household.app.data.entities.InventoryEventEntity
         OcrCacheEntity::class,
         VaultDocumentEntityRecord::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -511,6 +511,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // fileHash column on vault_entries for SHA-256 dedup
+                try {
+                    db.execSQL("ALTER TABLE vault_entries ADD COLUMN fileHash TEXT")
+                } catch (_: Exception) { /* already exists on fresh installs */ }
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_vault_entries_fileHash ON vault_entries(fileHash)")
+            }
+        }
+
         private val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -599,7 +609,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
-                        MIGRATION_18_19
+                        MIGRATION_18_19, MIGRATION_19_20
                     )
                     .build()
                 INSTANCE = instance

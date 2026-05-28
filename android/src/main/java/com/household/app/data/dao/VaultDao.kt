@@ -77,4 +77,7 @@ interface VaultDao {
 
     @Query("UPDATE vault_entries SET merchantName = :merchant, totalAmount = :amount, dateEpoch = :dateEpoch WHERE id = :id")
     suspend fun updateReceiptMeta(id: Long, merchant: String, amount: Double, dateEpoch: Long)
+
+    @Query("SELECT * FROM vault_entries WHERE fileHash = :hash LIMIT 1")
+    suspend fun getByFileHash(hash: String): VaultEntity?
 }

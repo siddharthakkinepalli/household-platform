@@ -1,5 +1,6 @@
 package com.household.app.data.repository
 
+import android.content.Context
 import android.net.Uri
 import com.household.app.data.dao.PantryDao
 import com.household.app.data.dao.VaultDao
@@ -21,7 +22,8 @@ class VaultRepositoryImpl(
     private val vaultDao: VaultDao,
     private val pantryDao: PantryDao,
     private val storageService: FileStorageService,
-    private val refiner: ReceiptRefiner
+    private val refiner: ReceiptRefiner,
+    private val context: Context
 ) : VaultRepository {
 
     override fun getVaultEntries(): Flow<List<VaultEntity>> = vaultDao.getAllEntries()
@@ -78,6 +80,13 @@ class VaultRepositoryImpl(
         folder: VaultFolderPath,
         title: String
     ): Long {
+        // SHA-256 dedup: compute hash first, return existing entry id if duplicate
+        val fileHash = computeFileHash(uri)
+        if (fileHash != null) {
+            val existing = vaultDao.getByFileHash(fileHash)
+            if (existing != null) return existing.id  // duplicate — return existing entry
+        }
+
         val path = storageService.saveDocument(uri, mimeType)
         val entity = VaultEntity(
             imagePath = path,
@@ -89,10 +98,23 @@ class VaultRepositoryImpl(
             ownerMemberId = folder.ownerMemberId,
             subFolder = VaultSubFolder.normalizeId(folder.subFolder),
             documentTitle = title.trim().ifBlank { null },
-            mimeType = mimeType
+            mimeType = mimeType,
+            fileHash = fileHash
         )
         return vaultDao.insertVaultEntry(entity)
     }
+
+    private fun computeFileHash(uri: Uri): String? = runCatching {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            val buffer = ByteArray(8192)
+            var read: Int
+            while (stream.read(buffer).also { read = it } != -1) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        digest.digest().joinToString("") { "%02x".format(it) }
+    }.getOrNull()
 
     override suspend fun linkReceiptToExpense(vaultId: Long, expenseId: Long) {
         vaultDao.linkToExpense(vaultId, expenseId.toLong())

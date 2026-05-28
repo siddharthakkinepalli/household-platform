@@ -30,5 +30,6 @@ data class VaultEntity(
     val ownerMemberId: Long? = null,
     val subFolder: String = VaultSubFolder.UNFILED.id,
     val documentTitle: String? = null,
-    val mimeType: String = "image/jpeg"
+    val mimeType: String = "image/jpeg",
+    val fileHash: String? = null
 )
