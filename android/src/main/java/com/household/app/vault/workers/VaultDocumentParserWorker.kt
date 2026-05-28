@@ -16,6 +16,11 @@ import com.household.app.vault.parser.LocalReceiptScanner
 import com.household.app.vault.parser.ReceiptTextParser
 import com.household.app.vault.scan.MlKitOcrEngine
 import com.household.app.vault.scan.PdfPageExtractor
+import android.util.Log
+import com.household.app.data.entities.VaultDocumentEntityRecord
+import com.household.app.vault.classification.DocumentDocType
+import com.household.app.vault.classification.ParserRegistry
+import com.household.app.vault.extraction.EntityType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -67,15 +72,19 @@ class VaultDocumentParserWorker(
             }
         }
 
-        // Use document title as classification hint when OCR is empty (e.g. PDFs)
+        // Use document title as classification hint when OCR is empty (e.g. scanned PDFs)
         val textForParsing = ocrText.ifBlank { entry.documentTitle ?: "" }
 
-        // Step 1.5: structured receipt extraction.
-        // For images: use spatialScanned (bounding-box row reconstruction — more accurate amounts).
-        // For PDFs: fall through to string-based ReceiptTextParser.
-        if (textForParsing.isNotBlank()) {
+        // Resolve existing category early — used to gate receipt-only processing below
+        val existingCategory = runCatching { VaultCategory.valueOf(entry.category) }
+            .getOrDefault(VaultCategory.OTHER)
+
+        // Step 1.5: structured receipt extraction — ONLY for receipt/unclassified documents.
+        // Identity, insurance, contract, medical docs should never go through receipt parsing.
+        val isReceiptLike = existingCategory == VaultCategory.RECEIPT ||
+                            existingCategory == VaultCategory.OTHER
+        if (isReceiptLike && textForParsing.isNotBlank()) {
             val receipt = spatialScanned?.let {
-                // Wrap ScannedReceipt as ParsedReceipt shape for the shared update logic below
                 ReceiptTextParser.ParsedReceipt(
                     merchant = it.merchant,
                     date = it.date,
@@ -86,7 +95,6 @@ class VaultDocumentParserWorker(
                 )
             } ?: ReceiptTextParser.parse(textForParsing)
 
-            // Only overwrite stored fields if parser produced confident results
             val merchant = receipt.merchant.takeIf { it != "UNBEKANNT" } ?: entry.merchantName
             val amount = receipt.totalAmount.takeIf { it > 0.0 } ?: entry.totalAmount
 
@@ -108,7 +116,6 @@ class VaultDocumentParserWorker(
                 )
             }
 
-            // Push grocery/drugstore line items to pantry as unconfirmed staged items
             val pantryEligible = receipt.category in setOf("Groceries", "Drugstore & Personal Care")
             if (!receipt.isInvoice && pantryEligible && receipt.lineItems.isNotEmpty()) {
                 val pantryItems = receipt.lineItems.map { item ->
@@ -124,22 +131,67 @@ class VaultDocumentParserWorker(
             }
         }
 
-        // Step 2: classify and extract metadata
-        val existingCategory = runCatching { VaultCategory.valueOf(entry.category) }
-            .getOrDefault(VaultCategory.OTHER)
-        val meta = VaultDocumentParser.parse(textForParsing, existingCategory)
+        Log.d("VaultParser", "OCR text length=${ocrText.length}, textForParsing preview=${textForParsing.take(200).replace('\n',' ')}")
 
-        // Step 3: persist updated category, subfolder and title
+        // Step 2: run Parser Registry — structured extraction with per-document-type parsers
+        val (winningParser, extractionResult) = if (textForParsing.isNotBlank()) {
+            runCatching { ParserRegistry.process(textForParsing) }.getOrNull()
+                ?: (null to null)
+        } else null to null
+
+        Log.d("VaultParser", "ParserRegistry winner=${winningParser?.docType} entities=${extractionResult?.entities?.size} confidence=${extractionResult?.overallConfidence}")
+
+        // Persist structured entities to vault_extracted_entities table
+        if (extractionResult != null && extractionResult.entities.isNotEmpty()) {
+            val records = extractionResult.entities.map { entity ->
+                VaultDocumentEntityRecord(
+                    vaultEntryId    = vaultId,
+                    entityType      = entity.type.name,
+                    rawValue        = entity.rawValue,
+                    normalizedValue = entity.normalizedValue,
+                    confidence      = entity.confidence,
+                    pageIndex       = entity.pageIndex,
+                    sourceContext   = entity.sourceContext,
+                    parserId        = winningParser?.docType?.name ?: "UNKNOWN"
+                )
+            }
+            db.documentEntityDao().deleteForDocument(vaultId)
+            db.documentEntityDao().insertAll(records)
+        }
+
+        // If registry extracted an expiry date with high confidence, use it for DocumentEntity creation
+        val registryExpiryDate: LocalDate? = extractionResult?.entities
+            ?.filter { it.type == EntityType.EXPIRY_DATE && it.confidence >= 0.6f }
+            ?.mapNotNull { runCatching { LocalDate.parse(it.normalizedValue) }.getOrNull() }
+            ?.maxOrNull()
+
+        // Step 2b: classify and extract metadata (existing VaultDocumentParser — keeps category/subfolder logic)
+        val meta = VaultDocumentParser.parse(textForParsing, existingCategory)
+        Log.d("VaultParser", "Parsed: category=${meta.category} subFolder=${meta.subFolder} expiry=${meta.expiryDate ?: registryExpiryDate} title=${meta.suggestedTitle}")
+
+        // Step 3: persist updated category, subfolder and title.
+        //
+        // IMPORTANT: preserve the user's explicit subfolder selection.
+        // When the user uploads a file directly into e.g. Siddharth → Identity → Passport,
+        // the entry is saved with subFolder="passport". If OCR later fails (e.g. JPEG2000
+        // embedded in a scanned PDF) the parser returns subFolder=UNFILED, which would move
+        // the document out of the folder the user chose. Only let the parser override the
+        // subfolder if it was never set (UNFILED) or is the catch-all (OTHER).
+        val parserMayOverrideSubFolder = entry.subFolder == "unfiled" || entry.subFolder == "other"
+        val effectiveSubFolder = if (parserMayOverrideSubFolder) meta.subFolder.id else entry.subFolder
+
         db.vaultDao().updateParsedMeta(
-            id       = vaultId,
-            category = meta.category.name,
-            subFolder = meta.subFolder.id,
-            title    = meta.suggestedTitle ?: entry.documentTitle
+            id        = vaultId,
+            category  = meta.category.name,
+            subFolder = effectiveSubFolder,
+            title     = meta.suggestedTitle ?: entry.documentTitle
         )
 
         // Step 4: if expiry date found, create a DocumentEntity + alert so the
-        //         existing upcoming-alerts UI picks it up automatically
-        meta.expiryDate?.let { expiry ->
+        //         existing upcoming-alerts UI picks it up automatically.
+        //         Registry expiry takes priority (higher fidelity, parser-specific logic).
+        val effectiveExpiry = registryExpiryDate ?: meta.expiryDate
+        effectiveExpiry?.let { expiry ->
             val expiryMs   = expiry.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
             val daysUntil  = ChronoUnit.DAYS.between(LocalDate.now(), expiry).toInt()
             val docTitle   = meta.suggestedTitle ?: entry.documentTitle ?: "Imported Document"

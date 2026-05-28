@@ -174,27 +174,192 @@ Replaced the circular gauge hero card with a smart "Household Pulse" card:
 
 ---
 
-## JUGAAD Vault — Architecture Blueprint (2026-05-28)
+## JUGAAD Vault — Full Architecture Blueprint (updated 2026-05-28)
 
-Standalone product designed as a privacy-first, offline-first intelligent document vault.
+Standalone privacy-first, offline-first intelligent document vault for Indian and German household documents.
 
-**Stack:** Kotlin · CameraX · PaddleOCR (ONNX) · ML Kit fallback · PdfBox · OpenCV · Room FTS · WorkManager
+**Stack:** Kotlin · CameraX · PaddleOCR ONNX · ML Kit · Tesseract · PdfBox · OpenCV · Room FTS · WorkManager · Hilt
 
-**Key architectural decisions:**
-- OCR abstraction layer (`OcrEngine` interface) — PaddleOCR / ML Kit / Tesseract are swappable
-- Two-level dedup: SHA-256 file hash + perceptual page hash — OCR never reruns for identical content
-- Text-based PDF fast path (PdfBox) — no OCR cost for digital PDFs
-- Atomic processing state machine persisted in DB — crash-safe restart at last known state
-- Engine version tracking — model upgrade triggers incremental rescan of affected pages only
-- Page-level granularity — pages in a multi-page PDF process independently
+---
+
+### Processing Lifecycle
+
+```
+Document Import (camera / PDF / gallery)
+    ↓ SHA-256 hash → duplicate? → link version, skip
+    ↓ Store file encrypted
+    ↓ Split into pages → pHash per page
+    ↓ per page:
+       PDF + embedded text (PdfBox >50 chars)? → TEXT PATH (zero OCR)
+       else → page_hash in ocr_cache? → reuse cached text
+               else → OpenCV preprocess → PaddleOCR ONNX
+                       conf <0.75 → ML Kit | conf <0.60 → Tesseract
+                       → store in ocr_cache (page_hash, engine_version)
+    ↓ all pages merged
+Country Detection → IN / DE / OTHER
+    ↓
+Document-Type Classification (anchor keywords + structural signals + parser votes)
+    ↓
+Parser Registry lookup → best matching DocumentParser
+    ↓
+Entity Extraction + Confidence Scoring
+    ↓
+Normalization Layer (dates, names, IDs, OCR artifacts)
+    ↓
+Metadata Storage (Room) + FTS indexing
+    ↓
+Alert Scheduling (expiry / renewal)
+```
+
+State machine: `PENDING → SPLITTING → OCR_QUEUED → OCR_DONE → CLASSIFYING → EXTRACTING → INDEXED → FAILED`
+
+---
+
+### OCR Rescanning Minimization
+
+| Layer | Mechanism |
+|-------|-----------|
+| File dedup | SHA-256 — same file never reprocessed |
+| Page dedup | pHash — identical page in two PDFs shares cached OCR |
+| OCR cache | `(page_hash, engine_version)` key — model upgrade only rescans affected pages |
+| State machine | Completed docs skip pipeline; only FAILED or manual trigger re-enters |
+| Text PDF fast path | PdfBox bypasses OCR entirely for digital PDFs |
+
+---
+
+### Parser Registry Architecture
+
+```kotlin
+interface DocumentParser {
+    val country: Country
+    val docType: DocumentType
+    fun confidence(signals: ClassificationSignals): Float   // 0.0–1.0
+    fun extract(text: String, pages: List<PageText>): ExtractionResult
+}
+data class ExtractionResult(
+    val entities: List<ExtractedEntity>,
+    val confidence: Float,
+    val partial: Boolean
+)
+data class ExtractedEntity(
+    val type: EntityType,       // EXPIRY_DATE, FULL_NAME, DOB, ID_NUMBER, IBAN …
+    val rawValue: String,
+    val normalizedValue: String,
+    val confidence: Float,
+    val pageIndex: Int
+)
+```
+
+**Registry (most specific → generic fallback):**
+
+| Parser | Country | Key signals |
+|--------|---------|-------------|
+| `IndianPassportParser` | IN | "REPUBLIC OF INDIA", MRZ TD3, `[A-Z][0-9]{7}` |
+| `AadhaarParser` | IN | "UIDAI", "Government of India", `\d{4}\s\d{4}\s\d{4}` |
+| `PanParser` | IN | `[A-Z]{5}[0-9]{4}[A-Z]`, "Income Tax" |
+| `IndianDrivingLicenceParser` | IN | "Driving Licence", state RTO codes |
+| `VoterIdParser` | IN | "Election Commission", EPIC pattern |
+| `OciParser` | IN | "Overseas Citizen", "OCI" |
+| `GermanPassportParser` | DE | "BUNDESREPUBLIK DEUTSCHLAND", "REISEPASS", MRZ TD3 |
+| `AufenthaltstitelParser` | DE | "Aufenthaltstitel", `§` references, "Bundesrepublik" |
+| `MeldebescheinigungParser` | DE | "Meldebescheinigung", "Einwohnermeldeamt" |
+| `GermanDrivingLicenceParser` | DE | "Führerschein", EU flag + DE code |
+| `InsuranceDocParser` | ANY | "Versicherung"/"Insurance", policy number patterns |
+| `TaxDocParser` | DE | "Finanzamt", "Steuernummer", "ELSTER" |
+| `RentalContractParser` | DE | "Mietvertrag", "Vermieter", monthly cost |
+| `EmploymentLetterParser` | DE | "Arbeitsvertrag", salary keywords |
+| `GenericFallbackParser` | ANY | Extracts any dates, names, numbers |
+
+---
+
+### Country + Type Classification Pipeline
+
+```
+1. Script detection:  Devanagari present → IN
+2. Anchor keywords:   "UIDAI" → AADHAAR | "REISEPASS" → DE_PASSPORT | "Aufenthaltstitel" → DE_AT
+3. Structural:        MRZ TD3 line → PASSPORT | 12-digit → AADHAAR | PAN regex → PAN
+4. Parser vote:       all matching parsers scored; highest ≥ 0.6 wins; else GenericFallback
+```
+
+---
+
+### Entity Types + Extraction Strategy
+
+| Entity | Docs | Strategy |
+|--------|------|----------|
+| Full name | All | Keyword anchor + next line; MRZ `<<` separator |
+| Date of birth | All | `DD MMM YYYY` / `DD.MM.YYYY` / MRZ YYMMDD |
+| Expiry date | Passport, DL, OCI, Aufenthaltstitel | Same formats + "Date of Expiry" / "Gültig bis" |
+| Passport number | Passport | `[A-Z][0-9]{7}` (IN) / 9-char alpha (DE) |
+| Aadhaar number | Aadhaar | `\d{4}\s\d{4}\s\d{4}` |
+| PAN number | PAN | `[A-Z]{5}[0-9]{4}[A-Z]` |
+| IBAN | Bank/Insurance | `DE\d{2}[0-9A-Z]{18}` |
+| Steuernummer | Tax | `\d{2,3}/\d{3}/\d{5}` |
+| Address | Aadhaar, Meldebescheinigung | Multi-line anchor |
+| Monthly cost | Contracts | `€\s*\d+` / monthly keyword |
+
+---
+
+### Normalization Engine
+
+Converts any raw date format → ISO 8601:
+- `14/09/31` → `2031-09-14`
+- `14.09.2031` → `2031-09-14`
+- `14 SEP 2031` → `2031-09-14`
+- MRZ `310914` → `2031-09-14`
+
+Also normalizes: MRZ names (`AKKINEPALLI<<SIDDHARTH` → `Siddharth Akkinepalli`), IBANs (strip spaces, validate), OCR artifacts (I→1, O→0, common glitches).
+
+---
+
+### Database Schema
+
+```
+documents           — core: file_hash, country, doc_type, classification_confidence, state, ocr_engine_version
+document_pages      — per-page: page_hash, text_source, state, ocr_engine_version
+ocr_cache           — shared: PK(page_hash, engine_version), ocr_text, confidence
+document_entities   — structured: entity_type, raw_value, normalized_value, confidence
+document_tags       — AUTO/USER tags
+expiry_alerts       — trigger_date, advance_days
+processing_jobs     — job_type, state, attempt_count, error_message
+family_members      — owner scopes
+documents_fts       — VIRTUAL fts4(ocr_text)
+entities_fts        — VIRTUAL fts4(raw_value, normalized_value)
+```
+
+---
+
+### 10 Specialized Agents
+
+| Agent | Responsibilities | Key risk |
+|-------|-----------------|----------|
+| **OCR Pipeline** | OcrEngine interface, PaddleOCR ONNX, ML Kit/Tesseract adapters, OcrRouter, OcrCacheManager | ONNX startup latency; JPEG2000 in scanned PDFs |
+| **PDF & Preprocessing** | PdfBox text extraction, PdfRenderer rasterizer, OpenCV pipeline, PageHasher | PdfBox OOM on large files |
+| **Classification** | Country detection, anchor scan, structural signals, parser confidence vote | Low-confidence ties on damaged scans |
+| **Parser Registry** | DocumentParser interface, all 14 parsers, registry lookup, fallback chain | New government layouts breaking patterns |
+| **Entity Extraction** | Per-entity extractors, MRZ TD3 parser, positional/anchor extraction, confidence scoring | OCR noise causing wrong field extraction |
+| **Normalization Engine** | Date normalizer (all formats), name cleaner, ID validators, OCR artifact fixer | DD/MM vs MM/DD ambiguity |
+| **Database & Search** | Room schema v1, DAOs, FTS, ocr_cache, migration chain | FTS out-of-sync after bulk import |
+| **Pipeline & Jobs** | WorkManager chains, state machine, retry logic, IncrementalRescanScheduler | Chain broken on process kill |
+| **Storage & Security** | Encrypted file store, ContentResolver URI copy, future AES vault | Scoped storage API 30+; URI permission loss |
+| **Camera & UX** | CameraX, edge detection, capture quality, vault browser states, processing badges | OpenCV lib size; badge state after restart |
+
+---
+
+### Implementation Phases
+
+| Phase | Deliverable | Fixes included |
+|-------|------------|----------------|
+| **P0 — Foundation** | Room schema v1, encrypted file store, vault browser, PDF/image import, no OCR yet | — |
+| **P1 — Text Extraction** | PdfBox fast path, ML Kit OCR, ocr_cache, state machine, FTS search | — |
+| **P2 — Classification + Entities** | Parser Registry + all 14 parsers, entity extraction, normalization, expiry alerts | **TASK-001**: IndianPassportParser with full MRZ TD3 + `DD MMM YYYY` date handling |
+| **P3 — Advanced OCR** | PaddleOCR ONNX, OpenCV preprocessing, incremental rescan | — |
+| **P4 — Search** | FTS UI, entity filters, tag system, duplicate detection | — |
+| **P5 — Polish & Security** | AES vault, CameraX scanner, family scopes, expiry timeline | — |
 
 **Module structure:** `app` · `feature:{vault,scanner,search,family,settings}` · `core:{common,database,storage,ocr,pdf,preprocessing,classification,extraction,pipeline}`
 
-**Implementation phases:** Phase 0 (Foundation) → Phase 1 (Text extraction) → Phase 2 (Classification + entity extraction) → Phase 3 (PaddleOCR + OpenCV) → Phase 4 (Search) → Phase 5 (Encryption + Camera)
-
-**Status:** Architecture approved. Phase 0 execution pending.
-
-See session log for full blueprint including DB schema, OCR decision tree, worker chains, agent assignments, and risk analysis.
+**Status:** Architecture + government document intelligence extension approved. Phase 0 execution pending.
 
 ---
 

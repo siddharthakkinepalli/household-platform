@@ -693,7 +693,46 @@ Full architecture designed for a standalone privacy-first Android document vault
 
 **5 implementation phases:** P0 Foundation → P1 Text Extraction → P2 Classification + Entities → P3 Advanced OCR → P4 Search → P5 Polish & Security
 
-**Status:** Architecture approved; awaiting Phase 0 execution kickoff.
+**Status:** Architecture approved + government document intelligence extension added. Awaiting Phase 0 execution kickoff.
+
+---
+
+## Session 2026-05-28 (session 3 continued) — Vault Upload Bugs + JUGAAD Extension
+
+### BUG-011 — Document moves out of user-set folder after parsing ✅ FIXED
+
+**File:** `vault/workers/VaultDocumentParserWorker.kt`
+- Root cause: `updateParsedMeta` always wrote `meta.subFolder.id` — when OCR failed on a scanned PDF (JPEG2000), the parser returned `UNFILED`, moving the doc out of the user's chosen folder (e.g. Siddharth → Identity → Passport)
+- Fix: `parserMayOverrideSubFolder = entry.subFolder == "unfiled" || entry.subFolder == "other"` — parser only overrides if user never set a specific subfolder
+
+### BUG-012 — Receipt parsing ran on all document types ✅ FIXED
+
+**File:** `vault/workers/VaultDocumentParserWorker.kt`
+- Root cause: `ReceiptTextParser` executed on passports, contracts, insurance docs — nonsense fields written
+- Fix: Added `isReceiptLike` guard — receipt parsing skipped for IDENTITY, INSURANCE, CONTRACT, MEDICAL, PROPERTY
+
+### TASK-001 — Indian passport date extraction not working 🔲 DEFERRED → JUGAAD Phase 2
+
+**Status:** Fix partially implemented (added `DATE_MONTH_SHORT` for `15 APR 2033` format, `MRZ_LINE2` TD3 regex, expanded MONTH_MAP with 3-letter abbreviations) but not verified via live device test.
+
+**Root cause identified from logs:** OCR succeeds (3000×1942px bitmap processed, `PipelineManager: OCR process succeeded via visionkit pipeline`) but `extractExpiryDate` does not recognise `DD MMM YYYY` abbreviated month format used on Indian passports, nor the MRZ YYMMDD at fixed TD3 offset.
+
+**Will be addressed properly during JUGAAD Vault Phase 2 (Classification + Entity Extraction)** when the dedicated `IndianPassportParser` is implemented with full MRZ TD3 parsing and Indian date format support.
+
+**Debug logging added:** `Log.d("VaultParser", ...)` in worker shows OCR text preview + parsed result for future diagnosis.
+
+### JUGAAD Vault — Government Document Intelligence Extension ✅ ARCHITECTURE EXTENDED
+
+Full updated architecture incorporating:
+- Parser Registry pattern (`DocumentParser` interface, per-type parsers)
+- Country + document type classification pipeline
+- Structured entity extraction with confidence scores
+- Normalization engine (dates, names, IDs, addresses)
+- Indian documents: Aadhaar, PAN, Passport, DL, Voter ID, OCI
+- German documents: Passport, Aufenthaltstitel, Meldebescheinigung, DL, insurance, tax, contracts
+- 10 specialized agents updated with new responsibilities
+
+See PLATFORM.md for full updated blueprint.
 
 ---
 
@@ -729,6 +768,10 @@ Full architecture designed for a standalone privacy-first Android document vault
 - [x] FEATURE-004: Passport/ID expiry extraction fixed — 15yr range, MRZ regex, expanded keywords
 - [x] FEATURE-005: Salary detection overhaul — 28 keywords, confidence scoring, auto-confirm ≥70, Mark as Salary button
 - [x] JUGAAD Vault — complete architecture blueprint (10 agents, 5 phases, DB schema, OCR decision tree)
+- [x] BUG-011: Vault document moves to UNFILED after OCR failure — subFolder preservation fix
+- [x] BUG-012: Receipt parsing ran on passport/insurance docs — isReceiptLike guard added
+- [x] JUGAAD Vault — government document intelligence extension (Parser Registry, 14 parsers, normalization engine, IN+DE doc support)
+- [ ] TASK-001: Indian passport date extraction (DD MMM YYYY + MRZ TD3) — partial fix merged; full fix in JUGAAD P2 IndianPassportParser
 
 ---
 

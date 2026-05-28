@@ -30,6 +30,12 @@ import com.household.app.data.dao.RecurringBillDao
 import com.household.app.data.dao.SalarySourceDao
 import com.household.app.data.dao.TaxCheckDao
 import com.household.app.data.dao.TaxTagDao
+import com.household.app.data.dao.DocumentEntityDao
+import com.household.app.data.dao.DocumentPageDao
+import com.household.app.data.dao.OcrCacheDao
+import com.household.app.data.entities.DocumentPageEntity
+import com.household.app.data.entities.OcrCacheEntity
+import com.household.app.data.entities.VaultDocumentEntityRecord
 import com.household.app.data.entities.CategoryThresholdEntity
 import com.household.app.data.entities.RecurringBillEntity
 import com.household.app.data.entities.WalletTransactionFts
@@ -80,9 +86,12 @@ import com.household.app.data.entities.InventoryEventEntity
         RecurringBillEntity::class,
         TaxCheckEntity::class,
         TaxTagEntity::class,
-        WalletTransactionFts::class
+        WalletTransactionFts::class,
+        DocumentPageEntity::class,
+        OcrCacheEntity::class,
+        VaultDocumentEntityRecord::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -110,6 +119,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun recurringBillDao(): RecurringBillDao
     abstract fun taxCheckDao(): TaxCheckDao
     abstract fun taxTagDao(): TaxTagDao
+    abstract fun documentPageDao(): DocumentPageDao
+    abstract fun ocrCacheDao(): OcrCacheDao
+    abstract fun documentEntityDao(): DocumentEntityDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -499,6 +511,56 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS vault_document_pages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        vaultEntryId INTEGER NOT NULL,
+                        pageIndex INTEGER NOT NULL,
+                        pageHash TEXT NOT NULL,
+                        widthPx INTEGER NOT NULL DEFAULT 0,
+                        heightPx INTEGER NOT NULL DEFAULT 0,
+                        textSource TEXT NOT NULL DEFAULT 'UNKNOWN',
+                        processingState TEXT NOT NULL DEFAULT 'PENDING',
+                        ocrEngineVersion INTEGER NOT NULL DEFAULT 1,
+                        createdAt INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_vault_document_pages_vaultEntryId ON vault_document_pages(vaultEntryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_vault_document_pages_pageHash ON vault_document_pages(pageHash)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS ocr_cache (
+                        pageHash TEXT NOT NULL,
+                        engineVersion INTEGER NOT NULL,
+                        ocrText TEXT NOT NULL,
+                        confidence REAL NOT NULL,
+                        processedAt INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(pageHash, engineVersion)
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS vault_extracted_entities (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        vaultEntryId INTEGER NOT NULL,
+                        entityType TEXT NOT NULL,
+                        rawValue TEXT NOT NULL,
+                        normalizedValue TEXT NOT NULL,
+                        confidence REAL NOT NULL,
+                        pageIndex INTEGER NOT NULL DEFAULT 0,
+                        sourceContext TEXT NOT NULL DEFAULT '',
+                        isVerified INTEGER NOT NULL DEFAULT 0,
+                        parserId TEXT NOT NULL DEFAULT '',
+                        createdAt INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_vault_extracted_entities_vaultEntryId ON vault_extracted_entities(vaultEntryId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_vault_extracted_entities_entityType ON vault_extracted_entities(entityType)")
+            }
+        }
+
         private val MIGRATION_14_15 = object : Migration(14, 15) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE recurring_bills ADD COLUMN source TEXT NOT NULL DEFAULT 'AUTO'")
@@ -536,7 +598,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
-                        MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18
+                        MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
+                        MIGRATION_18_19
                     )
                     .build()
                 INSTANCE = instance
