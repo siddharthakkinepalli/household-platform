@@ -1,6 +1,7 @@
 package com.household.app.vault.workers
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.ListenableWorker.Result
@@ -24,9 +25,15 @@ class ReceiptMatchingWorker(
 
             val vaultEntry = withContext(Dispatchers.IO) {
                 db.vaultDao().getEntryById(vaultId)
-            } ?: return Result.success()
+            } ?: run {
+                Log.d("ReceiptMatchingWorker", "vault entry $vaultId not found — skipping")
+                return Result.success()
+            }
 
-            val amount = vaultEntry.totalAmount ?: return Result.success()
+            val amount = vaultEntry.totalAmount ?: run {
+                Log.d("ReceiptMatchingWorker", "vault entry $vaultId has no amount — skipping")
+                return Result.success()
+            }
             val date = LocalDate.ofEpochDay(vaultEntry.dateEpoch)
 
             val absAmount = abs(amount.toDouble())
