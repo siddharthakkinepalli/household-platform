@@ -20,9 +20,10 @@ import java.nio.FloatBuffer
  * Model file: `assets/paddle_ocr_v4_rec.onnx` — loaded lazily on first use.
  * If the file is absent, [recognizeText] returns null and [OcrRouter] falls through to ML Kit.
  *
+ * Model: en_PP-OCRv3_rec_infer (Latin+German, 96-char dict, H=32 input)
  * Pipeline:
- *   bitmap → resize to H=48, align W to multiple of 8
- *          → float CHW tensor [1,3,48,W], normalized to [-1,1]
+ *   bitmap → resize to H=32, align W to multiple of 8
+ *          → float CHW tensor [1,3,32,W], normalized to [-1,1]
  *          → ONNX session → logits [1, T, charset_size]
  *          → greedy CTC decode → plain text
  */
@@ -81,8 +82,9 @@ class PaddleOcrEngine(private val context: Context) : OcrEngine {
         runCatching {
             val sess = loadSession() ?: return@withContext null
 
-            // --- 1. Preprocess: resize to H=48, align W to nearest multiple of 8 ---
-            val targetH = 48
+            // --- 1. Preprocess: resize to H=32, align W to nearest multiple of 8 ---
+            // en_PP-OCRv3_rec_infer expects H=32 (PP-OCRv4 uses 48 but has no standalone English model)
+            val targetH = 32
             val scale = targetH.toFloat() / bitmap.height
             val scaledW = (bitmap.width * scale).toInt().coerceAtLeast(8)
             val alignedW = (scaledW + 7) / 8 * 8   // round up to multiple of 8
