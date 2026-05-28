@@ -55,13 +55,25 @@ Glass card pattern: `EliteGlassCard(glowColor = LumeXxx.copy(alpha = 0.12f))`
 
 ---
 
-## Next pending work (Wave 5)
+## Product principles (JUGAAD OS — active from 2026-05-28)
 
-| Item | Description |
-|------|-------------|
-| **F1** | Tax Tagging Layer — long-press tx/doc → tag with tax category. `tax_tags` table already in DB. |
-| **F2** | Annual Tax Summary Export — group tagged items → PDF/CSV. `TaxSummaryScreen.kt` exists, needs VM. |
-| **F3** | Receipt ↔ Wallet Linking UI — `linkedVaultEntryId` already populated; show 📄 icon in transaction list. |
-| **E2** | SteuerKlar Drive sync — write `TAXATION_COMPLETE.json` to Drive on "Mark Complete". |
+This is a **Germany-first** household OS. No UPI, no India payments. SEPA/CSV is the payment layer.
 
-See `STATUS.md` for full details and `FGRAPH.md` for architecture.
+**Automation over interaction:** If vault extracts structured data, the system must react automatically.  
+**No vibe-coded features:** Every screen must complete a real task, not just display information.  
+**Alert deeplinks are mandatory:** Alerts without resolution paths are noise, not UX.  
+**No half-built tabs:** A broken nav tab destroys trust. Build it or remove it.
+
+---
+
+## Wave 5 — next work (3 parallel agents, launch immediately)
+
+| Agent | Task | What it fixes |
+|-------|------|--------------|
+| **M — Vault automation bridge** | `VaultDocumentParserWorker.kt` post-extraction hook | `MONTHLY_COST` from Mietvertrag/contract → auto-propose `RecurringBillEntity`. `GROSS_SALARY` from Arbeitsvertrag → pre-seed salary expectation in `SalarySourceEntity`. Extended expiry alerts at -90d and -180d for IDENTITY docs (passports). |
+| **N — Smart Alert deeplinks** | `V2FinanceScreen.kt` SmartAlertFeed | Every SmartAlert chip must navigate somewhere on tap: "uncategorized" → import review, "expiry" → DocumentsScreen, "new subscription" → SubscriptionHub, "tax total" → TaxSummary. Read the existing alert types in `ExpensesViewModel.computeSmartAlerts()` first. |
+| **O — Meals module decision** | `V2MealsScreen.kt` | Read the file. If ViewModel is empty/stub: **remove Meals from the nav rail** (`Screen.kt` + `V2AppNavHost.kt`) and repurpose that slot OR build a minimal real flow (weekly plan → auto-generate shopping list from pantry stock). No half-built tabs. |
+
+**Wave 6 after Wave 5:** E2 SteuerKlar Drive write · F3 Receipt↔Wallet 📄 icon · F1 Tax Tagging
+
+See `STATUS.md` audit findings section for full context on what's broken and why.

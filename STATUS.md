@@ -1,10 +1,29 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-05-28 (Wave 2 — FTS + D5 import review)
+**Last updated:** 2026-05-28 (JUGAAD OS audit — Wave 5 reprioritised)
 **DB version:** 21  
-**Build status:** ✅ BUILD SUCCESSFUL (Wave 1 commit c612842) | Wave 2 changes uncommitted  
+**Build status:** ✅ BUILD SUCCESSFUL (last commit 9bee292 CLAUDE.md)
 **APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`  
-**Next action:** Commit Waves 2–4 → Wave 5: E2 SteuerKlar + F1 Tax Tagging + F3 Receipt↔Wallet Linking
+**Next action:** Wave 5 — 3 parallel agents: (M) Vault automation bridge · (N) Smart Alert deeplinks · (O) Meals module build-or-cut
+
+---
+
+## ⚠️ Product Audit Findings (2026-05-28) — act on these before adding new features
+
+### Vibe-coded systems that need fixing
+
+| Issue | File | Problem | Fix required |
+|-------|------|---------|-------------|
+| Smart Alert Feed is read-only | `V2FinanceScreen.kt` | Alerts show info but tapping does nothing — no deeplink to resolution | Every alert chip needs a `DeepLink` destination |
+| SteuerKlar is a static checklist | `SteuerKlarScreen.kt` | "Mark Complete" doesn't write `TAXATION_COMPLETE.json` to Drive | E2: implement Drive write |
+| Meals module is a shell | `V2MealsScreen.kt` | ViewModel is empty, nothing writes to `meals_summary` table | Either build it properly or remove the nav tab |
+| Vault data drives no automation | `VaultDocumentParserWorker.kt` | Contract extracts `MONTHLY_COST`, employment letter extracts `GROSS_SALARY` — neither triggers any downstream action | Post-extraction hook: auto-propose recurring bill from contract, pre-seed salary from Arbeitsvertrag |
+
+### Product principles now active (JUGAAD OS)
+- Germany-first (no UPI, no India payments — SEPA/CSV is the payment layer)
+- Automation over interaction: if vault extracts structured data, the system must react to it
+- No vibe-coded features: every screen must complete a real task, not just display info
+- Alert deeplinks are mandatory — alerts without resolution paths are noise
 
 ---
 
