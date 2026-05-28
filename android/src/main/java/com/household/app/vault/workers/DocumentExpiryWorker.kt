@@ -1,8 +1,6 @@
 package com.household.app.vault.workers
 
 import android.content.Context
-import android.app.NotificationManager
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
@@ -39,9 +37,6 @@ class DocumentExpiryWorker(
             .filter { !it.isAcknowledged }
 
         if (alerts.isEmpty()) return@withContext Result.success()
-
-        val notificationManager =
-            applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         // Ensure the shared expiry channel exists (idempotent — no-ops if already created).
         ExpiryNotificationWorker.createChannel(applicationContext)
