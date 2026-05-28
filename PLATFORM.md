@@ -1,8 +1,8 @@
 # Household Platform - Build Plan
 
 **Date:** April 27, 2026  
-**Last updated:** May 28, 2026 (session 3)
-**Status:** Session 3 complete — Vault/Docs fixed, salary detection overhauled, JUGAAD Vault architecture designed  
+**Last updated:** May 28, 2026 (Wave 2 — FTS + D5 import review)
+**Status:** Wave 2 complete — vault_entities_fts migration 20→21, D5 import review screen, advanceFromSalary filter fix  
 **Target:** Running MVP with Expenses + Household Core
 
 ---
@@ -25,10 +25,61 @@
 | **S3b** | **Document vault fixes — expiry date range, MRZ extraction, alert creation, edit-on-tap, sort order, currency symbol** | ✅ Done |
 | **S3c** | **Salary detection overhaul — confidence scoring, German/English keywords, auto-confirm, Mark as Salary button** | ✅ Done |
 | **S3d** | **Document upload — original filename pre-population, PDF passport date extraction** | ✅ Done |
-| **JUGAAD** | **JUGAAD Vault — standalone document vault product; architecture blueprint complete** | 🔵 Architecture Done |
-| **D5** | **Import review screen for Uncategorized transactions** | 🔲 Planned |
-| **E** | **WorkManager pipeline architecture + SteuerKlar tax mode + Drive integration** | 🔲 Planned |
-| **F** | **Tax preparation, receipt linking, spending trends, full intelligence suite** | 🔲 Planned |
+| **JUGAAD P0+2** | **JUGAAD Vault — Parser Registry, entity extraction, DB schema v19** | ✅ Done (commit 520abc1) |
+| **JUGAAD Wave 1** | **JUGAAD Vault — OCR cache, page tracking, file dedup, 7 parsers, entity detail UI, DB v20** | ✅ Done (commit c612842) |
+| **JUGAAD Wave 2** | **JUGAAD Vault — vault_entities_fts FTS4, searchFts/rebuildFts DAO, migration 20→21** | ✅ Done (uncommitted) |
+| **D5** | **Import review screen for Uncategorized transactions — ReviewUncategorized state + composable** | ✅ Done (uncommitted) |
+| **D6** | **PayPal Transaction Intelligence — PAYPAL \*MERCHANT extraction in MerchantNameCleaner** | ✅ Already done (Pattern 3 in MerchantNameCleaner + CsvParserService pipeline) |
+| **D7** | **Income Summary Section — collapsible income row above transaction list** | ✅ Done (Wave 3) |
+| **E3 Expiry Timeline** | **90-day document expiry card at top of Vault screen** | ✅ Done (Wave 3) |
+| **JUGAAD P3 OCR** | **OcrEngine interface, OpenCV preprocessing, OcrRouter, PaddleOcr stub** | ✅ Done (Wave 4) |
+| **JUGAAD P4 Search** | **Inline FTS search bar + results in Vault screen** | ✅ Done (Wave 3) |
+| **E1 PipelineManager** | **WorkManager trigger→chain registry; CSV + document upload triggers** | ✅ Done (Wave 4) |
+| **E2 SteuerKlar** | **Native Kotlin tax checklist reading Drive folder** | 🔲 Planned |
+| **E** | **WorkManager pipeline full suite + SteuerKlar + Drive integration** | 🔄 E1 done, E2 planned |
+| **F4 Sparklines** | **3-cycle mini-chart + delta label on each category tile** | ✅ Already done (commit c612842 — `CategorySparkline`, `CategoryGridItem` 3-bar chart) |
+| **F** | **Tax preparation, receipt linking, tax tagging, spending trends** | 🔲 Planned (F1–F3 remaining) |
+
+---
+
+## JUGAAD Vault Wave 1 (2026-05-28) — Committed c612842
+
+| Item | Details |
+|------|---------|
+| OCR Cache | `OcrCacheManager` — aHash perceptual page fingerprinting; cache lookup before rasterise+OCR; store on miss |
+| PdfPageExtractor | Optional `cacheManager` param; cache hit skips OCR entirely |
+| Page tracking | `vault_document_pages` row created/updated per document; state: `OCR_QUEUED → OCR_DONE → INDEXED` |
+| File dedup | SHA-256 `fileHash` column on `VaultEntity`; `getByFileHash()` DAO; dedup check at `saveDocument()` |
+| VaultDocumentParserWorker | State machine calls; all `pageDao` ops wrapped in `runCatching` |
+| DB v19 → v20 | `fileHash` column + `idx_vault_entries_fileHash` index |
+| 7 new parsers | VoterIdParser, OciParser, IndianDrivingLicenceParser, GermanDrivingLicenceParser, TaxDocParser, RentalContractParser, EmploymentLetterParser |
+| ParserRegistry | 7 parsers inserted before GenericFallbackParser; 11 new anchor keywords |
+| Entity detail UI | `DocumentDetailSheet` — `ExtractedInfoSection` shows ≤8 fields, deduped by type, sorted by confidence |
+
+---
+
+## JUGAAD Vault Wave 2 (2026-05-28) — Uncommitted
+
+| Item | File | Details |
+|------|------|---------|
+| `VaultEntityFts` | `data/entities/JugaadDocumentEntities.kt` | `@Fts4(contentEntity=VaultDocumentEntityRecord::class)` virtual table `vault_entities_fts` |
+| `searchFts()` | `data/dao/DocumentEntityDao.kt` | Inner join `vault_extracted_entities ⋈ vault_entities_fts MATCH :query`, ordered by confidence |
+| `rebuildFts()` | `data/dao/DocumentEntityDao.kt` | `INSERT INTO vault_entities_fts(vault_entities_fts) VALUES('rebuild')` |
+| Migration 20→21 | `data/AppDatabase.kt` | `CREATE VIRTUAL TABLE IF NOT EXISTS vault_entities_fts USING fts4(content=vault_extracted_entities, rawValue, normalizedValue)` + rebuild |
+| Worker FTS refresh | `vault/workers/VaultDocumentParserWorker.kt` | `runCatching { db.documentEntityDao().rebuildFts() }.getOrNull()` after every `insertAll(records)` |
+| D5 filter fix | `ui/viewmodels/ConfigViewModel.kt` | `advanceFromSalary` now catches both `"Uncategorized"` and `"Other"` (ignoreCase) before showing NeedsReview |
+| D5 ReviewUncategorized | `ui/viewmodels/ConfigViewModel.kt` | `ImportWorkflow.ReviewUncategorized`, `handleAssignCategory`, `handleConfirmReview` |
+| D5 Review UI | `ui/v2/V2ConfigHubScreen.kt` | `ReviewUncategorizedCard` composable — per-row category dropdown + "Make rule" checkbox, capped at 20, Done button |
+
+---
+
+## JUGAAD Vault Wave 3 / D7 / E3 (2026-05-28) — Uncommitted
+
+| Item | File | Details |
+|------|------|---------|
+| D7 Income Summary | `ui/v2/V2FinanceScreen.kt` | `IncomeSection` redesigned: collapsed by default, `AnimatedVisibility`, `LumeEmerald.copy(alpha=0.12f)` glow, chevron toggle, `+€X.XX` rows. ViewModel data (`_incomeTransactions`) already existed. |
+| E3 Expiry Timeline | `ui/v2/V2DocumentVaultScreen.kt` | `DocumentExpiryTimelineCard` rewritten: `LumeCyan` glow, "NEXT 90 DAYS" header, dot + title + "in N days" per row. `CriticalRed` ≤7d / `LumeAmber` ≤30d / `LumeEmerald` otherwise. VM + DAO (`getAlertsDueWithinDays(90)`) pre-existing. |
+| JUGAAD P4 Search | `ui/viewmodels/VaultViewModel.kt`, `ui/v2/V2DocumentVaultScreen.kt` | `VaultSearchResult(documentId, entityType, displayValue, confidence)`; `onSearchQuery()` calls `searchFts("${query}*")` on IO; `VaultSearchBar` (frosted pill, Search icon, clear ×) + `VaultSearchResults` (up to 10 hits, confidence %, entity type label) + `SearchEmptyState`; uses existing `formatEntityType()` |
 
 ---
 

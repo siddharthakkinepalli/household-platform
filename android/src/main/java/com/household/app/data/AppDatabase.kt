@@ -36,6 +36,7 @@ import com.household.app.data.dao.OcrCacheDao
 import com.household.app.data.entities.DocumentPageEntity
 import com.household.app.data.entities.OcrCacheEntity
 import com.household.app.data.entities.VaultDocumentEntityRecord
+import com.household.app.data.entities.VaultEntityFts
 import com.household.app.data.entities.CategoryThresholdEntity
 import com.household.app.data.entities.RecurringBillEntity
 import com.household.app.data.entities.WalletTransactionFts
@@ -89,9 +90,10 @@ import com.household.app.data.entities.InventoryEventEntity
         WalletTransactionFts::class,
         DocumentPageEntity::class,
         OcrCacheEntity::class,
-        VaultDocumentEntityRecord::class
+        VaultDocumentEntityRecord::class,
+        VaultEntityFts::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -521,6 +523,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS `vault_entities_fts` " +
+                    "USING fts4(content=`vault_extracted_entities`, `rawValue`, `normalizedValue`)"
+                )
+                db.execSQL("INSERT INTO vault_entities_fts(vault_entities_fts) VALUES('rebuild')")
+            }
+        }
+
         private val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -609,7 +621,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
-                        MIGRATION_18_19, MIGRATION_19_20
+                        MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21
                     )
                     .build()
                 INSTANCE = instance

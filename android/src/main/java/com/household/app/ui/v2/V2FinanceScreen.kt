@@ -90,6 +90,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -1721,89 +1722,72 @@ private fun SalaryAllocationCard(allocation: SalaryAllocationData) {
 
 @Composable
 private fun IncomeSection(transactions: List<Transaction>) {
+    if (transactions.isEmpty()) return
+
     var expanded by remember { mutableStateOf(false) }
-    val total = transactions.sumOf { it.amount }
-    EliteGlassCard(glowColor = LumeEmerald.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth()) {
-        Column {
+    val totalIncome = transactions.sumOf { kotlin.math.abs(it.amount) }
+
+    EliteGlassCard(glowColor = LumeEmerald.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Header row — always visible
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { expanded = !expanded },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.Payments,
-                        contentDescription = null,
-                        tint = LumeEmerald,
-                        modifier = Modifier.size(16.dp)
-                    )
+                Column {
                     Text(
-                        "Income this cycle",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = TextMain.copy(alpha = 0.85f)
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        "+€${"%.0f".format(total)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        "INCOME THIS CYCLE",
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.sp,
                         color = LumeEmerald
                     )
-                    Icon(
-                        imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = TextMain.copy(alpha = 0.50f),
-                        modifier = Modifier.size(18.dp)
+                    Text(
+                        "€${"%.2f".format(totalIncome)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMain
                     )
                 }
+                Icon(
+                    imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp
+                                  else Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = TextMain.copy(alpha = 0.50f),
+                    modifier = Modifier.size(20.dp)
+                )
             }
 
+            // Expandable rows
             AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    transactions.forEachIndexed { index, tx ->
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.07f))
+                    )
+                    transactions.forEach { tx ->
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    tx.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextMain.copy(alpha = 0.85f),
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    tx.date,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextMain.copy(alpha = 0.38f)
-                                )
-                            }
                             Text(
-                                "+€${"%.2f".format(tx.amount)}",
+                                tx.description,
                                 style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = LumeEmerald
+                                color = TextMain,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                        }
-                        if (index != transactions.lastIndex) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(1.dp)
-                                    .background(Color.White.copy(alpha = 0.05f))
+                            Text(
+                                "+€${"%.2f".format(kotlin.math.abs(tx.amount))}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = LumeEmerald,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }

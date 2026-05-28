@@ -159,4 +159,22 @@ object PipelineManager {
             .build()
         WorkManager.getInstance(context).enqueue(request)
     }
+
+    /**
+     * Called after a document is uploaded to the vault.
+     * Enqueues a DocumentExpiryWorker to fire notifications for documents
+     * expiring within 30/7/1 days.
+     *
+     * Uses unique work name "doc_upload_pipeline" with APPEND_OR_REPLACE so
+     * multiple concurrent uploads queue without cancelling each other.
+     */
+    fun onDocumentUploaded(context: Context) {
+        WorkManager.getInstance(context)
+            .beginUniqueWork(
+                "doc_upload_pipeline",
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                OneTimeWorkRequestBuilder<DocumentExpiryWorker>().build()
+            )
+            .enqueue()
+    }
 }

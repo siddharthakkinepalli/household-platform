@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -51,7 +52,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.Icons
@@ -83,9 +83,13 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileMove
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -135,6 +139,7 @@ import com.household.app.ui.v2.components.VaultFolderBreadcrumb
 import com.household.app.ui.v2.components.VaultFolderList
 import com.household.app.ui.v2.components.VaultFolderPickerSheet
 import com.household.app.ui.v2.components.VaultMoveToFolderSheet
+import com.household.app.ui.viewmodels.VaultSearchResult
 import com.household.app.ui.viewmodels.VaultUiState
 import com.household.app.ui.viewmodels.VaultViewModel
 import kotlinx.coroutines.Dispatchers
@@ -166,6 +171,8 @@ fun V2DocumentVaultScreen(
     val showFolderBrowser by viewModel.showFolderBrowser.collectAsStateWithLifecycle()
     val familyMembers by viewModel.familyMembers.collectAsStateWithLifecycle()
     val upcomingAlerts by viewModel.upcomingAlerts.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
 
     var fabExpanded by remember { mutableStateOf(false) }
     var selectedEntry by remember { mutableStateOf<VaultEntity?>(null) }
@@ -245,8 +252,22 @@ fun V2DocumentVaultScreen(
                 SubscriptionHubShortcutCard(onClick = onNavigateToSubscriptionHub)
             }
 
+            VaultSearchBar(
+                query = searchQuery,
+                onQueryChange = viewModel::onSearchQuery,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            if (searchResults.isNotEmpty()) {
+                VaultSearchResults(
+                    results = searchResults,
+                    onResultClick = { viewModel.onSearchQuery("") },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
+                    searchQuery.length >= 2 && searchResults.isEmpty() -> SearchEmptyState(searchQuery)
                     vaultUiState is VaultUiState.Loading -> LoadingGlow()
                     showFolderBrowser -> VaultFolderList(
                         rows = folderRows,
@@ -1029,7 +1050,7 @@ private fun AsyncReceiptImage(imagePath: String, modifier: Modifier = Modifier) 
     }
 }
 
-// ── Document Expiry Timeline Card ─────────────────────────────────────────────
+// ── Document Expiry Timeline Card (E3) ────────────────────────────────────────
 
 @Composable
 private fun DocumentExpiryTimelineCard(
@@ -1040,75 +1061,66 @@ private fun DocumentExpiryTimelineCard(
     val overflow = sorted.size - 5
 
     EliteGlassCard(
-        glowColor = LumeAmber.copy(alpha = 0.3f),
+        glowColor = LumeCyan.copy(alpha = 0.1f),
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // Header
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.CalendarMonth,
-                contentDescription = null,
-                tint = LumeAmber,
-                modifier = Modifier.size(18.dp)
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Header
             Text(
-                text = "Next 90 Days",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = TextMain
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Alert rows
-        visible.forEach { alert ->
-            val dotColor = when {
-                alert.daysUntil <= 7  -> CriticalRed
-                alert.daysUntil <= 30 -> LumeAmber
-                else                  -> LumeEmerald
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(dotColor, CircleShape)
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = alert.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMain,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "in ${alert.daysUntil} days",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary
-                )
-            }
-        }
-
-        // Overflow indicator
-        if (overflow > 0) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "+ $overflow more",
+                text = "NEXT 90 DAYS",
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
+                letterSpacing = 1.sp,
+                color = LumeCyan
             )
+
+            // Alert rows
+            visible.forEach { alert ->
+                val dotColor = when {
+                    alert.daysUntil <= 7  -> CriticalRed
+                    alert.daysUntil <= 30 -> LumeAmber
+                    else                  -> LumeEmerald
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(dotColor, CircleShape)
+                        )
+                        Text(
+                            text = alert.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMain,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 180.dp)
+                        )
+                    }
+                    Text(
+                        text = if (alert.daysUntil <= 0) "today" else "in ${alert.daysUntil} days",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = dotColor,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            // Overflow indicator
+            if (overflow > 0) {
+                Text(
+                    text = "+$overflow more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+            }
         }
     }
 }
@@ -1273,6 +1285,153 @@ private fun ExtractedInfoSection(entities: List<com.household.app.data.entities.
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ── Vault Search ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun VaultSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Rounded.Search,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp)
+            )
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodySmall.copy(color = TextMain),
+                decorationBox = { inner ->
+                    if (query.isEmpty()) {
+                        Text(
+                            "Search documents, names, IBANs, IDs…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMuted
+                        )
+                    }
+                    inner()
+                },
+                modifier = Modifier.weight(1f)
+            )
+            if (query.isNotEmpty()) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = "Clear",
+                    tint = TextMuted,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable { onQueryChange("") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VaultSearchResults(
+    results: List<VaultSearchResult>,
+    onResultClick: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (results.isEmpty()) return
+
+    EliteGlassCard(glowColor = LumeCyan.copy(alpha = 0.1f), modifier = modifier) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "SEARCH RESULTS",
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.sp,
+                color = LumeCyan
+            )
+            results.take(10).forEach { result ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onResultClick(result.documentId) }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            result.displayValue,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextMain,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            formatEntityType(result.entityType),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
+                    }
+                    Text(
+                        "${(result.confidence * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LumeCyan.copy(alpha = 0.7f)
+                    )
+                }
+                HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
+            }
+            if (results.size > 10) {
+                Text(
+                    "+${results.size - 10} more results",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchEmptyState(query: String) {
+    Box(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        EliteGlassCard(glowColor = LumeCyan.copy(alpha = 0.1f)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "No results for “$query”",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextMain
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Try a different name, number, or document type.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted
+                )
             }
         }
     }

@@ -71,7 +71,7 @@ class VaultDocumentParserWorker(
                 try {
                     when {
                         entry.mimeType == "application/pdf" -> {
-                            ocrText = PdfPageExtractor.extractText(applicationContext, file, engine)
+                            ocrText = PdfPageExtractor.extractText(applicationContext, file)
                         }
                         entry.mimeType.startsWith("image/") -> {
                             val payload = engine.recognize(applicationContext, file.toUri())
@@ -179,6 +179,7 @@ class VaultDocumentParserWorker(
             }
             db.documentEntityDao().deleteForDocument(vaultId)
             db.documentEntityDao().insertAll(records)
+            runCatching { db.documentEntityDao().rebuildFts() }.getOrNull()
         }
 
         // If registry extracted an expiry date with high confidence, use it for DocumentEntity creation
@@ -255,6 +256,7 @@ class VaultDocumentParserWorker(
             )
         }
 
+        PipelineManager.onDocumentUploaded(applicationContext)
         Result.success()
     }
 }

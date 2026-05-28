@@ -19,13 +19,12 @@ object PdfPageExtractor {
     suspend fun extractText(
         @Suppress("UNUSED_PARAMETER") context: Context,
         pdfFile: File,
-        engine: MlKitOcrEngine,
         cacheManager: OcrCacheManager? = null
     ): String =
         withContext(Dispatchers.IO) {
             val nativeText = tryNativeExtract(pdfFile)
             if (nativeText.length >= MIN_DIGITAL_TEXT_LENGTH) return@withContext nativeText
-            rasterAndOcr(context, pdfFile, engine, cacheManager)
+            rasterAndOcr(pdfFile, cacheManager)
         }
 
     private fun tryNativeExtract(pdfFile: File): String = try {
@@ -37,9 +36,7 @@ object PdfPageExtractor {
     }
 
     private suspend fun rasterAndOcr(
-        context: Context,
         pdfFile: File,
-        engine: MlKitOcrEngine,
         cacheManager: OcrCacheManager? = null
     ): String = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
@@ -59,11 +56,7 @@ object PdfPageExtractor {
                             if (cached != null) {
                                 cached
                             } else {
-                                val ocrResult = try {
-                                    engine.recognizeFromBitmap(bitmap).fullText
-                                } catch (_: Exception) {
-                                    ""
-                                }
+                                val ocrResult = OcrRouter.recognizeText(bitmap)
                                 if (hash != null) cacheManager.store(hash, ocrResult)
                                 ocrResult
                             }

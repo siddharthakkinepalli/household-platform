@@ -7,6 +7,7 @@ import com.google.mlkit.vision.text.Text
 import com.household.app.data.AppDatabase
 import com.household.app.data.entities.FamilyMemberEntity
 import com.household.app.data.entities.PantryEntity
+import com.household.app.data.entities.VaultDocumentEntityRecord
 import com.household.app.data.entities.VaultEntity
 import com.household.app.data.refiner.toVisionTextPayload
 import com.household.app.data.refiner.WeightedReceiptRefiner
@@ -58,6 +59,13 @@ sealed interface VaultUiState {
     ) : VaultUiState
     data class ScanSaved(val vaultId: Long) : VaultUiState
 }
+
+data class VaultSearchResult(
+    val documentId: Long,
+    val entityType: String,
+    val displayValue: String,
+    val confidence: Float
+)
 
 class VaultViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext = getApplication<Application>()
@@ -125,6 +133,34 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         db.documentAlertDao()
             .getAlertsDueWithinDays(90)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _searchResults = MutableStateFlow<List<VaultSearchResult>>(emptyList())
+    val searchResults: StateFlow<List<VaultSearchResult>> = _searchResults.asStateFlow()
+
+    fun onSearchQuery(query: String) {
+        _searchQuery.value = query
+        if (query.length < 2) {
+            _searchResults.value = emptyList()
+            return
+        }
+        viewModelScope.launch {
+            val ftsQuery = "${query.trim()}*"   // trailing * enables prefix matching in FTS4
+            val hits = withContext(Dispatchers.IO) {
+                db.documentEntityDao().searchFts(ftsQuery)
+            }
+            _searchResults.value = hits.map { entity ->
+                VaultSearchResult(
+                    documentId = entity.vaultEntryId,
+                    entityType = entity.entityType,
+                    displayValue = entity.normalizedValue.ifBlank { entity.rawValue },
+                    confidence = entity.confidence
+                )
+            }.distinctBy { it.documentId to it.entityType }
+        }
+    }
 
     init {
         viewModelScope.launch {

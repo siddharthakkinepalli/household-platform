@@ -346,7 +346,10 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun advanceFromSalary(summary: ImportSummary): ImportWorkflow {
-        val uncategorized = summary.transactions.filter { it.category == "Other" }
+        val uncategorized = summary.transactions.filter {
+            it.category.equals("Uncategorized", ignoreCase = true) ||
+            it.category.equals("Other", ignoreCase = true)
+        }
         return if (uncategorized.isNotEmpty()) {
             ImportWorkflow.ReviewUncategorized(
                 pending = uncategorized,

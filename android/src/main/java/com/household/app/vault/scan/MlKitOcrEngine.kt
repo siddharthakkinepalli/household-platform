@@ -49,5 +49,16 @@ class MlKitOcrEngine : OcrEngine {
         }
     }
 
+    /**
+     * [OcrEngine] bitmap interface used by [OcrRouter].
+     * Delegates to [recognizeFromBitmap] and returns the plain full-text string.
+     * The bitmap is expected to have already been preprocessed by [OpenCvPreprocessor]
+     * before arriving here; [ImagePreProcessor.optimizeForOcr] is still applied on top
+     * as a second contrast-boost pass (cheap Android-only op, no OpenCV required).
+     */
+    override suspend fun recognizeText(bitmap: Bitmap): String? =
+        runCatching { recognizeFromBitmap(bitmap).fullText.takeIf { it.isNotBlank() } }
+            .getOrNull()
+
     fun close() = recognizer.close()
 }

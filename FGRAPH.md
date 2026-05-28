@@ -19,8 +19,13 @@ Feature registry, status, and integration map. Update this file when features sh
 | Chatbot | 📋 Planned | — | Learns from all household data via Anthropic API |
 | Clear Data | ✅ Live | `ui/v2/V2ConfigHubScreen.kt` — DangerZoneCard | Clears transactions, recurring bills, salary source, import audits; keeps rules + thresholds |
 | Recurring Payments | ✅ Live | `ui/v2/SubscriptionHubScreen.kt` | Auto-detect ≥2 cycles, confirm/dismiss/edit, upcoming outflows, manual add |
+| **JUGAAD Vault** | ✅ Live (P0–P4 + Waves 1–4) | `ui/v2/V2DocumentVaultScreen.kt` | Privacy-first doc vault; OcrRouter (OpenCV→ML Kit→PaddleOcr stub); 14 parsers; entity extraction + FTS; inline search UI (DB v21) |
+| D5 Import Review | ✅ Live | `ui/v2/V2ConfigHubScreen.kt` — ReviewUncategorizedCard | Post-salary step: per-row category picker + make-rule checkbox for uncategorized imports |
 | Budget Alerts | 📋 Planned | — | Per-category threshold notifications |
 | PDF / Excel Export | 📋 Planned | — | From Reports page |
+| D6 PayPal Intelligence | 📋 Planned | `data/config/CsvParserService.kt` | PAYPAL *MERCHANT → actual merchant + category |
+| E3 Expiry Timeline | 📋 Planned | `ui/v2/V2DocumentVaultScreen.kt` | 90-day visual timeline from `document_alerts` table — pure UI |
+| SteuerKlar (E2) | 📋 Planned | — | Native Kotlin port of tax checklist; reads Drive tax folder; `TaxCheckEntity` cache |
 
 ---
 
@@ -83,6 +88,14 @@ Settings → Banks tab
 | `recipes` | `household_id`, `cuisine_type` | |
 | `meal_plans` | `start_date`, `end_date`, `is_active` | |
 | `shopping_lists` | `meal_plan_id`, `is_completed` | |
+| `vault_entries` | `fileHash`, `subFolder`, `state`, `docType` | JUGAAD Vault core; DB v21 |
+| `vault_document_pages` | `pageHash`, `textSource`, `ocrEngineVersion`, `state` | Per-page OCR state machine |
+| `vault_ocr_cache` | PK(`pageHash`, `engineVersion`) | Perceptual dedup — same page never re-OCR'd |
+| `vault_extracted_entities` | `entityType`, `rawValue`, `normalizedValue`, `confidence` | Structured fields from parsers |
+| `vault_entities_fts` | VIRTUAL FTS4 content=vault_extracted_entities | Full-text search over rawValue + normalizedValue |
+| `wallet_trips` | `name`, `budget`, `startDate`, `endDate` | Trip Tracker (DB v18) |
+| `salary_sources` | `pattern`, `lastAmount`, `anchorDay` | Singleton; auto-match on re-import |
+| `recurring_bills` | `merchantPattern`, `averageAmount`, `confirmedAt` | Auto-detected ≥2 cycles |
 
 ---
 

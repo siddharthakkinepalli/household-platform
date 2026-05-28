@@ -1,10 +1,10 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-05-28 (session 3 — full day)
-**DB version:** 18  
-**Build status:** ✅ BUILD SUCCESSFUL  
+**Last updated:** 2026-05-28 (Wave 2 — FTS + D5 import review)
+**DB version:** 21  
+**Build status:** ✅ BUILD SUCCESSFUL (Wave 1 commit c612842) | Wave 2 changes uncommitted  
 **APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`  
-**Next action:** JUGAAD Vault — Phase 0 (Foundation: DB schema + file storage) OR D5 Import Review Screen
+**Next action:** Commit Waves 2–4 → Wave 5: E2 SteuerKlar + F1 Tax Tagging + F3 Receipt↔Wallet Linking
 
 ---
 
@@ -331,25 +331,38 @@ Salary €2,850  ·  15 May
 
 ---
 
-### D5 — Import Review Screen for Uncategorized [ ] PLANNED
+### D5 — Import Review Screen for Uncategorized ✅ DONE
 
-After salary confirmation step, show uncategorized transactions (`category == "Other"` or unconfident "Shopping") in a review screen. Inline category picker + "make this a rule" per transaction. Pre-categorized shown in collapsed "✓ N auto-classified" chip.
+After salary confirmation, `advanceFromSalary()` filters `"Uncategorized"` OR `"Other"` (ignoreCase) and routes to `ImportWorkflow.ReviewUncategorized` before `NeedsReview`.
 
----
-
-### D6 — PayPal Transaction Intelligence [ ] PLANNED (quick win)
-
-In `MerchantNameCleaner`: detect `PAYPAL *<merchant>` pattern, extract actual merchant name, run standard categorizer on it.
-```
-"PAYPAL *NETFLIX INTERNAT" → title="Netflix", category="Utilities"
-"PAYPAL *LIEFERANDO"       → title="Lieferando", category="Eat Out"
-```
+| Item | File | Details |
+|------|------|---------|
+| `ReviewUncategorized` state | `ConfigViewModel.kt` | `pending: List<ParsedTransactionCandidate>`, `allAssignments: Map<Int,String>`, `pendingSummary: ImportSummary` |
+| `handleAssignCategory()` | `ConfigViewModel.kt` | Updates assignments map in workflow state; pure in-memory, no DB write yet |
+| `handleConfirmReview()` | `ConfigViewModel.kt` | Applies category overrides to DB (`walletTransactionDao().updateCategory`), creates merchant rules, advances to `NeedsReview` |
+| `ReviewUncategorizedCard` | `V2ConfigHubScreen.kt` | Per-row ExposedDropdownMenuBox (8 categories) + Checkbox "Make rule", Done button |
+| `advanceFromSalary` filter | `ConfigViewModel.kt` | Was `category == "Other"` only; now catches `"Uncategorized"` too (ignoreCase) |
 
 ---
 
-### D7 — Income Summary Section [ ] PLANNED
+### D6 — PayPal Transaction Intelligence ✅ ALREADY DONE
 
-Collapsible section above transaction list showing total income this cycle with each Income transaction listed.
+`MerchantNameCleaner` Pattern 3 (`PAYPAL\s*[*]\s*([^,.\n]+)`) already extracts the actual merchant name; `CsvParserService` runs `classifyCategory(cleanedTitle)` on the result. Verified:
+- `"PAYPAL *NETFLIX INTERNAT"` → `title="Netflix Internat"` → `"Media Subscriptions"` ✓
+- `"PAYPAL *LIEFERANDO"` → `title="Lieferando"` → `"Dining & Restaurants"` ✓
+- Pattern 2 (`PP.ID.PP/. merchant`) + Pattern 4 (`PP*merchant`) also covered.
+
+---
+
+### D7 — Income Summary Section ✅ DONE
+
+Collapsible "INCOME THIS CYCLE" card between CategoryGrid and transaction filter pill in `V2FinanceScreen.kt`.
+
+| Item | Details |
+|------|---------|
+| ViewModel data | `_incomeTransactions` / `incomeTransactions` already existed — populated by `publishVisibleState()` filtering `category == "Income"` |
+| `IncomeSection` composable | Replaced with spec design: collapsed by default, AnimatedVisibility expansion, `LumeEmerald` glow, `+€X.XX` per row, `TextOverflow.Ellipsis` |
+| Placement | Between `CategoryGrid` and `LumeFilterPill`, above the transaction LazyColumn |
 
 ---
 
@@ -512,6 +525,62 @@ Superseded by Phase E3 (Expiry Timeline in Vault) and Phase D4 (Recurring bills 
 - `android/src/test/.../RetroactiveCategorizerTest.kt` — 10 tests
 - `android/src/test/.../HouseholdExportServiceTest.kt` — 9 tests
 - `android/src/test/.../HouseholdImportServiceTest.kt` — 13 tests
+
+---
+
+## Session 2026-05-28 (Wave 4 — F4 + E1 + JUGAAD P3) — Uncommitted
+
+| Item | File(s) | Notes |
+|------|---------|-------|
+| F4 Sparklines | already committed (c612842) | `CategorySparkline`, 3-cycle `publishVisibleState()`, 3-bar `CategoryGridItem` — no action needed |
+| E1 PipelineManager | `vault/workers/PipelineManager.kt`, `vault/workers/DocumentExpiryWorker.kt`, `VaultDocumentParserWorker.kt` | `onDocumentUploaded()` added; `DocumentExpiryWorker` stub; trigger wired before `Result.success()`; CSV chain already existed |
+| JUGAAD P3 OCR | `vault/scan/OcrEngine.kt`, `MlKitOcrEngine.kt`, `PdfPageExtractor.kt`, new `OpenCvPreprocessor.kt`, `OcrRouter.kt`, `PaddleOcrEngine.kt` | OcrEngine interface extended; OpenCV preprocess→adaptiveThreshold pipeline with runCatching fallback; OcrRouter chains engines; PaddleOcr stub ready for ONNX model; PdfPageExtractor now calls OcrRouter |
+
+**OCR chain after P3:**
+```
+VaultDocumentParserWorker → PdfPageExtractor.extractText(context, file)
+  → OcrRouter.recognizeText(bitmap)
+      → OpenCvPreprocessor.preprocess(bitmap)   ← NEW
+      → MlKitOcrEngine.recognizeText(bitmap)
+          → ImagePreProcessor.optimizeForOcr()  ← preserved
+          → ML Kit TextRecognizer
+```
+
+---
+
+## Session 2026-05-28 (Wave 3 — D7 + E3 + JUGAAD P4) — Uncommitted
+
+| Item | File | Notes |
+|------|------|-------|
+| D7 Income Summary | `V2FinanceScreen.kt` | `IncomeSection` composable redesigned — collapsed by default, AnimatedVisibility, LumeEmerald glow, +€X.XX per row. ViewModel income data already existed (`_incomeTransactions`). |
+| E3 Expiry Timeline | `V2DocumentVaultScreen.kt` | `DocumentExpiryTimelineCard` rewritten — LumeCyan glow, "NEXT 90 DAYS", dot + title + daysUntil, CriticalRed ≤7d / LumeAmber ≤30d / LumeEmerald otherwise. ViewModel + DAO already wired. |
+| JUGAAD P4 Search | `VaultViewModel.kt`, `V2DocumentVaultScreen.kt` | `VaultSearchResult` data class; `_searchQuery`/`_searchResults` StateFlows; `onSearchQuery()` calls `searchFts(query*)` on IO dispatcher; `VaultSearchBar` + `VaultSearchResults` + `SearchEmptyState` composables inserted above main content |
+
+---
+
+## Session 2026-05-28 (Wave 1 — JUGAAD Vault) — Committed c612842
+
+| Item | Notes |
+|------|-------|
+| OCR Cache + PdfPageExtractor | aHash perceptual fingerprint, cache lookup before OCR, store on miss |
+| Page state machine | `vault_document_pages` rows; `OCR_QUEUED → OCR_DONE → INDEXED`; `runCatching` guards all pageDao calls |
+| File dedup | SHA-256 `fileHash` on `VaultEntity`; dedup at `saveDocument()` returns existing id |
+| DB v19 → v20 | `fileHash` column + index |
+| 7 new parsers | VoterIdParser, OciParser, IndianDrivingLicenceParser, GermanDrivingLicenceParser, TaxDocParser, RentalContractParser, EmploymentLetterParser |
+| ParserRegistry | 7 parsers inserted before GenericFallbackParser; 11 new keywords |
+| Entity detail UI | `ExtractedInfoSection` in `DocumentDetailSheet` — ≤8 fields, deduped, confidence-sorted |
+
+---
+
+## Session 2026-05-28 (Wave 2 — FTS + D5) — Uncommitted
+
+| Item | File | Notes |
+|------|------|-------|
+| `VaultEntityFts` FTS4 entity | `JugaadDocumentEntities.kt` | Links to `vault_extracted_entities` as content table |
+| `searchFts()` + `rebuildFts()` | `DocumentEntityDao.kt` | FTS MATCH query + rebuild command |
+| Migration 20→21 | `AppDatabase.kt` | Creates `vault_entities_fts` virtual table + initial rebuild |
+| Worker FTS refresh | `VaultDocumentParserWorker.kt` | `runCatching { rebuildFts() }` after every insertAll |
+| D5 `advanceFromSalary` fix | `ConfigViewModel.kt` | Filter broadened from `== "Other"` to `"Uncategorized" OR "Other"` (ignoreCase) |
 
 ---
 
@@ -771,7 +840,18 @@ See PLATFORM.md for full updated blueprint.
 - [x] BUG-011: Vault document moves to UNFILED after OCR failure — subFolder preservation fix
 - [x] BUG-012: Receipt parsing ran on passport/insurance docs — isReceiptLike guard added
 - [x] JUGAAD Vault — government document intelligence extension (Parser Registry, 14 parsers, normalization engine, IN+DE doc support)
+- [x] JUGAAD Wave 1 — OCR cache, page state machine, file dedup, 7 parsers, entity UI (DB v20, committed c612842)
+- [x] JUGAAD Wave 2 — vault_entities_fts FTS4, searchFts/rebuildFts DAO, migration 20→21, worker FTS refresh (uncommitted)
+- [x] D5 — Import review screen: ReviewUncategorized state, handleAssignCategory/handleConfirmReview, ReviewUncategorizedCard composable (uncommitted)
+- [x] D5 fix — advanceFromSalary filter broadened to catch "Uncategorized" + "Other" (uncommitted)
 - [ ] TASK-001: Indian passport date extraction (DD MMM YYYY + MRZ TD3) — partial fix merged; full fix in JUGAAD P2 IndianPassportParser
+- [x] D6: PayPal Transaction Intelligence — already done via MerchantNameCleaner Pattern 3 + CsvParserService categorizer pipeline
+- [x] D7: Income Summary Section — collapsible IncomeSection card in V2FinanceScreen between CategoryGrid and filter pill
+- [x] F4: Spending trend sparklines — already done (c612842); `CategorySparkline` data class, 3-cycle boundaries in `publishVisibleState()`, 3-bar `CategoryGridItem` chart + delta label
+- [x] E1: WorkManager Pipeline Registry — `PipelineManager.onDocumentUploaded()` + `DocumentExpiryWorker` stub added; wired into `VaultDocumentParserWorker`; CSV chain was already wired in `ConfigViewModel`
+- [x] JUGAAD P3: Advanced OCR — `OcrEngine` interface extended; `OpenCvPreprocessor` (grayscale→denoise→adaptiveThreshold, runCatching fallback); `OcrRouter` singleton (preprocesses once, iterates engines); `PaddleOcrEngine` stub; `PdfPageExtractor` wired to `OcrRouter`; build.gradle already had OpenCV 4.13.0 + ONNX Runtime 1.26.0
+- [x] JUGAAD P4: Vault FTS Search UI — `VaultSearchBar` + `VaultSearchResults` + `SearchEmptyState` composables; `VaultSearchResult` data class + `onSearchQuery()` in VaultViewModel; FTS prefix matching with `*`
+- [x] E3: Document Expiry Timeline card — `DocumentExpiryTimelineCard` rewritten; glow=LumeCyan, "NEXT 90 DAYS", dot+title+days, CriticalRed ≤7d / LumeAmber ≤30d / LumeEmerald otherwise
 
 ---
 

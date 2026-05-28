@@ -52,3 +52,14 @@ data class VaultDocumentEntityRecord(
     val parserId: String = "",       // e.g. "IndianPassportParser"
     val createdAt: Long = System.currentTimeMillis()
 )
+
+/**
+ * FTS4 mirror of vault_extracted_entities for full-text search over extracted values.
+ * Populated by VaultDocumentParserWorker after entity extraction.
+ */
+@androidx.room.Fts4(contentEntity = VaultDocumentEntityRecord::class)
+@Entity(tableName = "vault_entities_fts")
+data class VaultEntityFts(
+    val rawValue: String,
+    val normalizedValue: String
+)

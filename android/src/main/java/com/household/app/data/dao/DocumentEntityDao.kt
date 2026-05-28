@@ -29,4 +29,17 @@ interface DocumentEntityDao {
 
     @Query("UPDATE vault_extracted_entities SET isVerified = 1 WHERE id = :id")
     suspend fun markVerified(id: Long)
+
+    /** Full-text search across rawValue and normalizedValue. */
+    @Query("""
+        SELECT e.* FROM vault_extracted_entities e
+        INNER JOIN vault_entities_fts fts ON e.rowid = fts.rowid
+        WHERE vault_entities_fts MATCH :query
+        ORDER BY e.confidence DESC
+    """)
+    suspend fun searchFts(query: String): List<VaultDocumentEntityRecord>
+
+    /** Rebuilds the FTS index — call after bulk inserts. */
+    @Query("INSERT INTO vault_entities_fts(vault_entities_fts) VALUES('rebuild')")
+    suspend fun rebuildFts()
 }
