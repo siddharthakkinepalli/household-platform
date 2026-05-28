@@ -32,7 +32,7 @@
 | **D6** | **PayPal Transaction Intelligence — PAYPAL \*MERCHANT extraction in MerchantNameCleaner** | ✅ Already done (Pattern 3 in MerchantNameCleaner + CsvParserService pipeline) |
 | **D7** | **Income Summary Section — collapsible income row above transaction list** | ✅ Done (Wave 3) |
 | **E3 Expiry Timeline** | **90-day document expiry card at top of Vault screen** | ✅ Done (Wave 3) |
-| **JUGAAD P3 OCR** | **OcrEngine interface, OpenCV preprocessing, OcrRouter, PaddleOcr stub** | ✅ Done (Wave 4) |
+| **JUGAAD P3 OCR** | **OcrEngine interface, OpenCV preprocessing, OcrRouter, PaddleOcrEngine (full ONNX)** | ✅ Done (Wave 4 + impl) |
 | **JUGAAD P4 Search** | **Inline FTS search bar + results in Vault screen** | ✅ Done (Wave 3) |
 | **E1 PipelineManager** | **WorkManager trigger→chain registry; CSV + document upload triggers** | ✅ Done (Wave 4) |
 | **E2 SteuerKlar** | **Native Kotlin tax checklist reading Drive folder** | 🔲 Planned |

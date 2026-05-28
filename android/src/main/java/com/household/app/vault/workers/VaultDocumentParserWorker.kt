@@ -15,6 +15,7 @@ import com.household.app.domain.models.vault.VaultCategory
 import com.household.app.vault.parser.LocalReceiptScanner
 import com.household.app.vault.parser.ReceiptTextParser
 import com.household.app.vault.scan.MlKitOcrEngine
+import com.household.app.vault.scan.OcrRouter
 import com.household.app.vault.scan.PdfPageExtractor
 import android.util.Log
 import com.household.app.data.entities.VaultDocumentEntityRecord
@@ -37,6 +38,10 @@ class VaultDocumentParserWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val vaultId = inputData.getLong("vault_id", -1L)
         if (vaultId == -1L) return@withContext Result.failure()
+
+        // Register PaddleOcrEngine as the primary OCR engine (no-op if already registered).
+        // Must be called before any OcrRouter.recognizeText() invocations in this worker.
+        OcrRouter.init(applicationContext)
 
         val db = AppDatabase.getInstance(applicationContext)
         val entry = db.vaultDao().getEntryById(vaultId) ?: return@withContext Result.failure()

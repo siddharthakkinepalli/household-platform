@@ -848,8 +848,9 @@ See PLATFORM.md for full updated blueprint.
 - [x] D6: PayPal Transaction Intelligence — already done via MerchantNameCleaner Pattern 3 + CsvParserService categorizer pipeline
 - [x] D7: Income Summary Section — collapsible IncomeSection card in V2FinanceScreen between CategoryGrid and filter pill
 - [x] F4: Spending trend sparklines — already done (c612842); `CategorySparkline` data class, 3-cycle boundaries in `publishVisibleState()`, 3-bar `CategoryGridItem` chart + delta label
-- [x] E1: WorkManager Pipeline Registry — `PipelineManager.onDocumentUploaded()` + `DocumentExpiryWorker` stub added; wired into `VaultDocumentParserWorker`; CSV chain was already wired in `ConfigViewModel`
-- [x] JUGAAD P3: Advanced OCR — `OcrEngine` interface extended; `OpenCvPreprocessor` (grayscale→denoise→adaptiveThreshold, runCatching fallback); `OcrRouter` singleton (preprocesses once, iterates engines); `PaddleOcrEngine` stub; `PdfPageExtractor` wired to `OcrRouter`; build.gradle already had OpenCV 4.13.0 + ONNX Runtime 1.26.0
+- [x] E1: WorkManager Pipeline Registry — `PipelineManager.onDocumentUploaded()` + `DocumentExpiryWorker` (fully implemented); wired into `VaultDocumentParserWorker`; CSV chain pre-existing
+- [x] DocumentExpiryWorker FULL: queries `document_alerts` (daysUntil ≤ 30, !isAcknowledged); posts 🔴/🟡 notifications; reuses `ExpiryNotificationWorker.CHANNEL_ID`; `acknowledgeAlert()` after each post; handles notifications-disabled gracefully
+- [x] JUGAAD P3: `OcrEngine` interface, `OpenCvPreprocessor`, `OcrRouter`, `PaddleOcrEngine` FULL — lazy ONNX session from assets, bitmap→float CHW tensor [1,3,48,W], greedy CTC decode, Latin+German charset; `OcrRouter.init(context)` prepends PaddleOcr before ML Kit; `VaultDocumentParserWorker` calls `OcrRouter.init()` at top of `doWork()`
 - [x] JUGAAD P4: Vault FTS Search UI — `VaultSearchBar` + `VaultSearchResults` + `SearchEmptyState` composables; `VaultSearchResult` data class + `onSearchQuery()` in VaultViewModel; FTS prefix matching with `*`
 - [x] E3: Document Expiry Timeline card — `DocumentExpiryTimelineCard` rewritten; glow=LumeCyan, "NEXT 90 DAYS", dot+title+days, CriticalRed ≤7d / LumeAmber ≤30d / LumeEmerald otherwise
 
