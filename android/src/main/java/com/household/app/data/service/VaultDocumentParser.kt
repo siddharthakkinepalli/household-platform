@@ -20,13 +20,20 @@ object VaultDocumentParser {
 
     private val EXPIRY_KEYWORDS = setOf(
         "gültig bis", "gueltig bis", "gültig:", "gültigkeit",
-        "valid until", "valid through", "valid to",
-        "expires", "expiry date", "expiry:", "expiration",
+        "gültigkeitsdatum", "gültig bis:", "gültig bis ",
+        "valid until", "valid through", "valid to", "date of expiry",
+        "expires", "expiry date", "expiry:", "expiration", "date of expiration",
         "ablauf", "ablaufdatum", "vertragsende", "vertragsablauf",
         "laufzeit bis", "vertragslaufzeit bis", "end of contract",
         "end date", "contract ends", "kündigungsfrist bis",
-        "date d'expiration"
+        "date d'expiration", "expiry", "gültig"
     )
+
+    // MRZ 6-digit date pattern: YYMMDD appearing after a <<< sequence (passport/ID MRZ lines)
+    private val DATE_MRZ = Regex("""[<0-9]{5,}(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[0-1])""")
+
+    // Standalone 6-digit date: used as fallback for identity docs when above MRZ pattern fails
+    private val DATE_YYMMDD = Regex("""\b(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[0-1])\b""")
 
     private val DATE_GERMAN   = Regex("""(\d{1,2})\.(\d{1,2})\.(\d{2,4})""")
     private val DATE_ISO      = Regex("""(\d{4})-(\d{2})-(\d{2})""")
@@ -179,28 +186,53 @@ object VaultDocumentParser {
 
     private fun extractExpiryDate(lines: List<String>, category: VaultCategory): LocalDate? {
         val today = LocalDate.now()
-        val twoYearsAhead = today.plusYears(2)
+        // Identity docs (passports, IDs) are valid up to 15 years; contracts/utilities up to 5 years.
+        val maxFuture = if (category == VaultCategory.IDENTITY) today.plusYears(15) else today.plusYears(5)
         val oneYearAgo = today.minusYears(1)
 
-        // Primary: expiry keyword on the same line as or immediately before a date
+        // Primary: expiry keyword on the same or next line
         for (i in lines.indices) {
             val line = lines[i]
             if (EXPIRY_KEYWORDS.any { line.contains(it) }) {
                 val window = if (i + 1 < lines.size) "$line ${lines[i + 1]}" else line
                 parseFirstDate(window)
-                    ?.takeIf { it.isAfter(oneYearAgo) && it.isBefore(twoYearsAhead) }
+                    ?.takeIf { it.isAfter(oneYearAgo) && it.isBefore(maxFuture) }
                     ?.let { return it }
             }
         }
 
-        // Fallback for identity documents: the LATEST future-dated date is typically the expiry
+        // MRZ path: look for 6-digit YYMMDD dates in MRZ context for identity documents
         if (category == VaultCategory.IDENTITY) {
-            return lines.flatMap { allDatesIn(it) }
-                .filter { it.isAfter(today) && it.isBefore(twoYearsAhead) }
-                .maxOrNull()
+            val fullText = lines.joinToString("\n")
+
+            // Try structured MRZ pattern first (YYMMDD embedded in <<< block)
+            DATE_MRZ.findAll(fullText).mapNotNull { m ->
+                parseMrzDate(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+            }.filter { it.isAfter(today) && it.isBefore(maxFuture) }
+                .maxOrNull()?.let { return it }
+
+            // Fallback: latest future-dated conventional date in the document
+            lines.flatMap { allDatesIn(it) }
+                .filter { it.isAfter(today) && it.isBefore(maxFuture) }
+                .maxOrNull()?.let { return it }
+
+            // Last resort: standalone YYMMDD digits anywhere in the text (MRZ expiry field)
+            DATE_YYMMDD.findAll(fullText).mapNotNull { m ->
+                parseMrzDate(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+            }.filter { it.isAfter(today) && it.isBefore(maxFuture) }
+                .maxOrNull()?.let { return it }
         }
 
         return null
+    }
+
+    private fun parseMrzDate(yy: String, mm: String, dd: String): LocalDate? {
+        val year2 = yy.toIntOrNull() ?: return null
+        val month = mm.toIntOrNull() ?: return null
+        val day   = dd.toIntOrNull() ?: return null
+        // MRZ two-digit year: < 30 → 2000s, >= 30 → 1900s (but for expiry dates always 2000s)
+        val year  = if (year2 < 70) 2000 + year2 else 1900 + year2
+        return runCatching { LocalDate.of(year, month, day) }.getOrNull()
     }
 
     private fun extractMonthlyCost(lower: String): Double? =

@@ -329,7 +329,12 @@ fun V2ConfigHubScreen(
                 DriveBackupCard()
             }
 
-            // 11 — About
+            // 11 — Danger zone
+            item {
+                DangerZoneCard(onIntent = viewModel::onIntent)
+            }
+
+            // 12 — About
             item {
                 AboutCard()
             }
@@ -1316,6 +1321,76 @@ private fun RecentImportsCard(audits: List<ImportAuditRecord>) {
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Danger zone — clear all transaction data
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DangerZoneCard(onIntent: (ConfigIntent) -> Unit) {
+    var showConfirm by remember { mutableStateOf(false) }
+
+    EliteGlassCard(glowColor = CriticalRed.copy(alpha = 0.12f), borderAlpha = 0.18f) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "DANGER ZONE",
+                style = MaterialTheme.typography.labelSmall,
+                color = CriticalRed.copy(alpha = 0.8f),
+                letterSpacing = 1.sp
+            )
+            Text(
+                text = "Clear All Data",
+                color = TextMain,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "Deletes all imported transactions, recurring bills, salary source, and import history. Merchant rules and budget thresholds are kept.",
+                color = LumeWhite.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            if (showConfirm) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "This cannot be undone. Are you sure?",
+                        color = CriticalRed,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = { showConfirm = false },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = LumeWhite.copy(alpha = 0.08f))
+                        ) {
+                            Text("Cancel", color = LumeWhite)
+                        }
+                        Button(
+                            onClick = {
+                                showConfirm = false
+                                onIntent(ConfigIntent.ClearAllData)
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = CriticalRed.copy(alpha = 0.22f))
+                        ) {
+                            Text("Yes, clear all", color = CriticalRed, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { showConfirm = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CriticalRed),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CriticalRed.copy(alpha = 0.4f))
+                ) {
+                    Text("Clear All Transaction Data", fontWeight = FontWeight.Medium)
                 }
             }
         }

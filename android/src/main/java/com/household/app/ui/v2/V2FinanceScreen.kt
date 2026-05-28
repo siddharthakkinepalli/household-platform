@@ -10,6 +10,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,6 +95,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.household.app.data.AppDatabase
 import com.household.app.data.entities.TaxTagEntity
+import com.household.app.data.entities.WalletTripEntity
 import com.household.app.ui.compose.theme.CriticalRed
 import com.household.app.ui.compose.theme.LumeAmber
 import com.household.app.ui.compose.theme.LumeEmerald
@@ -131,7 +134,8 @@ private data class CategoryBlockUi(
 
 @Composable
 fun V2FinanceScreen(
-    viewModel: ExpensesViewModel = viewModel()
+    viewModel: ExpensesViewModel = viewModel(),
+    onNavigateToTrips: () -> Unit = {}
 ) {
     // Refresh whenever this screen comes to the foreground (e.g. after a CSV import)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -228,18 +232,48 @@ fun V2FinanceScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Column {
-                    Text(
-                        text = "Wallet",
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextMain
-                    )
-                    Text(
-                        text = activePeriodLabel,
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Wallet",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextMain
+                        )
+                        Text(
+                            text = activePeriodLabel,
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(LumeCyan.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+                            .clickable(onClick = onNavigateToTrips)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Flight,
+                                contentDescription = null,
+                                tint = LumeCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Trips",
+                                color = LumeCyan,
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
                 }
             }
 
@@ -342,6 +376,15 @@ fun V2FinanceScreen(
                         merchantName = editingTransaction.description,
                         newCategory = category,
                         applyToHistory = applyToFuture
+                    )
+                    editingTransactionId = null
+                },
+                onMarkAsSalary = { applyToHistory ->
+                    viewModel.reclassifyTransaction(
+                        transactionId = editingTransaction.id,
+                        merchantName = editingTransaction.description,
+                        newCategory = "Salary",
+                        applyToHistory = applyToHistory
                     )
                     editingTransactionId = null
                 }
@@ -1039,25 +1082,31 @@ private fun TransactionStrip(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TransactionEditSheet(
     transaction: Transaction,
     onDismiss: () -> Unit,
-    onUpdateCategory: (String, Boolean) -> Unit
+    onUpdateCategory: (String, Boolean) -> Unit,
+    onMarkAsSalary: (applyToHistory: Boolean) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var applyToFuture by rememberSaveable(transaction.id) { mutableStateOf(false) }
     val categories = listOf(
-        "Groceries", "Dining", "Travel", "Utilities", "Shopping",
-        "Housing & Rent", "Long-Distance Transport", "Local Transit (SWU/DING)",
-        "Gas & Fuel", "Carsharing & Taxi", "Media Subscriptions", "Internet & Mobile",
-        "Insurance", "Pharmacy & Health", "Drugstore & Personal Care",
-        "School Lunch / Mensa", "School Fees & Education", "Local Activities & Sports",
-        "Electronics", "Home & Furniture", "DIY & Hardware Store",
-        "Discount & Department Stores", "Broadcasting License", "Bank Fees & Charges",
-        "Transfers", "Income", "Exclude"
+        "Groceries", "Dining", "Travel", "Shopping",
+        "Entertainment", "School", "Utilities", "Exclude"
     )
     val selectedCategory = canonicalCategory(transaction.category)
+
+    var trips by remember { mutableStateOf<List<WalletTripEntity>>(emptyList()) }
+    var selectedTrip by remember(transaction.id) { mutableStateOf(transaction.trip) }
+
+    LaunchedEffect(Unit) {
+        trips = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            AppDatabase.getInstance(context).walletTripDao().getAllTrips()
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1077,26 +1126,24 @@ private fun TransactionEditSheet(
             Text("RE-CATEGORIZE", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp, color = TextMain.copy(alpha = 0.6f))
             Spacer(Modifier.height(12.dp))
 
-            categories.chunked(3).forEach { rowCats ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    rowCats.forEach { cat ->
-                        val isSelected = selectedCategory.equals(cat, ignoreCase = true)
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { onUpdateCategory(cat, applyToFuture) },
-                            label = { Text(cat) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = LumePurple.copy(alpha = 0.2f),
-                                selectedLabelColor = LumePurple,
-                                selectedLeadingIconColor = LumePurple
-                            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                categories.forEach { cat ->
+                    val isSelected = selectedCategory.equals(cat, ignoreCase = true)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onUpdateCategory(cat, applyToFuture) },
+                        label = { Text(cat) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = LumePurple.copy(alpha = 0.2f),
+                            selectedLabelColor = LumePurple,
+                            selectedLeadingIconColor = LumePurple
                         )
-                    }
+                    )
                 }
-                Spacer(Modifier.height(8.dp))
             }
 
             Spacer(Modifier.height(16.dp))
@@ -1122,6 +1169,91 @@ private fun TransactionEditSheet(
                     )
                 }
             }
+
+            if (trips.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                Spacer(Modifier.height(16.dp))
+                Text("TAG TO TRIP", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp, color = TextMain.copy(alpha = 0.6f))
+                Spacer(Modifier.height(10.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedTrip == null,
+                        onClick = {
+                            selectedTrip = null
+                            scope.launch {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    AppDatabase.getInstance(context).walletTransactionDao()
+                                        .updateTransactionTrip(transaction.localId, null)
+                                }
+                            }
+                        },
+                        label = { Text("None") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = LumeCyan.copy(alpha = 0.15f),
+                            selectedLabelColor = LumeCyan
+                        )
+                    )
+                    trips.forEach { trip ->
+                        FilterChip(
+                            selected = selectedTrip == trip.name,
+                            onClick = {
+                                selectedTrip = trip.name
+                                scope.launch {
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        AppDatabase.getInstance(context).walletTransactionDao()
+                                            .updateTransactionTrip(transaction.localId, trip.name)
+                                    }
+                                }
+                            },
+                            label = { Text(trip.name) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = LumeCyan.copy(alpha = 0.15f),
+                                selectedLabelColor = LumeCyan
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Mark as Salary — shown for positive-amount (income) transactions
+            if (transaction.amount > 0) {
+                Spacer(Modifier.height(20.dp))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                Spacer(Modifier.height(16.dp))
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = { onMarkAsSalary(applyToFuture) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                        containerColor = LumeEmerald.copy(alpha = 0.15f),
+                        contentColor = LumeEmerald
+                    ),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Payments,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Mark as Salary",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Text(
+                    if (applyToFuture) "Will auto-classify future transactions from this payer as Salary"
+                    else "Only marks this transaction",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMain.copy(alpha = 0.40f),
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
             Spacer(Modifier.height(32.dp))
         }
     }
@@ -1132,7 +1264,7 @@ private fun TransactionEditSheet(
 private fun TaxTagDialog(tx: Transaction, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val taxCategories = listOf("Arbeitsmittel", "Homeoffice", "Krankenkosten", "Spendenquittung", "Fahrtkosten", "Andere")
+    val taxCategories = listOf("Work Equipment", "Home Office", "Medical Expenses", "Donations", "Work Commute", "Other")
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Tag for Tax", color = TextMain) },

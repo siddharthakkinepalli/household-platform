@@ -16,6 +16,7 @@ import com.household.app.data.config.CsvParserService
 import com.household.app.data.config.ImportErrorType
 import com.household.app.data.config.ImportParseResult
 import com.household.app.data.config.ImportSummary
+import com.household.app.data.TransactionCategorizer
 import com.household.app.data.config.RuleEngineService
 import com.household.app.data.service.RecurringDetectionService
 import com.household.app.domain.services.RetroactiveCategorizer
@@ -101,6 +102,7 @@ sealed class ConfigIntent {
     object SkipSalary : ConfigIntent()
     data class AssignCategory(val transactionId: Int, val category: String) : ConfigIntent()
     data class ConfirmReview(val makeRules: List<Pair<String, String>>) : ConfigIntent() // pattern→category pairs
+    object ClearAllData : ConfigIntent()
 }
 
 sealed class ImportWorkflow {
@@ -222,6 +224,7 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
             ConfigIntent.SkipSalary -> handleSkipSalary()
             is ConfigIntent.AssignCategory -> handleAssignCategory(intent.transactionId, intent.category)
             is ConfigIntent.ConfirmReview -> handleConfirmReview(intent.makeRules)
+            ConfigIntent.ClearAllData -> clearAllData()
         }
     }
 
@@ -358,24 +361,19 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun resolveSalaryWorkflow(summary: ImportSummary): ImportWorkflow {
         val anchor = _uiState.value.salaryAnchor
         val stored = db.salarySourceDao().getSalarySource()
+        val categorizer = TransactionCategorizer()
 
-        // Credit transactions near the anchor day (within ±7 days)
-        val creditCandidates = summary.transactions.filter { tx ->
-            if (tx.amount <= 0.0) return@filter false
-            val dayOfMonth = tx.date.dayOfMonth
-            val dist = minOf(
-                abs(dayOfMonth - anchor),
-                abs(dayOfMonth - anchor + 31),
-                abs(dayOfMonth - anchor - 31)
-            )
-            dist <= 7
-        }.sortedByDescending { it.amount }
+        // All incoming credit transactions (positive amounts)
+        val allCredits = summary.transactions.filter { it.amount > 0.0 }
+        if (allCredits.isEmpty()) return advanceFromSalary(summary)
 
-        if (stored != null && creditCandidates.isNotEmpty()) {
-            val autoMatch = creditCandidates.firstOrNull { tx ->
-                val pattern = stored.merchantPattern.take(8).lowercase()
+        // Step 1: if a previously confirmed salary source exists, try to auto-match first
+        if (stored != null) {
+            val pattern = stored.merchantPattern.take(8).lowercase()
+            val autoMatch = allCredits.firstOrNull { tx ->
                 val titleLow = tx.title.lowercase()
-                val titleMatch = pattern.isNotBlank() && (titleLow.contains(pattern) || pattern.contains(titleLow.take(8)))
+                val titleMatch = pattern.isNotBlank() &&
+                    (titleLow.contains(pattern) || pattern.contains(titleLow.take(8)))
                 val amountMatch = tx.amount in stored.minAmount..stored.maxAmount
                 titleMatch || amountMatch
             }
@@ -392,11 +390,48 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-        if (creditCandidates.isEmpty()) {
+        // Step 2: score all credit transactions; auto-confirm if a single high-confidence hit exists
+        data class ScoredCandidate(val tx: com.household.app.data.config.ParsedTransactionCandidate, val score: Int)
+        val scored = allCredits.map { tx ->
+            ScoredCandidate(tx, categorizer.salaryConfidenceScore(tx.title, tx.amount))
+        }.sortedByDescending { it.score }
+
+        val topCandidate = scored.firstOrNull()
+        if (topCandidate != null && topCandidate.score >= 70) {
+            // Auto-confirm — high confidence, no user prompt needed
+            val tx = topCandidate.tx
+            val pattern = tx.title.take(16).lowercase().trim()
+            db.salarySourceDao().upsert(
+                SalarySourceEntity(
+                    merchantPattern = pattern,
+                    lastAmount = tx.amount,
+                    minAmount = tx.amount * 0.80,
+                    maxAmount = tx.amount * 1.20,
+                    confirmedAt = System.currentTimeMillis()
+                )
+            )
             return advanceFromSalary(summary)
         }
 
-        val salaryCandidates = creditCandidates.take(5).map { tx ->
+        // Step 3: gather candidates near anchor day with score >= 20 (medium confidence)
+        val anchorCandidates = allCredits.filter { tx ->
+            val dayOfMonth = tx.date.dayOfMonth
+            val dist = minOf(
+                abs(dayOfMonth - anchor),
+                abs(dayOfMonth - anchor + 31),
+                abs(dayOfMonth - anchor - 31)
+            )
+            dist <= 10 && tx.amount >= 300.0
+        }.sortedByDescending { it.amount }
+
+        // Merge anchor candidates and scored candidates, dedup, take top 5
+        val combined = (anchorCandidates + scored.filter { it.score >= 20 }.map { it.tx })
+            .distinctBy { it.id.toString() }
+            .take(5)
+
+        if (combined.isEmpty()) return advanceFromSalary(summary)
+
+        val salaryCandidates = combined.map { tx ->
             SalaryCandidate(
                 transactionId = tx.id,
                 title = tx.title,
@@ -691,6 +726,21 @@ class ConfigViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             DriveDataStore.clearOnSignOut(ctx)
             _uiState.update { it.copy(isCloudSyncEnabled = false, connectedEmail = null) }
+        }
+    }
+
+    fun clearAllData() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                db.walletTransactionDao().deleteAllTransactions()
+                db.recurringBillDao().clearAll()
+                db.salarySourceDao().clear()
+                db.importAuditDao().clearAll()
+                db.transactionOverrideDao().deleteAllOverrides()
+                db.excludedTransactionDao().deleteAllExcluded()
+            }
+            _uiState.update { it.copy(importWorkflow = ImportWorkflow.Idle, recentAudits = emptyList()) }
+            refreshState()
         }
     }
 

@@ -162,6 +162,37 @@ class ApiClient {
     })
   }
 
+  // Plaid Open Banking
+  async createPlaidLinkToken(householdId: number) {
+    return this.client.get('/plaid/link_token', { params: { household_id: householdId } })
+  }
+
+  async exchangePlaidToken(data: {
+    household_id: number
+    public_token: string
+    institution_name?: string
+    institution_id?: string
+  }) {
+    return this.client.post('/plaid/exchange_token', data)
+  }
+
+  async getPlaidConnections(householdId: number) {
+    return this.client.get('/plaid/connections', { params: { household_id: householdId } })
+  }
+
+  async syncPlaidTransactions(householdId: number, connectionId?: number) {
+    return this.client.post('/plaid/sync', {
+      household_id: householdId,
+      ...(connectionId ? { connection_id: connectionId } : {}),
+    })
+  }
+
+  async removePlaidConnection(connectionId: number, householdId: number) {
+    return this.client.delete(`/plaid/connections/${connectionId}`, {
+      params: { household_id: householdId },
+    })
+  }
+
   // Health check
   async getHealth() {
     return this.client.get('/health')

@@ -128,16 +128,39 @@ def upload_to_play(
     if not sa_json_path.exists():
         raise FileNotFoundError(f"Service account JSON not found: {sa_json_path}")
 
+    try:
+        import httplib2
+        from google.auth.transport.httplib2 import AuthorizedHttp
+    except ImportError as exc:
+        raise RuntimeError("Install httplib2: C:/Projects/.venv/Scripts/python.exe -m pip install httplib2") from exc
+
     scopes = ["https://www.googleapis.com/auth/androidpublisher"]
     creds = service_account.Credentials.from_service_account_file(str(sa_json_path), scopes=scopes)
-    service = build("androidpublisher", "v3", credentials=creds, cache_discovery=False)
+    # 10-minute socket timeout — Play validates the bundle server-side on the final chunk response
+    http = AuthorizedHttp(creds, http=httplib2.Http(timeout=600))
+    service = build("androidpublisher", "v3", http=http, cache_discovery=False)
 
     def run_edit_with_status(status: str) -> str:
         edit = service.edits().insert(packageName=package_name, body={}).execute()
         edit_id = edit["id"]
 
-        media = MediaFileUpload(str(AAB_PATH), mimetype="application/octet-stream", resumable=False)
-        bundle = service.edits().bundles().upload(packageName=package_name, editId=edit_id, media_body=media).execute()
+        # Use resumable upload: uploads in chunks so large AABs (100+ MB) don't time out
+        media = MediaFileUpload(
+            str(AAB_PATH),
+            mimetype="application/octet-stream",
+            resumable=True,
+            chunksize=5 * 1024 * 1024,  # 5 MB chunks
+        )
+        request = service.edits().bundles().upload(
+            packageName=package_name, editId=edit_id, media_body=media
+        )
+        bundle = None
+        while bundle is None:
+            status_obj, bundle = request.next_chunk()
+            if status_obj:
+                pct = int(status_obj.progress() * 100)
+                print(f"  Upload progress: {pct}%", end="\r", flush=True)
+        print()
         version_code = str(bundle["versionCode"])
 
         release = {

@@ -113,6 +113,10 @@ class DocumentsViewModel(
         viewModelScope.launch { repo.insertDocument(doc) }
     }
 
+    fun updateDocument(doc: DocumentEntity) {
+        viewModelScope.launch { repo.updateDocument(doc) }
+    }
+
     fun deleteDocument(id: Long) {
         viewModelScope.launch { repo.deleteDocument(id) }
     }
@@ -143,6 +147,7 @@ fun DocumentsScreen(
 ) {
     val documents by viewModel.documents.collectAsStateWithLifecycle()
     var showAddSheet by remember { mutableStateOf(false) }
+    var editingDoc by remember { mutableStateOf<DocumentEntity?>(null) }
     val selectedIds = remember { mutableStateListOf<Long>() }
     val isMultiSelect = selectedIds.isNotEmpty()
 
@@ -235,7 +240,7 @@ fun DocumentsScreen(
 
                             Box(
                                 modifier = Modifier.combinedClickable(
-                                    onClick = {},
+                                    onClick = { editingDoc = doc },
                                     onLongClick = { selectedIds.add(doc.id) }
                                 )
                             ) {
@@ -307,6 +312,17 @@ fun DocumentsScreen(
             onSave = { doc ->
                 viewModel.addDocument(doc)
                 showAddSheet = false
+            }
+        )
+    }
+
+    editingDoc?.let { doc ->
+        AddDocumentSheet(
+            onDismiss = { editingDoc = null },
+            existingDocument = doc,
+            onSave = { updated ->
+                viewModel.updateDocument(updated)
+                editingDoc = null
             }
         )
     }
@@ -429,7 +445,7 @@ private fun DocumentCard(doc: DocumentEntity, isSelected: Boolean = false) {
                     if (doc.monthlyCost != null) {
                         Text("·", color = TextMuted, style = MaterialTheme.typography.labelSmall)
                         Text(
-                            text = "£${"%.2f".format(doc.monthlyCost)}/mo",
+                            text = "€${"%.2f".format(doc.monthlyCost)}/mo",
                             color = TextSecondary,
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 10.sp

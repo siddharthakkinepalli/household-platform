@@ -62,7 +62,12 @@ fun V2AppNavHost(
                 }
             )
         }
-        composable(route = Screen.Wallet.route) { V2FinanceScreen() }
+        composable(route = Screen.Wallet.route) {
+            V2FinanceScreen(onNavigateToTrips = { navController.navigate(Screen.Trips.route) })
+        }
+        composable(route = Screen.Trips.route) {
+            TripTrackerScreen(onBack = { navController.popBackStack() })
+        }
         composable(route = Screen.Meals.route) { V2MealsScreen() }
         composable(route = Screen.Family.route) {
             V2FamilyScreen(

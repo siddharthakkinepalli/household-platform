@@ -134,7 +134,7 @@ data class TaxTagEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val entityType: String,   // "transaction" or "vault_doc"
     val entityId: Long,
-    val taxCategory: String,  // e.g. "Arbeitsmittel", "Homeoffice", "Krankenkosten", "Spendenquittung", "Fahrtkosten", "Andere"
+    val taxCategory: String,  // e.g. "Work Equipment", "Home Office", "Medical Expenses", "Donations", "Work Commute", "Other"
     val year: Int,
     val note: String? = null
 )

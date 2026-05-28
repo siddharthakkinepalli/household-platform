@@ -47,7 +47,7 @@ interface FamilyMemberDao {
 @Dao
 interface DocumentDao {
 
-    @Query("SELECT * FROM documents ORDER BY expiryDate ASC")
+    @Query("SELECT * FROM documents ORDER BY CASE WHEN expiryDate IS NULL THEN 1 ELSE 0 END, expiryDate ASC")
     fun getAllDocuments(): Flow<List<DocumentEntity>>
 
     @Query("SELECT * FROM documents WHERE id = :id")

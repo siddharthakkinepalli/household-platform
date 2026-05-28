@@ -52,6 +52,7 @@ sealed class Screen(
     object SteuerKlar : Screen("steuer_klar", Icons.Rounded.Tune, "SteuerKlar")
     object SubscriptionHub : Screen("subscription_hub", Icons.Rounded.Tune, "Subscription Hub")
     object TaxSummary : Screen("tax_summary", Icons.Rounded.Tune, "Tax Summary")
+    object Trips : Screen("trips", Icons.Rounded.Tune, "Trips")
 
     companion object {
         /** Ordered list used to build primary rail items and NavHost destinations. */

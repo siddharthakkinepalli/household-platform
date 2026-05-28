@@ -169,6 +169,7 @@ fun V2DocumentVaultScreen(
     var showUploadSheet by remember { mutableStateOf(false) }
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
     var pendingMime by remember { mutableStateOf("application/octet-stream") }
+    var pendingFilename by remember { mutableStateOf("") }
     val selectedIds = remember { mutableStateListOf<Long>() }
     var showMoveDialog by remember { mutableStateOf(false) }
 
@@ -181,6 +182,13 @@ fun V2DocumentVaultScreen(
                 uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
             val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            // Extract the display name and strip extension for use as default title
+            val displayName = context.contentResolver.query(
+                uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            } ?: ""
+            pendingFilename = displayName.substringBeforeLast('.').replace('_', ' ').trim()
             pendingUri = uri
             pendingMime = mime
             showUploadSheet = true
@@ -304,16 +312,19 @@ fun V2DocumentVaultScreen(
             title = "Save document",
             members = familyMembers,
             initialFolder = viewModel.defaultSaveFolder(),
-            onDismiss = { showUploadSheet = false; pendingUri = null },
+            initialDocumentTitle = pendingFilename,
+            onDismiss = { showUploadSheet = false; pendingUri = null; pendingFilename = "" },
             onConfirm = { folder, title ->
                 viewModel.saveDocument(pendingUri!!, pendingMime, folder, title)
                 showUploadSheet = false
                 pendingUri = null
+                pendingFilename = ""
             },
             onAddMember = onNavigateToFamily?.let { navigate ->
                 {
                     showUploadSheet = false
                     pendingUri = null
+                    pendingFilename = ""
                     navigate()
                 }
             }
@@ -907,7 +918,7 @@ private fun DocumentDetailSheet(
     }
 
     if (showTaxTagPicker) {
-        val taxCategories = listOf("Arbeitsmittel", "Homeoffice", "Krankenkosten", "Spendenquittung", "Fahrtkosten", "Andere")
+        val taxCategories = listOf("Work Equipment", "Home Office", "Medical Expenses", "Donations", "Work Commute", "Other")
         val year = LocalDate.ofEpochDay(entry.dateEpoch).year
         AlertDialog(
             onDismissRequest = { showTaxTagPicker = false },

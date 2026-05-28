@@ -290,7 +290,7 @@ fun SubscriptionHubScreen(
                         badgeColor = LumeAmber
                     )
                 }
-                items(autoBills, key = { it.id }) { bill ->
+                items(autoBills, key = { "auto_${it.id}" }) { bill ->
                     DetectionCard(
                         bill = bill,
                         onConfirm = { viewModel.confirmBill(bill.id) },
@@ -319,7 +319,7 @@ fun SubscriptionHubScreen(
                     )
                 }
             } else {
-                items(confirmedBills, key = { it.id }) { bill ->
+                items(confirmedBills, key = { "confirmed_${it.id}" }) { bill ->
                     ConfirmedBillRow(
                         bill = bill,
                         onToggleActive = { viewModel.toggleActive(bill.id, it) },
@@ -337,7 +337,7 @@ fun SubscriptionHubScreen(
                         badgeColor = LumeAmber
                     )
                 }
-                items(upcomingOutflows, key = { it.first.id }) { (bill, date) ->
+                items(upcomingOutflows, key = { "upcoming_${it.first.id}" }) { (bill, date) ->
                     val daysUntil = java.time.temporal.ChronoUnit.DAYS
                         .between(LocalDate.now(), date).toInt()
                     val urgentColor = if (daysUntil <= 5) CriticalRed else LumeAmber

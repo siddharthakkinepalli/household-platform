@@ -106,4 +106,7 @@ interface ImportAuditDao {
 
     @Query("SELECT * FROM import_audits ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getRecentAudits(limit: Int = 10): List<ImportAuditEntity>
+
+    @Query("DELETE FROM import_audits")
+    suspend fun clearAll()
 }

@@ -57,22 +57,27 @@ fun AddDocumentSheet(
     onDismiss: () -> Unit,
     onSave: (DocumentEntity) -> Unit,
     ownerMemberId: Long? = null,
-    ownerOptions: List<Pair<Long?, String>> = emptyList()
+    ownerOptions: List<Pair<Long?, String>> = emptyList(),
+    existingDocument: DocumentEntity? = null
 ) {
+    val isEditing = existingDocument != null
     val sheetState = rememberModalBottomSheetState()
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
-    var title by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf(DocumentType.OTHER) }
-    var expiryDateText by remember { mutableStateOf("") }
-    var noticePeriodDays by remember { mutableFloatStateOf(30f) }
-    var monthlyCost by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
+    val initialExpiryText = existingDocument?.expiryDate?.let {
+        dateFormat.format(Date(it))
+    } ?: ""
+
+    var title by remember { mutableStateOf(existingDocument?.title ?: "") }
+    var selectedType by remember { mutableStateOf(existingDocument?.type ?: DocumentType.OTHER) }
+    var expiryDateText by remember { mutableStateOf(initialExpiryText) }
+    var noticePeriodDays by remember { mutableFloatStateOf(existingDocument?.noticePeriodDays?.toFloat() ?: 30f) }
+    var monthlyCost by remember { mutableStateOf(existingDocument?.monthlyCost?.let { "%.2f".format(it) } ?: "") }
+    var notes by remember { mutableStateOf(existingDocument?.notes ?: "") }
     var typeMenuExpanded by remember { mutableStateOf(false) }
     var ownerMenuExpanded by remember { mutableStateOf(false) }
-    var selectedOwnerId by remember(ownerMemberId) { mutableStateOf(ownerMemberId) }
+    var selectedOwnerId by remember(ownerMemberId) { mutableStateOf(existingDocument?.ownerId ?: ownerMemberId) }
     var expiryError by remember { mutableStateOf(false) }
-
-    val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = LumeCyan,
@@ -97,7 +102,7 @@ fun AddDocumentSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                "Add Document",
+                if (isEditing) "Edit Document" else "Add Document",
                 color = TextMain,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleLarge
@@ -301,6 +306,7 @@ fun AddDocumentSheet(
                     val now = System.currentTimeMillis()
                     onSave(
                         DocumentEntity(
+                            id = existingDocument?.id ?: 0,
                             ownerId = selectedOwnerId,
                             title = trimmedTitle,
                             type = selectedType,
@@ -308,7 +314,7 @@ fun AddDocumentSheet(
                             noticePeriodDays = noticePeriodDays.toInt(),
                             monthlyCost = monthlyCost.trim().toDoubleOrNull(),
                             notes = notes.trim().ifEmpty { null },
-                            createdAt = now,
+                            createdAt = existingDocument?.createdAt ?: now,
                             updatedAt = now
                         )
                     )
@@ -322,7 +328,7 @@ fun AddDocumentSheet(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Text(
-                    "Save Document",
+                    if (isEditing) "Update Document" else "Save Document",
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(vertical = 4.dp)

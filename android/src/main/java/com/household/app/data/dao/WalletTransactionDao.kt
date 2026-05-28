@@ -53,6 +53,19 @@ interface WalletTransactionDao {
     @Query("SELECT COUNT(*) FROM wallet_transactions")
     suspend fun getTransactionCount(): Int
 
+    /**
+     * Returns all income transactions whose title contains [patternFragment] (case-insensitive),
+     * sorted oldest-first. Used to derive actual salary landing dates for fiscal cycle boundaries.
+     */
+    @Query("SELECT * FROM wallet_transactions WHERE trip = :tripName AND amount < 0 ORDER BY date DESC")
+    suspend fun getTransactionsByTrip(tripName: String): List<WalletTransactionEntity>
+
+    @Query("UPDATE wallet_transactions SET trip = :tripName WHERE id = :id")
+    suspend fun updateTransactionTrip(id: Int, tripName: String?)
+
+    @Query("SELECT * FROM wallet_transactions WHERE amount > 0 AND LOWER(title) LIKE '%' || LOWER(:patternFragment) || '%' ORDER BY date ASC")
+    suspend fun getSalaryTransactionsByPattern(patternFragment: String): List<WalletTransactionEntity>
+
     @Query("UPDATE wallet_transactions SET category = :category WHERE id = :id")
     suspend fun updateCategory(id: Int, category: String)
 

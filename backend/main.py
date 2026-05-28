@@ -40,6 +40,7 @@ from ai_pipeline import (
     apply_automation_rules,
 )
 from receipt_parser.routes import register_receipt_routes
+from plaid_routes import plaid_bp
 
 # ---------------------------------------------------------------------------
 # Flask Setup
@@ -49,6 +50,9 @@ app = Flask(__name__, static_folder=None)
 
 # Register receipt parser routes
 register_receipt_routes(app)
+
+# Register Plaid Open Banking routes
+app.register_blueprint(plaid_bp, url_prefix='/plaid')
 
 # Database
 DB_PATH = BACKEND_DIR / 'household_platform.db'

@@ -9,9 +9,27 @@ class TransactionCategorizer {
     )
 
     private val incomeKeywords = listOf(
-        "gehalt", "lohn", "bezüge", "bezu ge", "rente", "arbeitsagentur",
-        "familienkasse", "lohnzahlung", "kindergeld", "elterngeld", "wohngeld",
-        "erstattung", "steuererstattung", "finanzamt"
+        // German salary / wage keywords (strong signal)
+        "gehalt", "gehaltszahlung", "gehaltsüberweisung",
+        "lohn", "lohnzahlung", "lohnauszahlung",
+        "vergütung", "arbeitsentgelt", "arbeitslohn",
+        "bezüge", "bezu ge", "dienstbezüge",
+        "entgelt", "monatsentgelt", "monatslohn", "monatsverdienst",
+        // German benefits / social
+        "rente", "rentenversicherung", "rentenanpassung",
+        "arbeitsagentur", "bundesagentur für arbeit", "arbeitslosengeld",
+        "familienkasse", "kindergeld", "elterngeld", "wohngeld",
+        "kurzarbeitergeld", "sozialhilfe", "grundsicherung", "bürgergeld",
+        "steuererstattung", "steuerrückzahlung", "finanzamt",
+        "minijob", "minij", "werkstudent", "werkstudentenlohn",
+        // English salary / payroll
+        "salary", "payroll", "wages", "wage payment",
+        "net pay", "gross pay", "payslip",
+        // Employer indicators: companies paying salary often include GMBH/AG + SEPA
+        "auszahlung",           // "Auszahlung Gehalt" is common in SEPA references
+        // Named employers (user-specific, kept for backward compat)
+        "caleda",               // Brian Benedict Caleda — mini-job at Flavor Academy
+        "elektrobit"            // Primary employer
     )
 
     private val categoryKeywords = linkedMapOf(
@@ -56,6 +74,7 @@ class TransactionCategorizer {
         ),
         "Utilities" to listOf(
             "strom", "stadtwerke", "swu", "vattenfall", "e.on", "eon", "enbw",
+            "lekker energie", "lekker energy",
             "mvv energie", "naturstrom", "badenova", "enercity",
             "wasser", "heizung", "waerme", "fernwaerme", "gasabschlag",
             "eprimo", "lichtblick", "yello strom"
@@ -92,7 +111,8 @@ class TransactionCategorizer {
         ),
         "Carsharing & Taxi" to listOf(
             "miles", "share now", "sixt share", "sixt rent", "tier ", "lime ",
-            "bolt", "uber", "taxi", "free now", "freenow", "flinkster", "cambio", "stadtmobil"
+            "bolt", "uber", "taxi", "free now", "freenow", "flinkster", "cambio", "stadtmobil",
+            "easypark", "logpay"
         ),
         "Travel" to listOf(
             "booking.com", "airbnb", "hotel", "hostel", "ryanair", "lufthansa",
@@ -157,6 +177,49 @@ class TransactionCategorizer {
     fun isIncome(description: String): Boolean {
         val lower = description.lowercase()
         return incomeKeywords.any { lower.contains(it) }
+    }
+
+    /**
+     * Returns a 0–100 salary confidence score for an incoming credit transaction.
+     * >= 70 → auto-classify as Salary without user prompt.
+     * 40–69 → show "Is this your salary?" confirmation.
+     * < 40  → treat as generic Income.
+     *
+     * @param description raw booking description / payer name
+     * @param amount      absolute (positive) credit amount
+     */
+    fun salaryConfidenceScore(description: String, amount: Double): Int {
+        val lower = description.lowercase()
+        var score = 0
+
+        // Keyword signal (up to 50 pts)
+        val strongKeywords = listOf(
+            "gehalt", "gehaltszahlung", "lohn", "lohnzahlung", "vergütung",
+            "arbeitsentgelt", "arbeitslohn", "entgelt", "salary", "payroll",
+            "wages", "monatslohn", "monatsverdienst", "auszahlung"
+        )
+        val mediumKeywords = listOf(
+            "bezüge", "dienstbezüge", "minijob", "werkstudent", "net pay", "gross pay"
+        )
+        score += when {
+            strongKeywords.any { lower.contains(it) } -> 50
+            mediumKeywords.any { lower.contains(it) }  -> 30
+            else -> 0
+        }
+
+        // Amount signal (up to 30 pts) — below 300€ unlikely to be primary salary
+        score += when {
+            amount >= 2000 -> 30
+            amount >= 800  -> 20
+            amount >= 300  -> 10
+            else           -> 0
+        }
+
+        // Corporate payer indicator (up to 20 pts)
+        val corporateSuffixes = listOf(" gmbh", " ag", " kg", " ug", " e.g.", " gbr", " ltd", " inc")
+        if (corporateSuffixes.any { lower.contains(it) }) score += 20
+
+        return score.coerceIn(0, 100)
     }
 
     fun classifyCategory(description: String, currentCategory: String): String {

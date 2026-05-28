@@ -19,6 +19,7 @@ Tables:
   - shopping_list_items      : individual grocery items
 """
 
+import json
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.ext.declarative import declarative_base
@@ -438,6 +439,37 @@ class ShoppingList(Base):
             'is_completed': self.is_completed,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class BankConnection(Base):
+    """Plaid Open Banking connection — one row per connected bank item."""
+    __tablename__ = 'bank_connections'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    household_id = Column(Integer, ForeignKey('household_profiles.id'), nullable=False)
+    item_id = Column(String(255), unique=True)       # Plaid item ID (stable per bank link)
+    access_token = Column(String(500))               # Plaid access token — NEVER expose in API responses
+    bank_name = Column(String(255))                  # e.g., 'N26', 'Commerzbank'
+    institution_id = Column(String(100))             # Plaid institution ID
+    account_ids = Column(Text)                       # JSON array of Plaid account IDs
+    cursor = Column(String(500))                     # Plaid transactions cursor for incremental sync
+    last_sync_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+
+    household = relationship('HouseholdProfile')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'household_id': self.household_id,
+            'bank_name': self.bank_name,
+            'institution_id': self.institution_id,
+            'account_ids': json.loads(self.account_ids) if self.account_ids else [],
+            'last_sync_at': self.last_sync_at.isoformat() if self.last_sync_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'is_active': self.is_active,
         }
 
 

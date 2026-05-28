@@ -1,8 +1,8 @@
 # Household Platform - Build Plan
 
 **Date:** April 27, 2026  
-**Last updated:** May 27, 2026  
-**Status:** Phase D+ complete — CSV expansion, Smart Budget feed, Receipt OCR, 7-step onboarding shipped  
+**Last updated:** May 28, 2026 (session 3)
+**Status:** Session 3 complete — Vault/Docs fixed, salary detection overhauled, JUGAAD Vault architecture designed  
 **Target:** Running MVP with Expenses + Household Core
 
 ---
@@ -18,9 +18,14 @@
 | C3 | Family module + Vault folder tree + Wallet Pulse card + budget fixes | ✅ Done |
 | D1 | Salary detection from CSV — SalarySourceEntity, migration 10→11, confirmation UI | ✅ Done |
 | D2 | Credit & transfer categorization fix — Income/Excluded logic, Revolut transfers | ✅ Done |
-| D+ | 24-category engine, PayPal SEPA extraction, ING support, FTS fix, Smart Alert Feed, Receipt OCR engine (spatial row reconstruction), 7-step onboarding, Android 13 notifications | ✅ Done |
-| **D3** | **Salary Allocation Bar in Pulse — Fixed / Discretionary / Remaining segmented bar** | 🔲 Planned |
-| **D4** | **Recurring bills detection — RecurringBillEntity, ≥2 cycles ±15% auto-detect** | 🔲 Planned |
+| D+ | 24-category engine, PayPal SEPA extraction, ING support, FTS fix, Smart Alert Feed, Receipt OCR engine, 7-step onboarding, Android 13 notifications | ✅ Done |
+| D3 | Salary Allocation Bar in Pulse — Fixed / Discretionary / Remaining segmented bar | ✅ Done |
+| D4 | Recurring bills detection + SubscriptionHubScreen — actual salary dates, dynamic cycle boundaries | ✅ Done |
+| **S3a** | **Trip Tracker — WalletTripEntity, TripTrackerScreen, trip tagging in edit sheet** | ✅ Done |
+| **S3b** | **Document vault fixes — expiry date range, MRZ extraction, alert creation, edit-on-tap, sort order, currency symbol** | ✅ Done |
+| **S3c** | **Salary detection overhaul — confidence scoring, German/English keywords, auto-confirm, Mark as Salary button** | ✅ Done |
+| **S3d** | **Document upload — original filename pre-population, PDF passport date extraction** | ✅ Done |
+| **JUGAAD** | **JUGAAD Vault — standalone document vault product; architecture blueprint complete** | 🔵 Architecture Done |
 | **D5** | **Import review screen for Uncategorized transactions** | 🔲 Planned |
 | **E** | **WorkManager pipeline architecture + SteuerKlar tax mode + Drive integration** | 🔲 Planned |
 | **F** | **Tax preparation, receipt linking, spending trends, full intelligence suite** | 🔲 Planned |
@@ -116,11 +121,80 @@ Replaced the circular gauge hero card with a smart "Household Pulse" card:
 |------|--------|-------|
 | Salary detection from CSV | ✅ Done | SalarySourceEntity, migration 10→11, SalaryConfirmation UI |
 | Credit/transfer categorization | ✅ Done | Credits → Income; N26/ING/Revolut debits → Excluded |
-| Salary allocation bar in Pulse | 🔲 Planned | Salary → Fixed → Discretionary → Remaining; segmented bar + collapsible recurring list above 4 tiles |
-| Recurring bills detection | 🔲 Planned | RecurringBillEntity, auto-detect ≥2 cycles same merchant ±15% |
+| Salary allocation bar in Pulse | ✅ Done | `SalaryAllocationCard` + `SalaryAllocationData` in `ExpensesViewModel`; segmented bar Fixed/Discretionary/Remaining; collapsible recurring bill list |
+| Recurring bills detection | ✅ Done | RecurringBillEntity, RecurringDetectionService + Worker, actual salary dates as cycle boundaries, SubscriptionHubScreen |
 | Import review for uncategorized | 🔲 Planned | Post-salary step, inline category picker + make-rule option |
 | PayPal intelligence | 🔲 Planned | Extract merchant from "PAYPAL *NETFLIX" → correct category |
 | Income summary section | 🔲 Planned | Collapsible income row above transaction list |
+
+---
+
+## Session 3 (2026-05-28) — Completed Work
+
+### S3a — Trip Tracker
+
+| Item | File(s) | Notes |
+|------|---------|-------|
+| `WalletTripEntity` + `WalletTripDao` | `data/entities/WalletTripEntity.kt`, `data/dao/WalletTripDao.kt` | Already committed; wired in AppDatabase |
+| DB migration 17→18 | `data/AppDatabase.kt` | Creates `wallet_trips` table; `ALTER TABLE wallet_transactions ADD COLUMN trip TEXT` wrapped in try/catch (column may already exist on fresh v17 installs) |
+| `TripTrackerScreen` | `ui/v2/TripTrackerScreen.kt` | Trip CRUD, per-trip budget bar, transaction list filtered by trip |
+| Navigation | `Screen.kt`, `V2AppNavHost.kt`, `V2FinanceScreen.kt` | "Trips" pill button in Wallet header → TripTrackerScreen |
+| Edit sheet trip tagging | `V2FinanceScreen.kt:TransactionEditSheet` | `LaunchedEffect` loads trips; "TAG TO TRIP" chip row; `updateTransactionTrip()` called on tap |
+| Transaction data class | `ui/viewmodels/ExpensesViewModel.kt` | Added `trip: String?` field; populated from `WalletDataLoader.WalletTransaction.trip` |
+
+### S3b — Document Vault Bug Fixes
+
+| Bug | File | Fix |
+|-----|------|-----|
+| Monthly cost shows `£` instead of `€` | `ui/v2/DocumentsScreen.kt:DocumentCard` | Changed `£` → `€` |
+| Documents with no expiry sort to top | `data/dao/FamilyMemberDao.kt:DocumentDao.getAllDocuments()` | `ORDER BY CASE WHEN expiryDate IS NULL THEN 1 ELSE 0 END, expiryDate ASC` |
+| Manual document add never creates `DocumentAlertEntity` | `data/repository/DocumentRepositoryImpl.kt` | `insertDocument()` now calls `createAlertIfExpiring()` if `expiryDate` set; `updateDocument()` deletes stale alert and recreates |
+| `DocumentsViewModel` missing `updateDocument()` | `ui/v2/DocumentsScreen.kt` | Added method; calls `repo.updateDocument()` |
+| Tapping document does nothing | `ui/v2/DocumentsScreen.kt` | `onClick = { editingDoc = doc }` → opens `AddDocumentSheet` pre-populated |
+| No edit capability | `ui/v2/components/AddDocumentSheet.kt` | Added `existingDocument: DocumentEntity?` parameter; pre-populates all fields; "Save Document" ↔ "Update Document" label |
+
+### S3c — Salary Detection Overhaul
+
+| Item | File | Notes |
+|------|------|-------|
+| Expanded income keywords | `data/TransactionCategorizer.kt` | Added: GEHALTSZAHLUNG, GEHALTSÜBERWEISUNG, VERGÜTUNG, ARBEITSENTGELT, MONATSLOHN, WERKSTUDENT, KURZARBEITERGELD, BÜRGERGELD, SALARY, PAYROLL, WAGES, NET PAY, GROSS PAY, AUSZAHLUNG, ELEKTROBIT |
+| `salaryConfidenceScore()` | `data/TransactionCategorizer.kt` | 0–100 score: keyword hit (50pts) + amount tier (30pts) + corporate payer GmbH/AG (20pts) |
+| Auto-confirm high-confidence salary | `ui/viewmodels/ConfigViewModel.kt:resolveSalaryWorkflow()` | Score ≥ 70 → auto-saves to `SalarySourceEntity`, skips confirmation UI |
+| Wider candidate pool | `ui/viewmodels/ConfigViewModel.kt:resolveSalaryWorkflow()` | All credits (not anchor-day only); anchor ±10 days + score ≥ 20 merged |
+| "Mark as Salary" button | `ui/v2/V2FinanceScreen.kt:TransactionEditSheet` | Shown for positive-amount transactions; calls `reclassifyTransaction("Salary", applyToHistory)` |
+
+### S3d — Document Upload Pipeline Fixes
+
+| Bug | File | Fix |
+|-----|------|-----|
+| Passport expiry date silently dropped (date > 2 years in future) | `data/service/VaultDocumentParser.kt` | IDENTITY docs: `plusYears(15)`; all others: `plusYears(5)` |
+| MRZ dates not parsed | `data/service/VaultDocumentParser.kt` | Added `DATE_MRZ` regex (6-digit YYMMDD in `<<<` context) + `DATE_YYMMDD` fallback + `parseMrzDate()` |
+| More expiry keywords | `data/service/VaultDocumentParser.kt` | Added: gültigkeitsdatum, date of expiry, gültig (broad) |
+| Upload title field empty | `ui/v2/V2DocumentVaultScreen.kt` | Extracts `DISPLAY_NAME` from URI via `ContentResolver`; strips extension + underscores; passes as `initialDocumentTitle` to `VaultFolderPickerSheet` |
+
+---
+
+## JUGAAD Vault — Architecture Blueprint (2026-05-28)
+
+Standalone product designed as a privacy-first, offline-first intelligent document vault.
+
+**Stack:** Kotlin · CameraX · PaddleOCR (ONNX) · ML Kit fallback · PdfBox · OpenCV · Room FTS · WorkManager
+
+**Key architectural decisions:**
+- OCR abstraction layer (`OcrEngine` interface) — PaddleOCR / ML Kit / Tesseract are swappable
+- Two-level dedup: SHA-256 file hash + perceptual page hash — OCR never reruns for identical content
+- Text-based PDF fast path (PdfBox) — no OCR cost for digital PDFs
+- Atomic processing state machine persisted in DB — crash-safe restart at last known state
+- Engine version tracking — model upgrade triggers incremental rescan of affected pages only
+- Page-level granularity — pages in a multi-page PDF process independently
+
+**Module structure:** `app` · `feature:{vault,scanner,search,family,settings}` · `core:{common,database,storage,ocr,pdf,preprocessing,classification,extraction,pipeline}`
+
+**Implementation phases:** Phase 0 (Foundation) → Phase 1 (Text extraction) → Phase 2 (Classification + entity extraction) → Phase 3 (PaddleOCR + OpenCV) → Phase 4 (Search) → Phase 5 (Encryption + Camera)
+
+**Status:** Architecture approved. Phase 0 execution pending.
+
+See session log for full blueprint including DB schema, OCR decision tree, worker chains, agent assignments, and risk analysis.
 
 ---
 
@@ -199,7 +273,7 @@ Native Kotlin port of `tax_api.py` CHECKS logic, reading from the linked Drive f
 
 | Feature | Description |
 |---------|-------------|
-| Tax tagging layer | Long-press transaction or doc → tag with German tax category (Arbeitsmittel, Homeoffice, Krankenkosten, Spendenquittung) |
+| Tax tagging layer | Long-press transaction or doc → tag with tax category (Work Equipment, Home Office, Medical Expenses, Donations, Work Commute, Other) — English labels as of S3 |
 | Annual tax summary export | Group tagged items → PDF/CSV by German tax category |
 | Receipt ↔ wallet linking | `ReceiptMatchingWorker` populates existing `linkedVaultEntryId` column; transaction list shows 📄 receipt icon |
 | Spending trend mini-charts | 3-cycle sparkline per category tile; "↑ +€42 vs last cycle" label |

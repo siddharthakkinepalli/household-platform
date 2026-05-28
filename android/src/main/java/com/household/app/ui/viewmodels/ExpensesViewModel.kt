@@ -53,7 +53,8 @@ data class Transaction(
     val amount: Double,
     val category: String,
     val date: String,
-    val bookedOn: LocalDate
+    val bookedOn: LocalDate,
+    val trip: String? = null
 )
 
 data class CategorySummary(
@@ -254,7 +255,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                             amount = transaction.amount,
                             category = resolvedCategory,
                             date = transaction.date.toString(),
-                            bookedOn = transaction.date
+                            bookedOn = transaction.date,
+                            trip = transaction.trip
                         )
                     }
                     .sortedByDescending { it.bookedOn }
