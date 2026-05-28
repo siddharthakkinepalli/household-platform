@@ -20,11 +20,12 @@ import java.nio.FloatBuffer
  * Model file: `assets/paddle_ocr_v4_rec.onnx` — loaded lazily on first use.
  * If the file is absent, [recognizeText] returns null and [OcrRouter] falls through to ML Kit.
  *
- * Model: en_PP-OCRv3_rec_infer (Latin+German, 96-char dict, H=32 input)
+ * Model: en_PP-OCRv4_rec_mobile (94-char ASCII dict, H=48 input, blank at last index)
+ * Download: en_PP-OCRv4_rec_mobile.onnx from RapidAI/RapidOCR → rename to paddle_ocr_v4_rec.onnx
  * Pipeline:
- *   bitmap → resize to H=32, align W to multiple of 8
- *          → float CHW tensor [1,3,32,W], normalized to [-1,1]
- *          → ONNX session → logits [1, T, charset_size]
+ *   bitmap → resize to H=48, align W to multiple of 8
+ *          → float CHW tensor [1,3,48,W], normalized to [-1,1]
+ *          → ONNX session → logits [1, T, 95]  (94 chars + CTC blank at index 94)
  *          → greedy CTC decode → plain text
  */
 class PaddleOcrEngine(private val context: Context) : OcrEngine {
@@ -36,17 +37,14 @@ class PaddleOcrEngine(private val context: Context) : OcrEngine {
     private var session: OrtSession? = null
     private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
 
-    // Latin + German + digits character set for CTC decoding.
-    // Index 0 is the CTC blank token; all other indices map to printable characters.
+    // 94-char ASCII dict matching en_PP-OCRv4_rec_mobile/en_dict.txt (printable ASCII 33–126).
+    // CTC blank is at index 94 (= charset.size), NOT at index 0 — PaddleOCR places blank last.
     private val charset: List<String> = buildCharset()
 
     private fun buildCharset(): List<String> {
-        val chars = mutableListOf(" ")   // index 0 = CTC blank
-        ('0'..'9').forEach { chars.add(it.toString()) }
-        ('a'..'z').forEach { chars.add(it.toString()) }
-        ('A'..'Z').forEach { chars.add(it.toString()) }
-        "!\"#\$%&'()*+,-./:;<=>?@[\\]^_{|}~äöüÄÖÜß€@".forEach { chars.add(it.toString()) }
-        return chars
+        // Printable ASCII chars 33–126: !"#$%&'()*+,-./0-9:;<=>?@A-Z[\]^_`a-z{|}~
+        // Matches en_PP-OCRv4_rec_mobile en_dict.txt exactly (94 entries).
+        return (33..126).map { it.toChar().toString() }
     }
 
     /**
@@ -82,9 +80,8 @@ class PaddleOcrEngine(private val context: Context) : OcrEngine {
         runCatching {
             val sess = loadSession() ?: return@withContext null
 
-            // --- 1. Preprocess: resize to H=32, align W to nearest multiple of 8 ---
-            // en_PP-OCRv3_rec_infer expects H=32 (PP-OCRv4 uses 48 but has no standalone English model)
-            val targetH = 32
+            // --- 1. Preprocess: resize to H=48, align W to nearest multiple of 8 ---
+            val targetH = 48
             val scale = targetH.toFloat() / bitmap.height
             val scaledW = (bitmap.width * scale).toInt().coerceAtLeast(8)
             val alignedW = (scaledW + 7) / 8 * 8   // round up to multiple of 8
@@ -131,9 +128,10 @@ class PaddleOcrEngine(private val context: Context) : OcrEngine {
 
     /**
      * Greedy CTC decode: argmax at each time-step, collapse consecutive duplicates, remove blanks.
-     * Blank token is index 0 (matches the charset definition above).
+     * PaddleOCR places the CTC blank at the LAST index (= charset.size = 94), not at 0.
      */
     private fun ctcDecode(output: Array<FloatArray>): String {
+        val blankIdx = charset.size   // 94 — last output node
         var prevIdx = -1
         val sb = StringBuilder()
         for (timestep in output) {
@@ -146,7 +144,7 @@ class PaddleOcrEngine(private val context: Context) : OcrEngine {
                 }
             }
             if (maxIdx != prevIdx) {
-                if (maxIdx != 0 && maxIdx < charset.size) sb.append(charset[maxIdx])
+                if (maxIdx != blankIdx && maxIdx < charset.size) sb.append(charset[maxIdx])
                 prevIdx = maxIdx
             }
         }
