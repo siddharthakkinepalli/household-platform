@@ -844,7 +844,7 @@ See PLATFORM.md for full updated blueprint.
 - [x] JUGAAD Wave 2 — vault_entities_fts FTS4, searchFts/rebuildFts DAO, migration 20→21, worker FTS refresh (uncommitted)
 - [x] D5 — Import review screen: ReviewUncategorized state, handleAssignCategory/handleConfirmReview, ReviewUncategorizedCard composable (uncommitted)
 - [x] D5 fix — advanceFromSalary filter broadened to catch "Uncategorized" + "Other" (uncommitted)
-- [ ] TASK-001: Indian passport date extraction (DD MMM YYYY + MRZ TD3) — partial fix merged; full fix in JUGAAD P2 IndianPassportParser
+- [x] TASK-001: Indian passport date extraction — DONE. IndianPassportParser fully implements MRZ TD3 line1+2 (DOB, expiry, name), DD MMM YYYY visual zone fallback, keyword-anchored fallbacks. OcrSpace fix: mrzCandidates strips intra-line spaces before MRZ regex so OCR-inserted spaces don't break matching.
 - [x] D6: PayPal Transaction Intelligence — already done via MerchantNameCleaner Pattern 3 + CsvParserService categorizer pipeline
 - [x] D7: Income Summary Section — collapsible IncomeSection card in V2FinanceScreen between CategoryGrid and filter pill
 - [x] F4: Spending trend sparklines — already done (c612842); `CategorySparkline` data class, 3-cycle boundaries in `publishVisibleState()`, 3-bar `CategoryGridItem` chart + delta label

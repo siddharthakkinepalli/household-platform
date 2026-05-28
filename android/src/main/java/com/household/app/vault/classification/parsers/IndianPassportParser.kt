@@ -59,8 +59,12 @@ object IndianPassportParser : DocumentParser {
         val entities = mutableListOf<ExtractedEntity>()
         var partial = false
 
+        // OCR sometimes inserts spaces mid-word in MRZ zones (e.g. "A K K I N E P A L L I").
+        // Strip intra-line spaces before MRZ matching so the fixed-position regexes don't miss.
+        val mrzCandidates = signals.upperLines.map { it.replace(" ", "") }
+
         // ── 1. MRZ line 2 → DOB + Expiry ─────────────────────────────────────
-        val mrzL2Match = signals.upperLines
+        val mrzL2Match = mrzCandidates
             .mapNotNull { RE_MRZ_L2.find(it) }
             .firstOrNull()
 
@@ -97,7 +101,7 @@ object IndianPassportParser : DocumentParser {
         }
 
         // ── 2. MRZ line 1 → Name (SURNAME << GIVEN NAMES) ───────────────────
-        val mrzL1Match = signals.upperLines
+        val mrzL1Match = mrzCandidates
             .mapNotNull { RE_MRZ_L1.find(it) }
             .firstOrNull()
 
