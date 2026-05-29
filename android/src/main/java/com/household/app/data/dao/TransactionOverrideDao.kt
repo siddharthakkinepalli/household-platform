@@ -15,19 +15,19 @@ import com.household.app.data.entities.MerchantRuleEntity
 @Dao
 interface TransactionOverrideDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOverride(override: TransactionOverrideEntity)
+    suspend fun insertOverride(override: TransactionOverrideEntity): Long
 
     @Query("SELECT * FROM transaction_overrides WHERE transactionId = :transactionId")
     suspend fun getOverride(transactionId: Int): TransactionOverrideEntity?
 
     @Update
-    suspend fun updateOverride(override: TransactionOverrideEntity)
+    suspend fun updateOverride(override: TransactionOverrideEntity): Int
 
     @Delete
-    suspend fun deleteOverride(override: TransactionOverrideEntity)
+    suspend fun deleteOverride(override: TransactionOverrideEntity): Int
 
     @Query("DELETE FROM transaction_overrides")
-    suspend fun deleteAllOverrides()
+    suspend fun deleteAllOverrides(): Int
 
     @Query("SELECT * FROM transaction_overrides")
     suspend fun getAllOverrides(): List<TransactionOverrideEntity>
@@ -36,10 +36,10 @@ interface TransactionOverrideDao {
 @Dao
 interface ExcludedTransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertExcluded(excluded: ExcludedTransactionEntity)
+    suspend fun insertExcluded(excluded: ExcludedTransactionEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertExcludedBatch(excluded: List<ExcludedTransactionEntity>)
+    suspend fun insertExcludedBatch(excluded: List<ExcludedTransactionEntity>): List<Long>
 
     @Query("SELECT transactionId FROM excluded_transactions")
     suspend fun getExcludedIds(): List<Int>
@@ -48,10 +48,10 @@ interface ExcludedTransactionDao {
     suspend fun getExcludedTransaction(transactionId: Int): ExcludedTransactionEntity?
 
     @Delete
-    suspend fun deleteExcluded(excluded: ExcludedTransactionEntity)
+    suspend fun deleteExcluded(excluded: ExcludedTransactionEntity): Int
 
     @Query("DELETE FROM excluded_transactions")
-    suspend fun deleteAllExcluded()
+    suspend fun deleteAllExcluded(): Int
 
     @Query("SELECT COUNT(*) FROM excluded_transactions")
     suspend fun getExcludedCount(): Int
@@ -60,7 +60,7 @@ interface ExcludedTransactionDao {
 @Dao
 interface MerchantRuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertRule(rule: MerchantRuleEntity)
+    suspend fun upsertRule(rule: MerchantRuleEntity): Long
 
     @Query("SELECT * FROM merchant_rules ORDER BY priority DESC, updatedAt DESC")
     suspend fun getAllRules(): List<MerchantRuleEntity>
@@ -75,16 +75,16 @@ interface MerchantRuleDao {
     suspend fun getRule(merchantPattern: String): MerchantRuleEntity?
 
     @Query("DELETE FROM merchant_rules WHERE merchantPattern = :merchantPattern")
-    suspend fun deleteRule(merchantPattern: String)
+    suspend fun deleteRule(merchantPattern: String): Int
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertRulesIgnore(rules: List<MerchantRuleEntity>)
+    suspend fun insertRulesIgnore(rules: List<MerchantRuleEntity>): List<Long>
 }
 
 @Dao
 interface CategoryThresholdDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertThreshold(threshold: CategoryThresholdEntity)
+    suspend fun upsertThreshold(threshold: CategoryThresholdEntity): Long
 
     @Query("SELECT * FROM category_thresholds ORDER BY categoryId")
     suspend fun getAllThresholds(): List<CategoryThresholdEntity>
@@ -93,13 +93,13 @@ interface CategoryThresholdDao {
     suspend fun getThreshold(categoryId: String): CategoryThresholdEntity?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertThresholdsIgnore(thresholds: List<CategoryThresholdEntity>)
+    suspend fun insertThresholdsIgnore(thresholds: List<CategoryThresholdEntity>): List<Long>
 }
 
 @Dao
 interface ImportAuditDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAudit(audit: ImportAuditEntity)
+    suspend fun insertAudit(audit: ImportAuditEntity): Long
 
     @Query("SELECT * FROM import_audits WHERE fileHash = :fileHash ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLatestByHash(fileHash: String): ImportAuditEntity?
@@ -108,5 +108,5 @@ interface ImportAuditDao {
     suspend fun getRecentAudits(limit: Int = 10): List<ImportAuditEntity>
 
     @Query("DELETE FROM import_audits")
-    suspend fun clearAll()
+    suspend fun clearAll(): Int
 }

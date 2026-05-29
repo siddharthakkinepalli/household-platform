@@ -16,11 +16,11 @@ interface TaxCheckDao {
     suspend fun getAvailableYears(): List<Int>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(entity: TaxCheckEntity)
+    suspend fun upsert(entity: TaxCheckEntity): Long
 
     @Query("UPDATE tax_checks SET driveIncomeTaxFolderId = :folderId WHERE year = :year")
-    suspend fun setDriveFolderId(year: Int, folderId: String)
+    suspend fun setDriveFolderId(year: Int, folderId: String): Int
 
     @Query("UPDATE tax_checks SET isComplete = :complete WHERE year = :year")
-    suspend fun setComplete(year: Int, complete: Boolean)
+    suspend fun setComplete(year: Int, complete: Boolean): Int
 }

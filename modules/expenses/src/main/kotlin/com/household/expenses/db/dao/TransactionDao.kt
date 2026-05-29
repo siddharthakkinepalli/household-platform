@@ -26,10 +26,10 @@ interface TransactionDao {
     suspend fun insertAll(transactions: List<Transaction>): List<Long>
 
     @Update
-    suspend fun update(transaction: Transaction)
+    suspend fun update(transaction: Transaction): Int
 
     @Delete
-    suspend fun delete(transaction: Transaction)
+    suspend fun delete(transaction: Transaction): Int
 
     @Query("SELECT * FROM transactions WHERE household_id = :householdId ORDER BY date DESC")
     fun getAllLive(householdId: String): LiveData<List<Transaction>>
@@ -84,7 +84,7 @@ interface TransactionDao {
         UPDATE transactions SET trip_id = :tripId
         WHERE household_id = :householdId AND date BETWEEN :startDate AND :endDate
     """)
-    suspend fun assignTripToRange(householdId: String, tripId: Long, startDate: String, endDate: String)
+    suspend fun assignTripToRange(householdId: String, tripId: Long, startDate: String, endDate: String): Int
 
     @Query("SELECT * FROM transactions WHERE household_id = :householdId AND trip_id = :tripId AND amount < 0")
     suspend fun getByTrip(householdId: String, tripId: Long): List<Transaction>

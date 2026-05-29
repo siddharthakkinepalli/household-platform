@@ -15,14 +15,37 @@ if not exist "%APK%" (
 echo [OK] Build done.
 
 set ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe
+
+echo === Checking for connected emulator ===
+set TARGET_EMULATOR=
 for /f "skip=1 tokens=1,2" %%A in ('"%ADB%" devices') do (
-    if "%%B"=="device" (
-        echo [INFO] Installing on %%A...
-        "%ADB%" install -r "%APK%"
-        echo [OK] Done.
-        goto done
+    echo %%A | findstr /i "emulator" >nul
+    if not errorlevel 1 (
+        if "%%B"=="device" (
+            set TARGET_EMULATOR=%%A
+            goto install
+        )
     )
 )
-echo [INFO] No device connected.
+
+echo [WARN] No emulator found. Looking for any connected device...
+for /f "skip=1 tokens=1,2" %%A in ('"%ADB%" devices') do (
+    if "%%B"=="device" (
+        set TARGET_EMULATOR=%%A
+        goto install
+    )
+)
+
+echo [FAIL] No device or emulator connected.
+goto done
+
+:install
+echo [INFO] Deploying to %TARGET_EMULATOR%...
+"%ADB%" -s %TARGET_EMULATOR% install -r "%APK%"
+if %errorlevel% equ 0 (
+    echo [OK] Deployment successful.
+) else (
+    echo [FAIL] Deployment failed.
+)
 
 :done

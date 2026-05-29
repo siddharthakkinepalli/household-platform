@@ -12,13 +12,13 @@ import kotlinx.coroutines.flow.Flow
 interface PantryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertItems(items: List<PantryEntity>)
+    suspend fun insertItems(items: List<PantryEntity>): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: PantryEntity): Long
 
     @Delete
-    suspend fun deleteItem(item: PantryEntity)
+    suspend fun deleteItem(item: PantryEntity): Int
 
     @Query("SELECT * FROM pantry_items WHERE vaultId = :vaultId AND isConfirmed = 0 ORDER BY addedAt ASC")
     fun getStagedItemsByVault(vaultId: Long): Flow<List<PantryEntity>>
@@ -27,7 +27,7 @@ interface PantryDao {
     fun getConfirmedItems(): Flow<List<PantryEntity>>
 
     @Query("DELETE FROM pantry_items WHERE vaultId = :vaultId AND isConfirmed = 0")
-    suspend fun deleteStagedForVault(vaultId: Long)
+    suspend fun deleteStagedForVault(vaultId: Long): Int
 
     @Query("SELECT * FROM pantry_items WHERE id = :id LIMIT 1")
     suspend fun getItemById(id: Long): PantryEntity?
@@ -36,5 +36,5 @@ interface PantryDao {
     suspend fun getAllPantry(): List<PantryEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertItemsIgnore(items: List<PantryEntity>)
+    suspend fun insertItemsIgnore(items: List<PantryEntity>): List<Long>
 }

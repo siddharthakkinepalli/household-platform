@@ -12,10 +12,10 @@ import java.time.LocalDate
 @Dao
 interface WalletTransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTransaction(transaction: WalletTransactionEntity)
+    suspend fun insertTransaction(transaction: WalletTransactionEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTransactions(transactions: List<WalletTransactionEntity>)
+    suspend fun insertTransactions(transactions: List<WalletTransactionEntity>): List<Long>
 
     @Query("SELECT * FROM wallet_transactions ORDER BY date DESC")
     suspend fun getAllTransactions(): List<WalletTransactionEntity>
@@ -24,7 +24,7 @@ interface WalletTransactionDao {
     suspend fun getTransactionById(id: Int): WalletTransactionEntity?
 
     @Query("UPDATE wallet_transactions SET linkedVaultEntryId = :vaultId WHERE id = :expenseId")
-    suspend fun attachVaultEntry(expenseId: Int, vaultId: Long)
+    suspend fun attachVaultEntry(expenseId: Int, vaultId: Long): Int
 
     @Query(
         """
@@ -42,13 +42,13 @@ interface WalletTransactionDao {
     ): List<WalletTransactionEntity>
 
     @Update
-    suspend fun updateTransaction(transaction: WalletTransactionEntity)
+    suspend fun updateTransaction(transaction: WalletTransactionEntity): Int
 
     @Delete
-    suspend fun deleteTransaction(transaction: WalletTransactionEntity)
+    suspend fun deleteTransaction(transaction: WalletTransactionEntity): Int
 
     @Query("DELETE FROM wallet_transactions")
-    suspend fun deleteAllTransactions()
+    suspend fun deleteAllTransactions(): Int
 
     @Query("SELECT COUNT(*) FROM wallet_transactions")
     suspend fun getTransactionCount(): Int
@@ -61,16 +61,16 @@ interface WalletTransactionDao {
     suspend fun getTransactionsByTrip(tripName: String): List<WalletTransactionEntity>
 
     @Query("UPDATE wallet_transactions SET trip = :tripName WHERE id = :id")
-    suspend fun updateTransactionTrip(id: Int, tripName: String?)
+    suspend fun updateTransactionTrip(id: Int, tripName: String?): Int
 
     @Query("SELECT * FROM wallet_transactions WHERE amount > 0 AND LOWER(title) LIKE '%' || LOWER(:patternFragment) || '%' ORDER BY date ASC")
     suspend fun getSalaryTransactionsByPattern(patternFragment: String): List<WalletTransactionEntity>
 
     @Query("UPDATE wallet_transactions SET category = :category WHERE id = :id")
-    suspend fun updateCategory(id: Int, category: String)
+    suspend fun updateCategory(id: Int, category: String): Int
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertTransactionsIgnore(transactions: List<WalletTransactionEntity>)
+    suspend fun insertTransactionsIgnore(transactions: List<WalletTransactionEntity>): List<Long>
 
     @Query("""
         SELECT wallet_transactions.* FROM wallet_transactions_fts

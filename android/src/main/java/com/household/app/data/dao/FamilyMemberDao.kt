@@ -26,13 +26,13 @@ interface FamilyMemberDao {
     suspend fun insertMember(member: FamilyMemberEntity): Long
 
     @Update
-    suspend fun updateMember(member: FamilyMemberEntity)
+    suspend fun updateMember(member: FamilyMemberEntity): Int
 
     @Delete
-    suspend fun deleteMember(member: FamilyMemberEntity)
+    suspend fun deleteMember(member: FamilyMemberEntity): Int
 
     @Query("DELETE FROM family_members WHERE id = :id")
-    suspend fun deleteMemberById(id: Long)
+    suspend fun deleteMemberById(id: Long): Int
 
     @Query("SELECT COUNT(*) FROM family_members")
     fun getMembersCount(): Flow<Int>
@@ -41,7 +41,7 @@ interface FamilyMemberDao {
     suspend fun getAllMembersList(): List<FamilyMemberEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertMembers(members: List<FamilyMemberEntity>)
+    suspend fun insertMembers(members: List<FamilyMemberEntity>): List<Long>
 }
 
 @Dao
@@ -69,13 +69,13 @@ interface DocumentDao {
     suspend fun insertDocument(document: DocumentEntity): Long
 
     @Update
-    suspend fun updateDocument(document: DocumentEntity)
+    suspend fun updateDocument(document: DocumentEntity): Int
 
     @Delete
-    suspend fun deleteDocument(document: DocumentEntity)
+    suspend fun deleteDocument(document: DocumentEntity): Int
 
     @Query("DELETE FROM documents WHERE id = :id")
-    suspend fun deleteDocumentById(id: Long)
+    suspend fun deleteDocumentById(id: Long): Int
 
     @Query("SELECT COUNT(*) FROM documents")
     fun getDocumentsCount(): Flow<Int>
@@ -87,7 +87,7 @@ interface DocumentDao {
     suspend fun getAllDocumentsList(): List<DocumentEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertDocuments(documents: List<DocumentEntity>)
+    suspend fun insertDocuments(documents: List<DocumentEntity>): List<Long>
 
     @Query("SELECT * FROM documents WHERE expiryDate IS NOT NULL AND expiryDate BETWEEN :now AND :future ORDER BY expiryDate ASC")
     fun getDocumentsExpiringSoon(now: Long, future: Long): Flow<List<DocumentEntity>>

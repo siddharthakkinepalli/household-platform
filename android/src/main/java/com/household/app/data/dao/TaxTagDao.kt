@@ -15,11 +15,11 @@ interface TaxTagDao {
     suspend fun getAvailableYears(): List<Int>
 
     @Upsert
-    suspend fun upsert(tag: TaxTagEntity)
+    suspend fun upsert(tag: TaxTagEntity): Long
 
     @Query("DELETE FROM tax_tags WHERE entityType = :entityType AND entityId = :entityId")
-    suspend fun removeTagFor(entityType: String, entityId: Long)
+    suspend fun removeTagFor(entityType: String, entityId: Long): Int
 
     @Query("DELETE FROM tax_tags WHERE id = :id")
-    suspend fun delete(id: Long)
+    suspend fun delete(id: Long): Int
 }

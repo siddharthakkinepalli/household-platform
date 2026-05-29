@@ -12,8 +12,8 @@ interface SalarySourceDao {
     suspend fun getSalarySource(): SalarySourceEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(entity: SalarySourceEntity)
+    suspend fun upsert(entity: SalarySourceEntity): Long
 
     @Query("DELETE FROM salary_sources")
-    suspend fun clear()
+    suspend fun clear(): Int
 }

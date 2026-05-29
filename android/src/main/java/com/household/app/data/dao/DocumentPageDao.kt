@@ -10,7 +10,7 @@ interface DocumentPageDao {
     suspend fun insert(page: DocumentPageEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(pages: List<DocumentPageEntity>)
+    suspend fun insertAll(pages: List<DocumentPageEntity>): List<Long>
 
     @Query("SELECT * FROM vault_document_pages WHERE vaultEntryId = :vaultId ORDER BY pageIndex ASC")
     suspend fun getPagesForDocument(vaultId: Long): List<DocumentPageEntity>
@@ -19,8 +19,8 @@ interface DocumentPageDao {
     suspend fun getByHash(hash: String): DocumentPageEntity?
 
     @Query("UPDATE vault_document_pages SET processingState = :state WHERE id = :id")
-    suspend fun updateState(id: Long, state: String)
+    suspend fun updateState(id: Long, state: String): Int
 
     @Query("DELETE FROM vault_document_pages WHERE vaultEntryId = :vaultId")
-    suspend fun deleteForDocument(vaultId: Long)
+    suspend fun deleteForDocument(vaultId: Long): Int
 }

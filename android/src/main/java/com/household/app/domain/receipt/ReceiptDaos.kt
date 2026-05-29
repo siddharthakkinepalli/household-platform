@@ -30,7 +30,7 @@ interface ProductDao {
 interface ProductAliasDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(alias: ProductAlias)
+    suspend fun insert(alias: ProductAlias): Long
 
     /**
      * Step 1: Exact Alias Match
@@ -57,7 +57,7 @@ interface ProductAliasDao {
         SET frequency = frequency + 1, lastSeenAt = :timestamp
         WHERE rawOcrString = :rawOcrString AND storeName = :storeName
     """)
-    suspend fun incrementFrequency(rawOcrString: String, storeName: String, timestamp: Long)
+    suspend fun incrementFrequency(rawOcrString: String, storeName: String, timestamp: Long): Int
 
     /**
      * Get high-frequency aliases (learned patterns)

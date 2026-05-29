@@ -20,10 +20,10 @@ interface VaultDao {
     fun getUnlinkedEntries(): Flow<List<VaultEntity>>
 
     @Query("UPDATE vault_entries SET isLinkedToExpense = 1, linkedExpenseId = :expenseId WHERE id = :vaultId")
-    suspend fun linkToExpense(vaultId: Long, expenseId: Long)
+    suspend fun linkToExpense(vaultId: Long, expenseId: Long): Int
 
     @Delete
-    suspend fun deleteEntry(entry: VaultEntity)
+    suspend fun deleteEntry(entry: VaultEntity): Int
 
     @Query("SELECT * FROM vault_entries WHERE id = :id")
     suspend fun getEntryById(id: Long): VaultEntity?
@@ -38,13 +38,13 @@ interface VaultDao {
     fun getEntriesByCategory(category: String): Flow<List<VaultEntity>>
 
     @Query("UPDATE vault_entries SET category = :category, documentTitle = :title WHERE id = :id")
-    suspend fun updateDocumentMeta(id: Long, category: String, title: String?)
+    suspend fun updateDocumentMeta(id: Long, category: String, title: String?): Int
 
     @Query("DELETE FROM vault_entries WHERE id IN (:ids)")
-    suspend fun deleteEntries(ids: List<Long>)
+    suspend fun deleteEntries(ids: List<Long>): Int
 
     @Query("UPDATE vault_entries SET category = :category WHERE id IN (:ids)")
-    suspend fun moveEntries(ids: List<Long>, category: String)
+    suspend fun moveEntries(ids: List<Long>, category: String): Int
 
     @Query(
         """
@@ -58,25 +58,25 @@ interface VaultDao {
         category: String,
         ownerMemberId: Long?,
         subFolder: String
-    )
+    ): Int
 
     @Query("SELECT * FROM vault_entries ORDER BY dateEpoch DESC")
     suspend fun getAllEntriesList(): List<VaultEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertEntries(entries: List<VaultEntity>)
+    suspend fun insertEntries(entries: List<VaultEntity>): List<Long>
 
     @Query("UPDATE vault_entries SET ownerMemberId = NULL WHERE ownerMemberId = :memberId")
-    suspend fun clearOwnerFromEntries(memberId: Long)
+    suspend fun clearOwnerFromEntries(memberId: Long): Int
 
     @Query("UPDATE vault_entries SET category = :category, subFolder = :subFolder, documentTitle = :title WHERE id = :id")
-    suspend fun updateParsedMeta(id: Long, category: String, subFolder: String, title: String?)
+    suspend fun updateParsedMeta(id: Long, category: String, subFolder: String, title: String?): Int
 
     @Query("UPDATE vault_entries SET rawOcrContent = :content WHERE id = :id")
-    suspend fun updateRawOcr(id: Long, content: String)
+    suspend fun updateRawOcr(id: Long, content: String): Int
 
     @Query("UPDATE vault_entries SET merchantName = :merchant, totalAmount = :amount, dateEpoch = :dateEpoch WHERE id = :id")
-    suspend fun updateReceiptMeta(id: Long, merchant: String, amount: Double, dateEpoch: Long)
+    suspend fun updateReceiptMeta(id: Long, merchant: String, amount: Double, dateEpoch: Long): Int
 
     @Query("SELECT * FROM vault_entries WHERE fileHash = :hash LIMIT 1")
     suspend fun getByFileHash(hash: String): VaultEntity?

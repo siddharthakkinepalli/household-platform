@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 ksp {
@@ -82,11 +83,6 @@ android {
         viewBinding = true
         buildConfig = true
         compose = true
-    }
-
-    composeOptions {
-        // Keep compiler extension aligned with project Kotlin (1.9.21).
-        kotlinCompilerExtensionVersion = "1.5.7"
     }
 
     packaging {

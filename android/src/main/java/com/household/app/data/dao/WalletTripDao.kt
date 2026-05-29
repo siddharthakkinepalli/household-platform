@@ -11,10 +11,10 @@ import com.household.app.data.entities.WalletTripEntity
 @Dao
 interface WalletTripDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTrip(trip: WalletTripEntity)
+    suspend fun insertTrip(trip: WalletTripEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTrips(trips: List<WalletTripEntity>)
+    suspend fun insertTrips(trips: List<WalletTripEntity>): List<Long>
 
     @Query("SELECT * FROM wallet_trips ORDER BY name ASC")
     suspend fun getAllTrips(): List<WalletTripEntity>
@@ -23,13 +23,13 @@ interface WalletTripDao {
     suspend fun getTripByName(name: String): WalletTripEntity?
 
     @Update
-    suspend fun updateTrip(trip: WalletTripEntity)
+    suspend fun updateTrip(trip: WalletTripEntity): Int
 
     @Delete
-    suspend fun deleteTrip(trip: WalletTripEntity)
+    suspend fun deleteTrip(trip: WalletTripEntity): Int
 
     @Query("DELETE FROM wallet_trips")
-    suspend fun deleteAllTrips()
+    suspend fun deleteAllTrips(): Int
 
     @Query("SELECT COUNT(*) FROM wallet_trips")
     suspend fun getTripCount(): Int

@@ -13,13 +13,13 @@ import com.household.expenses.db.entity.BudgetCategory
 interface BudgetCategoryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(category: BudgetCategory)
+    suspend fun upsert(category: BudgetCategory): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(categories: List<BudgetCategory>)
+    suspend fun upsertAll(categories: List<BudgetCategory>): List<Long>
 
     @Delete
-    suspend fun delete(category: BudgetCategory)
+    suspend fun delete(category: BudgetCategory): Int
 
     @Query("SELECT * FROM budget_categories WHERE household_id = :householdId ORDER BY name")
     fun getAllLive(householdId: String): LiveData<List<BudgetCategory>>

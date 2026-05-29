@@ -20,9 +20,13 @@ class MerchantRuleRepositoryImpl(
 
     override suspend fun getEnabledRules(): List<MerchantRuleEntity> = dao.getEnabledRules()
 
-    override suspend fun upsertRule(rule: MerchantRuleEntity) = dao.upsertRule(rule)
+    override suspend fun upsertRule(rule: MerchantRuleEntity) {
+        dao.upsertRule(rule)
+    }
 
-    override suspend fun deleteRule(pattern: String) = dao.deleteRule(pattern)
+    override suspend fun deleteRule(pattern: String) {
+        dao.deleteRule(pattern)
+    }
 
     override suspend fun seedDefaultRules() {
         val defaults = listOf(

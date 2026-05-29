@@ -9,10 +9,10 @@ interface OcrCacheDao {
     suspend fun get(hash: String, version: Int): OcrCacheEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun put(entry: OcrCacheEntity)
+    suspend fun put(entry: OcrCacheEntity): Long
 
     @Query("DELETE FROM ocr_cache WHERE processedAt < :olderThanMs")
-    suspend fun evictOlderThan(olderThanMs: Long)
+    suspend fun evictOlderThan(olderThanMs: Long): Int
 
     @Query("SELECT COUNT(*) FROM ocr_cache")
     suspend fun size(): Int

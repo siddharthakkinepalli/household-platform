@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface WeightSnapshotDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSnapshot(snapshot: WeightSnapshotEntity)
+    suspend fun insertSnapshot(snapshot: WeightSnapshotEntity): Long
 
     @Query("SELECT * FROM weight_snapshots ORDER BY date DESC LIMIT 1")
     suspend fun getLatestSnapshot(): WeightSnapshotEntity?
@@ -23,46 +23,46 @@ interface WeightSnapshotDao {
     suspend fun getAllSnapshots(): List<WeightSnapshotEntity>
 
     @Delete
-    suspend fun deleteSnapshot(snapshot: WeightSnapshotEntity)
+    suspend fun deleteSnapshot(snapshot: WeightSnapshotEntity): Int
 
     @Query("DELETE FROM weight_snapshots")
-    suspend fun deleteAllSnapshots()
+    suspend fun deleteAllSnapshots(): Int
 }
 
 @Dao
 interface MealsSummaryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSummary(summary: MealsSummaryEntity)
+    suspend fun insertSummary(summary: MealsSummaryEntity): Long
 
     @Query("SELECT * FROM meals_summary WHERE id = 1")
     suspend fun getSummary(): MealsSummaryEntity?
 
     @Update
-    suspend fun updateSummary(summary: MealsSummaryEntity)
+    suspend fun updateSummary(summary: MealsSummaryEntity): Int
 
     @Delete
-    suspend fun deleteSummary(summary: MealsSummaryEntity)
+    suspend fun deleteSummary(summary: MealsSummaryEntity): Int
 
     @Query("DELETE FROM meals_summary")
-    suspend fun deleteAllSummaries()
+    suspend fun deleteAllSummaries(): Int
 }
 
 @Dao
 interface DashboardPrefsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPrefs(prefs: DashboardPrefsEntity)
+    suspend fun insertPrefs(prefs: DashboardPrefsEntity): Long
 
     @Query("SELECT * FROM dashboard_prefs WHERE id = 1")
     suspend fun getPrefs(): DashboardPrefsEntity?
 
     @Update
-    suspend fun updatePrefs(prefs: DashboardPrefsEntity)
+    suspend fun updatePrefs(prefs: DashboardPrefsEntity): Int
 
     @Delete
-    suspend fun deletePrefs(prefs: DashboardPrefsEntity)
+    suspend fun deletePrefs(prefs: DashboardPrefsEntity): Int
 
     @Query("DELETE FROM dashboard_prefs")
-    suspend fun deleteAllPrefs()
+    suspend fun deleteAllPrefs(): Int
 
     @Query("SELECT salaryAnchorDay FROM dashboard_prefs WHERE id = 1")
     fun observeAnchorDay(): Flow<Int?>

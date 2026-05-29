@@ -29,14 +29,14 @@ interface ProductDao {
     suspend fun findExactByName(name: String): ProductEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(products: List<ProductEntity>)
+    suspend fun insertAll(products: List<ProductEntity>): List<Long>
 }
 
 @Dao
 interface ProductAliasDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(alias: ProductAliasEntity)
+    suspend fun insert(alias: ProductAliasEntity): Long
 
     @Query("""
         SELECT * FROM product_aliases
@@ -53,7 +53,7 @@ interface ProductAliasDao {
         SET frequency = frequency + 1, lastSeenAt = :timestamp
         WHERE rawOcrString = :rawOcrString AND storeName = :storeName
     """)
-    suspend fun incrementFrequency(rawOcrString: String, storeName: String, timestamp: Long)
+    suspend fun incrementFrequency(rawOcrString: String, storeName: String, timestamp: Long): Int
 
     @Query("SELECT * FROM product_aliases WHERE frequency >= 3 ORDER BY frequency DESC")
     suspend fun getLearnedAliases(): List<ProductAliasEntity>
@@ -91,7 +91,7 @@ interface InventoryEventDao {
     suspend fun insert(event: InventoryEventEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEvent(event: InventoryEventEntity)
+    suspend fun insertEvent(event: InventoryEventEntity): Long
 
     @Query("SELECT * FROM inventory_events WHERE pantryItemId = :pantryItemId ORDER BY timestamp DESC")
     suspend fun getEventsForPantryItem(pantryItemId: Long): List<InventoryEventEntity>
@@ -112,5 +112,5 @@ interface InventoryEventDao {
     suspend fun getAllEvents(): List<InventoryEventEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertEvents(events: List<InventoryEventEntity>)
+    suspend fun insertEvents(events: List<InventoryEventEntity>): List<Long>
 }

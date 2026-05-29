@@ -219,6 +219,11 @@ fun V2ConfigHubScreen(
                 )
             }
 
+            // 1b — App theme (Moved up for visibility)
+            item {
+                AppThemeCard()
+            }
+
             // 2 — Cloud Sync toggle
             item {
                 CloudSyncCard(
@@ -327,11 +332,6 @@ fun V2ConfigHubScreen(
             // 10 — Drive DB backup
             item {
                 DriveBackupCard()
-            }
-
-            // 11 — App theme
-            item {
-                AppThemeCard()
             }
 
             // 12 — Danger zone

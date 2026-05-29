@@ -31,28 +31,28 @@ interface DocumentAlertDao {
     suspend fun insertAlert(alert: DocumentAlertEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAlerts(alerts: List<DocumentAlertEntity>)
+    suspend fun insertAlerts(alerts: List<DocumentAlertEntity>): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertAlertsIgnore(alerts: List<DocumentAlertEntity>)
+    suspend fun insertAlertsIgnore(alerts: List<DocumentAlertEntity>): List<Long>
 
     @Query("SELECT * FROM document_alerts ORDER BY createdAt DESC")
     suspend fun getAllAlertsList(): List<DocumentAlertEntity>
 
     @Update
-    suspend fun updateAlert(alert: DocumentAlertEntity)
+    suspend fun updateAlert(alert: DocumentAlertEntity): Int
 
     @Query("UPDATE document_alerts SET isAcknowledged = 1, actionTaken = :action WHERE id = :alertId")
-    suspend fun acknowledgeAlert(alertId: Long, action: String? = null)
+    suspend fun acknowledgeAlert(alertId: Long, action: String? = null): Int
 
     @Query("UPDATE document_alerts SET isAcknowledged = 1 WHERE documentId = :documentId")
-    suspend fun acknowledgeAllForDocument(documentId: Long)
+    suspend fun acknowledgeAllForDocument(documentId: Long): Int
 
     @Delete
-    suspend fun deleteAlert(alert: DocumentAlertEntity)
+    suspend fun deleteAlert(alert: DocumentAlertEntity): Int
 
     @Query("DELETE FROM document_alerts WHERE documentId = :documentId")
-    suspend fun deleteAlertsForDocument(documentId: Long)
+    suspend fun deleteAlertsForDocument(documentId: Long): Int
 
     @Query("SELECT COUNT(*) FROM document_alerts WHERE isAcknowledged = 0")
     fun getUnacknowledgedCount(): Flow<Int>

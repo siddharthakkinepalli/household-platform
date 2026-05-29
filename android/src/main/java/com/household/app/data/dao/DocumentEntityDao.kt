@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface DocumentEntityDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(entities: List<VaultDocumentEntityRecord>)
+    suspend fun insertAll(entities: List<VaultDocumentEntityRecord>): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: VaultDocumentEntityRecord): Long
@@ -25,10 +25,10 @@ interface DocumentEntityDao {
     suspend fun search(query: String): List<VaultDocumentEntityRecord>
 
     @Query("DELETE FROM vault_extracted_entities WHERE vaultEntryId = :vaultId")
-    suspend fun deleteForDocument(vaultId: Long)
+    suspend fun deleteForDocument(vaultId: Long): Int
 
     @Query("UPDATE vault_extracted_entities SET isVerified = 1 WHERE id = :id")
-    suspend fun markVerified(id: Long)
+    suspend fun markVerified(id: Long): Int
 
     /** Full-text search across rawValue and normalizedValue. */
     @Query("""
@@ -41,5 +41,5 @@ interface DocumentEntityDao {
 
     /** Rebuilds the FTS index — call after bulk inserts. */
     @Query("INSERT INTO vault_entities_fts(vault_entities_fts) VALUES('rebuild')")
-    suspend fun rebuildFts()
+    suspend fun rebuildFts(): Long
 }
