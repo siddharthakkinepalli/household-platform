@@ -66,7 +66,9 @@ object ParserRegistry {
         val upperLines  = rawLines.map { it.trim() }.filter { it.isNotBlank() }
         val fullLower   = ocrText.lowercase()
 
-        val hasMrz      = upperLines.any { MRZ_TD3_LINE.containsMatchIn(it) }
+        // Normalize OCR guillemet artifacts before MRZ detection:
+        // ML Kit often renders MRZ filler '<' as '«' — replace before regex matching.
+        val hasMrz      = upperLines.any { MRZ_TD3_LINE.containsMatchIn(it.replace('«', '<').replace('»', '<')) }
         val hasDev      = DEVANAGARI.containsMatchIn(ocrText)
         val longestNum  = DIGIT_RUN.findAll(ocrText).maxByOrNull { it.value.length }?.value ?: ""
 
@@ -78,9 +80,12 @@ object ParserRegistry {
             "führerschein", "driving licence", "election commission",
             "voter", "overseas citizen", "oci",
             "fahrerlaubnis",
-            "steuernummer", "finanzamt", "mietvertrag", "arbeitsvertrag"
+            "steuernummer", "finanzamt", "mietvertrag", "arbeitsvertrag",
+            "ausstellungsdatum", "augenfarbe", "erwerbstätigkeit"
         )
         keywordsToScan.forEach { kw -> if (fullLower.contains(kw)) anchors.add(kw) }
+        // P<IND in OCR text is a definitive Indian passport MRZ marker
+        if (ocrText.contains("P<IND") || ocrText.contains("P«IND")) anchors.add("p<ind")
 
         return ClassificationSignals(
             fullText       = ocrText,

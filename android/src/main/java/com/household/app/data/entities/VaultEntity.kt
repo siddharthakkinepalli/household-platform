@@ -12,7 +12,8 @@ import com.household.app.domain.models.vault.VaultSubFolder
     indices = [
         Index("dateEpoch"),
         Index("category"),
-        Index(value = ["category", "ownerMemberId", "subFolder"])
+        Index(value = ["category", "ownerMemberId", "subFolder"], name = "index_vault_entries_folder"),
+        Index("fileHash", name = "idx_vault_entries_fileHash")
     ]
 )
 data class VaultEntity(
@@ -21,7 +22,6 @@ data class VaultEntity(
     val imagePath: String,
     val merchantName: String?,
     val totalAmount: Double?,
-    @ColumnInfo(defaultValue = "EUR")
     val currency: String = "EUR",
     val dateEpoch: Long,
     val rawOcrContent: String,

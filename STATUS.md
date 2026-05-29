@@ -1,8 +1,8 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-05-29 (Wave 5 + Theme engine complete)
+**Last updated:** 2026-05-29 (OCR pipeline hardening — passport + residence permit extraction fixed)
 **DB version:** 21  
-**Build status:** ✅ BUILD SUCCESSFUL (Wave 5 + theme engine — all clean)
+**Build status:** ✅ BUILD SUCCESSFUL  
 **APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`  
 **Next action:** Wave 6 — E2 SteuerKlar Drive write · F3 Receipt↔Wallet 📄 icon · F1 Tax Tagging
 
@@ -872,6 +872,44 @@ See PLATFORM.md for full updated blueprint.
 - [x] JUGAAD P3: `OcrEngine` interface, `OpenCvPreprocessor`, `OcrRouter`, `PaddleOcrEngine` FULL — lazy ONNX session from assets, bitmap→float CHW tensor [1,3,48,W], greedy CTC decode, Latin+German charset; `OcrRouter.init(context)` prepends PaddleOcr before ML Kit; `VaultDocumentParserWorker` calls `OcrRouter.init()` at top of `doWork()`
 - [x] JUGAAD P4: Vault FTS Search UI — `VaultSearchBar` + `VaultSearchResults` + `SearchEmptyState` composables; `VaultSearchResult` data class + `onSearchQuery()` in VaultViewModel; FTS prefix matching with `*`
 - [x] E3: Document Expiry Timeline card — `DocumentExpiryTimelineCard` rewritten; glow=LumeCyan, "NEXT 90 DAYS", dot+title+days, CriticalRed ≤7d / LumeAmber ≤30d / LumeEmerald otherwise
+
+## OCR Pipeline Hardening — COMPLETE ✅ (2026-05-29)
+
+### BUG-013 — CamScanner PDF watermark blocks OCR fallback ✅ FIXED
+
+**Root cause:** CamScanner embeds "Scanned by CamScanner" text (65 chars) in the PDF text layer — just enough to pass the 50-char threshold in `PdfPageExtractor`, so raster+OCR was never triggered. The actual passport image was never processed.
+
+**Files modified:**
+- `vault/scan/PdfPageExtractor.kt` — `SCANNER_WATERMARKS` list + `stripWatermarks()` + `isWatermarkOnly()`. Threshold check now uses stripped text. Scale bumped 2x→3x for MRZ OCR quality. `recognizeRaw(bitmap)` fallback when preprocessed OCR returns < 10 chars (amber-tinted scans survive without OpenCV binarisation).
+- `vault/workers/VaultDocumentParserWorker.kt` — Clears cached `rawOcrContent` if `isWatermarkOnly()`, so existing documents with cached watermark text get re-processed.
+
+### BUG-014 — PaddleOCR single-char noise blocks ML Kit fallback ✅ FIXED
+
+**Root cause:** `OcrRouter` accepted any non-blank result — PaddleOCR returning `"!"` on amber-tinted bitmaps short-circuited the chain before ML Kit could attempt it.
+
+**File modified:** `vault/scan/OcrRouter.kt` — result must be ≥4 chars to be accepted. Added `recognizeRaw(bitmap)` that bypasses OpenCV preprocessing and runs ML Kit directly.
+
+### BUG-015 — Indian passport misclassified as Driving Licence ✅ FIXED
+
+**Root cause:** ML Kit renders MRZ filler `<` as `«` (guillemet). `ParserRegistry.MRZ_TD3_LINE` regex requires literal `<`, so `hasMrzTd3 = false`. `IndianPassportParser` confidence → 0.0.
+
+**Files modified:**
+- `vault/classification/ParserRegistry.kt` — normalises `«→<` before MRZ detection. Detects `P<IND` / `P«IND` as anchor keyword `"p<ind"`.
+- `vault/classification/parsers/IndianPassportParser.kt` — `P<IND` anchor → 0.85 confidence. MRZ candidates normalize `«»*→<`. Added `RE_VISUAL_DATE_NUMERIC` for `DD/MM/YYYY`. Keyword fallback window widened 1→3 lines.
+
+### BUG-016 — Aufenthaltstitel back card unclassified, issue date not extracted ✅ FIXED
+
+**Root cause:** Back of card has no "aufenthaltstitel" text → confidence 0.0. Date `"12 09 2024"` (space-separated) not parsed. OCR splits `"AUSSTELLUNGSDATUM-"` onto its own line; the date `"12 09 2024"` is 3 lines further — outside the 2-line search window.
+
+**Files modified:**
+- `vault/classification/ParserRegistry.kt` — adds `ausstellungsdatum`, `augenfarbe`, `erwerbstätigkeit` to anchor keyword scan.
+- `vault/classification/parsers/AufenthaltstitelParser.kt` — back-of-card confidence 0.85 from `ausstellungsdatum` or (`augenfarbe`+`erwerbstätigkeit`). New `scanLinesForDate()` helper. Issue date extracted from `ausstellungsdatum` section. Windows widened: DOB→4, expiry→4, issue date→5 lines.
+- `vault/normalization/DocumentNormalizer.kt` — added `RE_SPACEDATE` + `parseSpaceDate()` for `DD MM YYYY` (German official document format).
+
+**Verified on device:**
+- Indian passport (CamScanner PDF): `IN_PASSPORT entities=4, expiry=2025-04-19` ✅
+- Aufenthaltstitel front: `AUFENTHALTSTITEL entities=4, expiry=2034-08-05` ✅
+- Aufenthaltstitel back: `AUFENTHALTSTITEL` classified from back-of-card keywords ✅
 
 ## Theme Engine — COMPLETE ✅ (2026-05-29)
 

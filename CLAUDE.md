@@ -86,6 +86,19 @@ New util: `String.capitalizeWords()` in `domain/utils/StringExtensions.kt`.
 
 ---
 
+## OCR pipeline — known behaviours (do not re-implement)
+
+| Layer | File | Notes |
+|-------|------|-------|
+| PDF text extract | `vault/scan/PdfPageExtractor.kt` | Strips CamScanner/Adobe Scan/MicrosoftLens watermark text before the 50-char threshold — falls through to raster+OCR for image-only PDFs. Scale=3x. `isWatermarkOnly()` exported for worker use. |
+| OCR chain | `vault/scan/OcrRouter.kt` | PaddleOCR → ML Kit. Requires result ≥4 chars to accept (prevents single-char noise short-circuiting chain). `recognizeRaw(bitmap)` skips OpenCV binarisation — use for amber/warm-tinted scans. |
+| MRZ normalization | `vault/classification/ParserRegistry.kt` | Replaces `«»` with `<` before MRZ TD3 regex. Detects `P<IND` as anchor keyword. Back-of-Aufenthaltstitel keywords: `ausstellungsdatum`, `augenfarbe`, `erwerbstätigkeit`. |
+| Indian passport | `parsers/IndianPassportParser.kt` | `P<IND` anchor → 0.85 confidence even without other signals. MRZ candidates normalize `«»*→<`. Numeric dates `DD/MM/YYYY` handled via `RE_VISUAL_DATE_NUMERIC`. Window=3 lines for keyword fallbacks. |
+| Aufenthaltstitel | `parsers/AufenthaltstitelParser.kt` | Back of card detected via `ausstellungsdatum` or (`augenfarbe` + `erwerbstätigkeit`). `scanLinesForDate()` checks up to 5 lines after keyword (OCR splits label across lines). Issue date extracted from `ausstellungsdatum` section. |
+| Date parsing | `vault/normalization/DocumentNormalizer.kt` | Handles ISO, DD.MM.YYYY, DD/MM/YYYY, DD MMM YYYY, DD Month YYYY, and **DD MM YYYY** space-separated (German official docs). |
+
+---
+
 ## Wave 6 — next work (3 parallel agents, launch immediately)
 
 | Agent | Task | What it delivers |

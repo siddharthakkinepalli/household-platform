@@ -7,6 +7,7 @@ import com.household.app.vault.classification.DocumentParser
 import com.household.app.vault.extraction.ExtractedEntity
 import com.household.app.vault.extraction.EntityType
 import com.household.app.vault.extraction.ExtractionResult
+import android.util.Log
 import com.household.app.vault.normalization.DocumentNormalizer
 import java.time.format.DateTimeFormatter
 
@@ -30,10 +31,15 @@ object AufenthaltstitelParser : DocumentParser {
         val hasBRD  = signals.anchorKeywords.contains("bundesrepublik deutschland")
         val hasMrz  = signals.hasMrzTd3
         val noReisepass = !signals.anchorKeywords.contains("reisepass")
+        // Back-of-card signals: Ausstellungsdatum, Augenfarbe, Erwerbstätigkeit are unique to AT
+        val hasBack = signals.anchorKeywords.contains("ausstellungsdatum") ||
+                      (signals.anchorKeywords.contains("augenfarbe") &&
+                       signals.anchorKeywords.contains("erwerbstätigkeit"))
         return when {
-            hasAT                          -> 0.95f
+            hasAT                           -> 0.95f
+            hasBack                         -> 0.85f
             hasBRD && hasMrz && noReisepass -> 0.60f
-            else                           -> 0.0f
+            else                            -> 0.0f
         }
     }
 
@@ -112,49 +118,57 @@ object AufenthaltstitelParser : DocumentParser {
         var dobExtracted = false
         val dobLineIdx = signals.lines.indexOfFirst { it.contains("geburtsdatum") }
         if (dobLineIdx >= 0) {
-            val candidates = listOfNotNull(
-                signals.upperLines.getOrNull(dobLineIdx),
-                signals.upperLines.getOrNull(dobLineIdx + 1)
-            )
-            for (cand in candidates) {
-                val parsed = DocumentNormalizer.parseDate(cand)
-                if (parsed != null) {
-                    entities += ExtractedEntity(
-                        type            = EntityType.DATE_OF_BIRTH,
-                        rawValue        = cand,
-                        normalizedValue = parsed.format(ISO),
-                        confidence      = 0.7f,
-                        sourceContext   = cand
-                    )
-                    dobExtracted = true
-                    break
-                }
+            val parsed = scanLinesForDate(signals, dobLineIdx, windowSize = 4)
+            if (parsed != null) {
+                entities += ExtractedEntity(
+                    type            = EntityType.DATE_OF_BIRTH,
+                    rawValue        = parsed.format(ISO),
+                    normalizedValue = parsed.format(ISO),
+                    confidence      = 0.7f,
+                    sourceContext   = "Geburtsdatum"
+                )
+                dobExtracted = true
             }
         }
 
         // ── 3. Expiry date (Gültig bis) ───────────────────────────────────────
         var expiryExtracted = false
         val expiryLineIdx = signals.lines.indexOfFirst {
-            it.contains("gültig bis") || it.contains("gultig bis") || it.contains("ablaufdatum")
+            it.contains("gültig bis") || it.contains("gultig bis") ||
+            it.contains("ablaufdatum") || it.contains("valid until")
         }
         if (expiryLineIdx >= 0) {
-            val candidates = listOfNotNull(
-                signals.upperLines.getOrNull(expiryLineIdx),
-                signals.upperLines.getOrNull(expiryLineIdx + 1)
-            )
-            for (cand in candidates) {
-                val parsed = DocumentNormalizer.parseDate(cand)
-                if (parsed != null) {
-                    entities += ExtractedEntity(
-                        type            = EntityType.EXPIRY_DATE,
-                        rawValue        = cand,
-                        normalizedValue = parsed.format(ISO),
-                        confidence      = 0.7f,
-                        sourceContext   = cand
-                    )
-                    expiryExtracted = true
-                    break
-                }
+            val parsed = scanLinesForDate(signals, expiryLineIdx, windowSize = 4)
+            if (parsed != null) {
+                entities += ExtractedEntity(
+                    type            = EntityType.EXPIRY_DATE,
+                    rawValue        = parsed.format(ISO),
+                    normalizedValue = parsed.format(ISO),
+                    confidence      = 0.7f,
+                    sourceContext   = "Gültig bis"
+                )
+                expiryExtracted = true
+            }
+        }
+
+        // ── 3b. Issue date (Ausstellungsdatum) ───────────────────────────────
+        val issueDateLineIdx = signals.lines.indexOfFirst {
+            it.contains("ausstellungsdatum") || it.contains("date of issue")
+        }
+        Log.d("AufenthaltstitelParser", "issueDateLineIdx=$issueDateLineIdx lines=${signals.lines.size}")
+        if (issueDateLineIdx >= 0) {
+            val linePreview = signals.upperLines.getOrNull(issueDateLineIdx)?.take(80) ?: "null"
+            Log.d("AufenthaltstitelParser", "issueLine preview: $linePreview")
+            val parsed = scanLinesForDate(signals, issueDateLineIdx, windowSize = 5)
+            Log.d("AufenthaltstitelParser", "scanLinesForDate result=$parsed")
+            if (parsed != null) {
+                entities += ExtractedEntity(
+                    type            = EntityType.ISSUE_DATE,
+                    rawValue        = parsed.format(ISO),
+                    normalizedValue = parsed.format(ISO),
+                    confidence      = 0.7f,
+                    sourceContext   = "Ausstellungsdatum"
+                )
             }
         }
 
@@ -215,5 +229,23 @@ object AufenthaltstitelParser : DocumentParser {
         if (afterColon.isNotBlank()) return afterColon
 
         return signals.upperLines.getOrNull(lineIdx + 1)?.trim() ?: ""
+    }
+
+    /**
+     * Scans [windowSize] lines starting at [startIdx] (including that line) for any parseable date.
+     * Checks the full line text — handles inline dates like "AUSSTELLUNGSDATUM … 12 09 2024 …".
+     */
+    private fun scanLinesForDate(
+        signals: ClassificationSignals,
+        startIdx: Int,
+        windowSize: Int
+    ): java.time.LocalDate? {
+        for (offset in 0 until windowSize) {
+            val line = signals.upperLines.getOrNull(startIdx + offset) ?: continue
+            val parsed = DocumentNormalizer.parseDate(line)
+            Log.d("AufenthaltstitelParser", "scanLine offset=$offset line='${line.take(60)}' parsed=$parsed")
+            if (parsed != null) return parsed
+        }
+        return null
     }
 }

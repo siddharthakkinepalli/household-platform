@@ -68,7 +68,8 @@ class VaultDocumentParserWorker(
         }
 
         // Step 1: resolve OCR text
-        var ocrText = entry.rawOcrContent
+        // Clear cached OCR if it contains only scanner watermarks so raster+OCR is retried.
+        var ocrText = if (PdfPageExtractor.isWatermarkOnly(entry.rawOcrContent)) "" else entry.rawOcrContent
         var spatialScanned: LocalReceiptScanner.ScannedReceipt? = null
 
         if (ocrText.isBlank()) {

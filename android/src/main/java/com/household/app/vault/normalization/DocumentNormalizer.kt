@@ -26,6 +26,8 @@ object DocumentNormalizer {
 
     // DD.MM.YYYY or DD/MM/YYYY or DD-MM-YYYY
     private val RE_DOTDATE = Regex("""(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})""")
+    // DD MM YYYY — space-separated (German official docs: "12 09 2024")
+    private val RE_SPACEDATE = Regex("""\b(\d{1,2})\s+(\d{1,2})\s+((?:19|20)\d{2})\b""")
     // YYYY-MM-DD (ISO)
     private val RE_ISO = Regex("""(\d{4})-(\d{2})-(\d{2})""")
     // "15 APR 2033" or "15-APR-2033"
@@ -49,6 +51,7 @@ object DocumentNormalizer {
             ?: parseDotDate(text)
             ?: parseShortMonth(text)
             ?: parseLongMonth(text)
+            ?: parseSpaceDate(text)
     }
 
     /** Normalizes a date to ISO-8601 string "yyyy-MM-dd", or returns null. */
@@ -95,6 +98,15 @@ object DocumentNormalizer {
         return runCatching {
             LocalDate.of(m.groupValues[3].toInt(), month, m.groupValues[1].toInt())
         }.getOrNull()
+    }
+
+    private fun parseSpaceDate(text: String): LocalDate? {
+        val m = RE_SPACEDATE.find(text) ?: return null
+        val d  = m.groupValues[1].toIntOrNull() ?: return null
+        val mo = m.groupValues[2].toIntOrNull() ?: return null
+        val y  = m.groupValues[3].toIntOrNull() ?: return null
+        if (mo > 12 || d > 31) return null
+        return runCatching { LocalDate.of(y, mo, d) }.getOrNull()
     }
 
     // ── Name normalization ────────────────────────────────────────────────────

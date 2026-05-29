@@ -41,15 +41,33 @@ object IndianPassportParser : DocumentParser {
         RegexOption.IGNORE_CASE
     )
 
+    // Numeric date DD/MM/YYYY (newer Indian passports print dates this way)
+    private val RE_VISUAL_DATE_NUMERIC = Regex(
+        """\b(\d{1,2})/(\d{1,2})/((?:19|20)\d{2})\b"""
+    )
+
     private val ISO = DateTimeFormatter.ISO_LOCAL_DATE
+
+    private fun findVisualDate(cand: String): java.time.LocalDate? {
+        RE_VISUAL_DATE.find(cand)?.let { m ->
+            DocumentNormalizer.parseDate(m.value)?.let { return it }
+        }
+        RE_VISUAL_DATE_NUMERIC.find(cand)?.let { m ->
+            DocumentNormalizer.parseDate(m.value)?.let { return it }
+        }
+        return null
+    }
 
     override fun confidence(signals: ClassificationSignals): Float {
         val hasIndia    = signals.anchorKeywords.contains("republic of india")
         val hasPassport = signals.anchorKeywords.contains("passport")
         val hasMrz      = signals.hasMrzTd3
+        val hasPInd     = signals.anchorKeywords.contains("p<ind")
         return when {
             hasIndia && hasMrz             -> 0.95f
+            hasPInd  && hasMrz             -> 0.95f
             hasIndia && hasPassport        -> 0.85f
+            hasPInd                        -> 0.85f  // P<IND is a definitive MRZ marker
             hasMrz   && hasPassport        -> 0.50f
             else                           -> 0.0f
         }
@@ -59,9 +77,11 @@ object IndianPassportParser : DocumentParser {
         val entities = mutableListOf<ExtractedEntity>()
         var partial = false
 
-        // OCR sometimes inserts spaces mid-word in MRZ zones (e.g. "A K K I N E P A L L I").
-        // Strip intra-line spaces before MRZ matching so the fixed-position regexes don't miss.
-        val mrzCandidates = signals.upperLines.map { it.replace(" ", "") }
+        // OCR inserts spaces mid-MRZ and renders '<' as '«' (guillemet) on amber/warm scans.
+        // Normalize both before fixed-position regex matching.
+        val mrzCandidates = signals.upperLines.map {
+            it.replace(" ", "").replace('«', '<').replace('»', '<').replace('*', '<')
+        }
 
         // ── 1. MRZ line 2 → DOB + Expiry ─────────────────────────────────────
         val mrzL2Match = mrzCandidates
@@ -160,30 +180,24 @@ object IndianPassportParser : DocumentParser {
             docNumExtracted = true
         }
 
-        // ── 4. Expiry fallback: scan for "Date of Expiry" + DD MMM YYYY ──────
+        // ── 4. Expiry fallback: scan for "Date of Expiry" + date ─────────────
         if (!expiryExtracted) {
             val expiryLine = signals.lines.indexOfFirst {
                 it.contains("date of expiry") || it.contains("expiry date")
             }
             if (expiryLine >= 0) {
-                val candidates = listOfNotNull(
-                    signals.upperLines.getOrNull(expiryLine),
-                    signals.upperLines.getOrNull(expiryLine + 1)
-                )
+                val candidates = (0..3).mapNotNull { signals.upperLines.getOrNull(expiryLine + it) }
                 for (cand in candidates) {
-                    val m = RE_VISUAL_DATE.find(cand) ?: continue
-                    val parsed = DocumentNormalizer.parseDate(m.value)
-                    if (parsed != null) {
-                        entities += ExtractedEntity(
-                            type            = EntityType.EXPIRY_DATE,
-                            rawValue        = m.value,
-                            normalizedValue = parsed.format(ISO),
-                            confidence      = 0.7f,
-                            sourceContext   = cand
-                        )
-                        expiryExtracted = true
-                        break
-                    }
+                    val parsed = findVisualDate(cand) ?: continue
+                    entities += ExtractedEntity(
+                        type            = EntityType.EXPIRY_DATE,
+                        rawValue        = cand.trim(),
+                        normalizedValue = parsed.format(ISO),
+                        confidence      = 0.7f,
+                        sourceContext   = cand
+                    )
+                    expiryExtracted = true
+                    break
                 }
             }
         }
@@ -194,24 +208,18 @@ object IndianPassportParser : DocumentParser {
                 it.contains("date of birth") || it.contains("dob")
             }
             if (dobLine >= 0) {
-                val candidates = listOfNotNull(
-                    signals.upperLines.getOrNull(dobLine),
-                    signals.upperLines.getOrNull(dobLine + 1)
-                )
+                val candidates = (0..3).mapNotNull { signals.upperLines.getOrNull(dobLine + it) }
                 for (cand in candidates) {
-                    val m = RE_VISUAL_DATE.find(cand) ?: continue
-                    val parsed = DocumentNormalizer.parseDate(m.value)
-                    if (parsed != null) {
-                        entities += ExtractedEntity(
-                            type            = EntityType.DATE_OF_BIRTH,
-                            rawValue        = m.value,
-                            normalizedValue = parsed.format(ISO),
-                            confidence      = 0.7f,
-                            sourceContext   = cand
-                        )
-                        dobExtracted = true
-                        break
-                    }
+                    val parsed = findVisualDate(cand) ?: continue
+                    entities += ExtractedEntity(
+                        type            = EntityType.DATE_OF_BIRTH,
+                        rawValue        = cand.trim(),
+                        normalizedValue = parsed.format(ISO),
+                        confidence      = 0.7f,
+                        sourceContext   = cand
+                    )
+                    dobExtracted = true
+                    break
                 }
             }
         }
@@ -221,23 +229,17 @@ object IndianPassportParser : DocumentParser {
             it.contains("date of issue") || it.contains("issue date")
         }
         if (issueLine >= 0) {
-            val candidates = listOfNotNull(
-                signals.upperLines.getOrNull(issueLine),
-                signals.upperLines.getOrNull(issueLine + 1)
-            )
+            val candidates = (0..3).mapNotNull { signals.upperLines.getOrNull(issueLine + it) }
             for (cand in candidates) {
-                val m = RE_VISUAL_DATE.find(cand) ?: continue
-                val parsed = DocumentNormalizer.parseDate(m.value)
-                if (parsed != null) {
-                    entities += ExtractedEntity(
-                        type            = EntityType.ISSUE_DATE,
-                        rawValue        = m.value,
-                        normalizedValue = parsed.format(ISO),
-                        confidence      = 0.7f,
-                        sourceContext   = cand
-                    )
-                    break
-                }
+                val parsed = findVisualDate(cand) ?: continue
+                entities += ExtractedEntity(
+                    type            = EntityType.ISSUE_DATE,
+                    rawValue        = cand.trim(),
+                    normalizedValue = parsed.format(ISO),
+                    confidence      = 0.7f,
+                    sourceContext   = cand
+                )
+                break
             }
         }
 
