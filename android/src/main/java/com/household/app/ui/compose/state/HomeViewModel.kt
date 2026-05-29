@@ -5,7 +5,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
-import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,7 +19,6 @@ import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.theme.DocsColor
 import com.household.app.ui.compose.theme.FamilyColor
 import com.household.app.ui.compose.theme.LumeEmerald
-import com.household.app.ui.compose.theme.MealsColor
 import com.household.app.ui.compose.theme.WalletColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +44,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     val modules: List<Module> = listOf(
         Module("wallet",  "Wallet",    Icons.Rounded.AccountBalanceWallet, WalletColor,  "Expenses & budget", Screen.Wallet.route),
-        Module("meals",   "Meals",     Icons.Rounded.Restaurant,           MealsColor,   "Meal planning",     Screen.Meals.route),
+        // Meals module removed — stub with no real data flow (JUGAAD OS: no half-built tabs)
         Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,    "Vault & receipts",  Screen.Docs.route),
         Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor,  "Family hub",        Screen.Family.route),
         Module("pantry",  "Pantry",    Icons.Rounded.ShoppingCart,         LumeEmerald,  "Stock & consume",   Screen.Pantry.route)

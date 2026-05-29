@@ -32,11 +32,14 @@ val Blue          = Color(0xFF3B82F6)  // Do NOT use in Phase 2 UI
 val BlueSoft      = Color(0xFFEFF6FF)  // Do NOT use in Phase 2 UI
 
 // ── Text ──────────────────────────────────────────────────────────────────
-val TextPrimary   = Color(0xFF0F172A)
-val TextSecondary = Color(0xFF6B7280)
-val TextMuted     = Color(0xFF9CA3AF)
-val TextOnDark    = Color(0xFFF9FAFB)
-val TextOnColor   = Color(0xFFFFFFFF)
+val TextPrimary       = Color(0xFF0F172A)
+val TextSecondary     = Color(0xFF6B7280)
+val TextMuted         = Color(0xFF9CA3AF)
+val TextOnDark        = Color(0xFFF9FAFB)
+val TextOnColor       = Color(0xFFFFFFFF)
+// Alpha-blended white text for dark glass cards — meets WCAG 4.5:1 on EliteNavy
+val TextMutedDark     = Color(0xB3FFFFFF)  // 70% white
+val TextSecondaryDark = Color(0xCCFFFFFF)  // 80% white
 
 // ── Module colors ─────────────────────────────────────────────────────────
 val WalletColor   = Color(0xFF6F3DF0)

@@ -66,14 +66,34 @@ This is a **Germany-first** household OS. No UPI, no India payments. SEPA/CSV is
 
 ---
 
-## Wave 5 — next work (3 parallel agents, launch immediately)
+## Theme system (active — do not re-implement)
 
-| Agent | Task | What it fixes |
-|-------|------|--------------|
-| **M — Vault automation bridge** | `VaultDocumentParserWorker.kt` post-extraction hook | `MONTHLY_COST` from Mietvertrag/contract → auto-propose `RecurringBillEntity`. `GROSS_SALARY` from Arbeitsvertrag → pre-seed salary expectation in `SalarySourceEntity`. Extended expiry alerts at -90d and -180d for IDENTITY docs (passports). |
-| **N — Smart Alert deeplinks** | `V2FinanceScreen.kt` SmartAlertFeed | Every SmartAlert chip must navigate somewhere on tap: "uncategorized" → import review, "expiry" → DocumentsScreen, "new subscription" → SubscriptionHub, "tax total" → TaxSummary. Read the existing alert types in `ExpensesViewModel.computeSmartAlerts()` first. |
-| **O — Meals module decision** | `V2MealsScreen.kt` | Read the file. If ViewModel is empty/stub: **remove Meals from the nav rail** (`Screen.kt` + `V2AppNavHost.kt`) and repurpose that slot OR build a minimal real flow (weekly plan → auto-generate shopping list from pantry stock). No half-built tabs. |
+Dynamic theme engine is fully wired. Key files:
 
-**Wave 6 after Wave 5:** E2 SteuerKlar Drive write · F3 Receipt↔Wallet 📄 icon · F1 Tax Tagging
+| What | Where |
+|------|-------|
+| Enum + 6 ColorSchemes | `ui/compose/theme/Theme.kt` — `JugaadThemeSelection` |
+| DataStore persistence | `ui/compose/theme/ThemePreferencesManager.kt` |
+| ViewModel | `ui/compose/theme/ThemeViewModel.kt` + `ThemeViewModelFactory.kt` |
+| Picker UI | `ui/compose/theme/ThemeSelector.kt` — rendered inside `AppThemeCard` in ConfigHub |
+| Root wiring | `MainActivity.kt` — `viewModels { ThemeViewModelFactory }` → `JugaadTheme(selectedTheme)` wraps `setContent` |
 
-See `STATUS.md` audit findings section for full context on what's broken and why.
+**6 themes:** LUMINESCENT_GLASS (default) · JUGAAD_CHILLI · NORDIC_EINKAUF · MATRIX_PIPELINE · MONSOON_FOREST · TWILIGHT_CASHMERE
+
+New color tokens: `TextMutedDark` (70% white) · `TextSecondaryDark` (80% white) — use these on dark glass cards.  
+New card: `JugaadGlassCard` — strict 40% surface alpha, for uniform card backgrounds without glow effects.  
+New util: `String.capitalizeWords()` in `domain/utils/StringExtensions.kt`.
+
+---
+
+## Wave 6 — next work (3 parallel agents, launch immediately)
+
+| Agent | Task | What it delivers |
+|-------|------|-----------------|
+| **E2 — SteuerKlar Drive write** | `SteuerKlarScreen.kt` | "Mark Complete" writes `TAXATION_COMPLETE.json` to Google Drive with year + checklist summary + completedAt timestamp |
+| **F3 — Receipt↔Wallet 📄 icon** | `V2FinanceScreen.kt` transaction list | Show 📄 icon on rows where `linkedVaultEntryId` is set; tap opens vault entry detail. `ReceiptMatchingWorker` already populates the link — UI layer only. |
+| **F1 — Tax Tagging Layer** | `V2FinanceScreen.kt` + `V2DocumentVaultScreen.kt` | Long-press tx/vault doc → "Mark as tax-relevant" sheet. New `tax_tags` table (DB v21→v22). German categories: Work Equipment, Home Office, Medical, Donations, Work Commute. Show 💶 badge on tagged items. |
+
+**Wave 7 after Wave 6:** F2 Annual Tax Summary Export · E2 full Drive scan + live checklist status
+
+See `STATUS.md` for full context.

@@ -63,12 +63,15 @@ fun V2AppNavHost(
             )
         }
         composable(route = Screen.Wallet.route) {
-            V2FinanceScreen(onNavigateToTrips = { navController.navigate(Screen.Trips.route) })
+            V2FinanceScreen(
+                onNavigateToTrips = { navController.navigate(Screen.Trips.route) },
+                onNavigate = { route -> navController.navigate(route) }
+            )
         }
         composable(route = Screen.Trips.route) {
             TripTrackerScreen(onBack = { navController.popBackStack() })
         }
-        composable(route = Screen.Meals.route) { V2MealsScreen() }
+        // Screen.Meals removed from nav graph (stub with no real data flow — JUGAAD OS: no half-built tabs)
         composable(route = Screen.Family.route) {
             V2FamilyScreen(
                 onMemberClick = { id ->

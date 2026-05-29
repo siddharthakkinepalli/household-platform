@@ -10,6 +10,8 @@ import com.household.app.data.entities.DocumentAlertEntity
 import com.household.app.data.entities.DocumentEntity
 import com.household.app.data.entities.DocumentType
 import com.household.app.data.entities.PantryEntity
+import com.household.app.data.entities.RecurringBillEntity
+import com.household.app.data.entities.SalarySourceEntity
 import com.household.app.data.service.VaultDocumentParser
 import com.household.app.domain.models.vault.VaultCategory
 import com.household.app.vault.parser.LocalReceiptScanner
@@ -197,6 +199,58 @@ class VaultDocumentParserWorker(
         val meta = VaultDocumentParser.parse(textForParsing, existingCategory)
         Log.d("VaultParser", "Parsed: category=${meta.category} subFolder=${meta.subFolder} expiry=${meta.expiryDate ?: registryExpiryDate} title=${meta.suggestedTitle}")
 
+        // Step 2c: automation bridge — react to structured extraction results
+        if (extractionResult != null && winningParser != null) {
+
+            // 2c-1: MONTHLY_COST from RENTAL_CONTRACT → auto-propose RecurringBillEntity
+            if (winningParser.docType == DocumentDocType.RENTAL_CONTRACT) {
+                val monthlyCostEntity = extractionResult.entities
+                    .firstOrNull { it.type == EntityType.MONTHLY_COST }
+                val amount = monthlyCostEntity?.normalizedValue?.toDoubleOrNull() ?: 0.0
+                if (amount > 0.0) {
+                    val rawTitle = meta.suggestedTitle ?: entry.documentTitle ?: "Mietvertrag"
+                    val merchantPattern = rawTitle.lowercase().trim().take(25)
+                    runCatching {
+                        val existing = db.recurringBillDao().getByMerchantPattern(merchantPattern)
+                        if (existing == null) {
+                            db.recurringBillDao().insert(
+                                RecurringBillEntity(
+                                    merchantPattern  = merchantPattern,
+                                    normalizedAmount = amount,
+                                    minAmount        = amount * 0.85,
+                                    maxAmount        = amount * 1.15,
+                                    category         = "Housing",
+                                    lastSeenDate     = System.currentTimeMillis(),
+                                    cycleCount       = 1,
+                                    isActive         = false,
+                                    source           = "VAULT"
+                                )
+                            )
+                        }
+                    }.getOrNull()
+                }
+            }
+
+            // 2c-2: GROSS_SALARY from EMPLOYMENT_LETTER → upsert SalarySourceEntity
+            if (winningParser.docType == DocumentDocType.EMPLOYMENT_LETTER) {
+                val grossSalaryEntity = extractionResult.entities
+                    .firstOrNull { it.type == EntityType.GROSS_SALARY }
+                val amount = grossSalaryEntity?.normalizedValue?.toDoubleOrNull() ?: 0.0
+                if (amount > 0.0) {
+                    runCatching {
+                        db.salarySourceDao().upsert(
+                            SalarySourceEntity(
+                                merchantPattern = "EMPLOYMENT_LETTER",
+                                lastAmount      = amount,
+                                minAmount       = amount * 0.80,
+                                maxAmount       = amount * 1.20
+                            )
+                        )
+                    }.getOrNull()
+                }
+            }
+        }
+
         // Step 3: persist updated category, subfolder and title.
         //
         // IMPORTANT: preserve the user's explicit subfolder selection.
@@ -259,6 +313,38 @@ class VaultDocumentParserWorker(
                     )
                 )
             )
+
+            // 2c-3: extended expiry alerts at -90d and -180d for IDENTITY documents
+            if (meta.category == VaultCategory.IDENTITY) {
+                val today = LocalDate.now()
+                val extraAlerts = mutableListOf<DocumentAlertEntity>()
+
+                val date90 = expiry.minusDays(90)
+                val days90 = ChronoUnit.DAYS.between(today, date90).toInt()
+                if (days90 >= 0) {
+                    extraAlerts += DocumentAlertEntity(
+                        documentId = docId,
+                        alertType  = AlertType.EXPIRY_WARNING,
+                        message    = "$docTitle — 90-day notice",
+                        daysUntil  = days90
+                    )
+                }
+
+                val date180 = expiry.minusDays(180)
+                val days180 = ChronoUnit.DAYS.between(today, date180).toInt()
+                if (days180 >= 0) {
+                    extraAlerts += DocumentAlertEntity(
+                        documentId = docId,
+                        alertType  = AlertType.EXPIRY_WARNING,
+                        message    = "$docTitle — 180-day notice",
+                        daysUntil  = days180
+                    )
+                }
+
+                if (extraAlerts.isNotEmpty()) {
+                    runCatching { db.documentAlertDao().insertAlerts(extraAlerts) }.getOrNull()
+                }
+            }
         }
 
         PipelineManager.onDocumentUploaded(applicationContext)

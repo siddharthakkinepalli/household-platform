@@ -135,13 +135,13 @@ object EmploymentLetterParser : DocumentParser {
             }
         }
 
-        // ── 4. MONTHLY_COST (gross salary) ────────────────────────────────────
+        // ── 4. GROSS_SALARY ───────────────────────────────────────────────────
         val salaryMatch = RE_GROSS_SALARY.find(signals.fullText)
         if (salaryMatch != null) {
             val rawAmount  = salaryMatch.groupValues[1]
             val normalized = rawAmount.replace(',', '.')
             entities += ExtractedEntity(
-                type            = EntityType.MONTHLY_COST,
+                type            = EntityType.GROSS_SALARY,
                 rawValue        = salaryMatch.value,
                 normalizedValue = normalized,
                 confidence      = 0.80f,

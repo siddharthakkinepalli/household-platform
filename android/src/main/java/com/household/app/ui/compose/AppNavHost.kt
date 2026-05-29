@@ -10,27 +10,17 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.motion.Motion
-import com.household.app.ui.compose.theme.HouseholdPlatformTheme
 import com.household.app.ui.v2.V2ConfigHubScreen
 import com.household.app.ui.v2.V2DocumentVaultScreen
 import com.household.app.ui.v2.V2FamilyScreen
 import com.household.app.ui.v2.V2FinanceScreen
-import com.household.app.ui.v2.V2MealsScreen
 
 /**
  * AppNavHost — sets up Compose Navigation with global transition defaults.
  *
- * Transition strategy:
- *   - Enter: fade + slide in from the end (forward navigation)
- *   - Exit:  fade + slide out to start
- *   - Pop enter/exit: reverse direction (back navigation)
- *
- * slideIntoContainer is preferred over slideInHorizontally — uses container bounds,
- * not screen width, so travel distance is proportionally correct.
- *
- * Home screen is the active Phase 2 Compose destination.
- * Other destinations stay on their already-working v2 implementations so the shell
- * migration does not disturb existing feature workflows.
+ * Theme is applied once at the MainActivity level (JugaadTheme wraps setContent).
+ * Individual screens must NOT re-wrap in HouseholdPlatformTheme — that would
+ * override the user's persisted theme selection with the default.
  */
 @Composable
 fun AppNavHost(
@@ -38,36 +28,24 @@ fun AppNavHost(
     modifier: Modifier = Modifier
 ) {
     NavHost(
-        navController   = navController,
+        navController    = navController,
         startDestination = Screen.Home.route,
-        modifier        = modifier,
-        enterTransition = {
+        modifier         = modifier,
+        enterTransition  = {
             fadeIn(Motion.FadeIn) +
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Start,
-                    Motion.Slide
-                )
+                slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, Motion.Slide)
         },
-        exitTransition = {
+        exitTransition   = {
             fadeOut(Motion.FadeOut) +
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Start,
-                    Motion.Slide
-                )
+                slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, Motion.Slide)
         },
         popEnterTransition = {
             fadeIn(Motion.FadeIn) +
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.End,
-                    Motion.Slide
-                )
+                slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, Motion.Slide)
         },
-        popExitTransition = {
+        popExitTransition  = {
             fadeOut(Motion.FadeOut) +
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.End,
-                    Motion.Slide
-                )
+                slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, Motion.Slide)
         }
     ) {
         composable(route = Screen.Home.route) {
@@ -82,10 +60,10 @@ fun AppNavHost(
             )
         }
 
-        composable(route = Screen.Wallet.route) { HouseholdPlatformTheme { V2FinanceScreen() } }
-        composable(route = Screen.Meals.route) { HouseholdPlatformTheme { V2MealsScreen() } }
-        composable(route = Screen.Family.route) { HouseholdPlatformTheme { V2FamilyScreen() } }
-        composable(route = Screen.Config.route) { HouseholdPlatformTheme { V2ConfigHubScreen() } }
+        composable(route = Screen.Wallet.route) { V2FinanceScreen() }
+        // Screen.Meals removed from nav graph (stub — JUGAAD OS: no half-built tabs)
+        composable(route = Screen.Family.route) { V2FamilyScreen() }
+        composable(route = Screen.Config.route) { V2ConfigHubScreen() }
 
         composable(
             route = Screen.Docs.route,
@@ -93,7 +71,7 @@ fun AppNavHost(
                 androidx.navigation.navDeepLink { uriPattern = "jugaad://${Screen.Docs.route}" }
             )
         ) {
-            HouseholdPlatformTheme { V2DocumentVaultScreen() }
+            V2DocumentVaultScreen()
         }
     }
 }

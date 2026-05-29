@@ -76,7 +76,8 @@ data class FinancialAlert(
     val label: String,
     val detail: String,
     val amount: Double?,
-    val tintKey: String
+    val tintKey: String,
+    val destination: String = ""
 )
 
 enum class PulseStatus { SAFE, WARNING, CRITICAL }
@@ -353,7 +354,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                 label = "New subscription",
                 detail = "${bill.merchantPattern.replaceFirstChar { it.uppercase() }} · €${"%.2f".format(bill.normalizedAmount)}/mo",
                 amount = bill.normalizedAmount,
-                tintKey = "amber"
+                tintKey = "amber",
+                destination = "subscription_hub"
             ))
         }
 
@@ -368,7 +370,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                     label = if (daysUntil == 0) "Due today" else "Due in $daysUntil day${if (daysUntil == 1) "" else "s"}",
                     detail = "${bill.merchantPattern.replaceFirstChar { it.uppercase() }} · €${"%.0f".format(bill.normalizedAmount)}",
                     amount = bill.normalizedAmount,
-                    tintKey = if (daysUntil <= 3) "red" else "amber"
+                    tintKey = if (daysUntil <= 3) "red" else "amber",
+                    destination = "subscription_hub"
                 ))
             }
         }
@@ -382,7 +385,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                 label = "Expires in ${alert.daysUntil}d",
                 detail = alert.message.take(50),
                 amount = null,
-                tintKey = if (alert.daysUntil <= 7) "red" else "cyan"
+                tintKey = if (alert.daysUntil <= 7) "red" else "cyan",
+                destination = "documents"
             ))
         }
 
@@ -396,7 +400,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                 label = "Tax-deductible",
                 detail = "€${"%.0f".format(taxTotal)} trackable this cycle",
                 amount = taxTotal,
-                tintKey = "emerald"
+                tintKey = "emerald",
+                destination = "tax_summary"
             ))
         }
 
@@ -410,7 +415,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                 label = "$uncategorizedCount uncategorized",
                 detail = "Tap a transaction to assign a category",
                 amount = null,
-                tintKey = "purple"
+                tintKey = "purple",
+                destination = "config"
             ))
         }
 

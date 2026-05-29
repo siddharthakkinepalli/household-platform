@@ -21,6 +21,9 @@ interface RecurringBillDao {
     @Query("SELECT * FROM recurring_bills WHERE isActive = 1 ORDER BY normalizedAmount DESC")
     suspend fun getActiveBills(): List<RecurringBillEntity>
 
+    @Query("SELECT * FROM recurring_bills WHERE merchantPattern = :pattern LIMIT 1")
+    suspend fun getByMerchantPattern(pattern: String): RecurringBillEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(bills: List<RecurringBillEntity>)
 

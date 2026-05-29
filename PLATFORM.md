@@ -35,10 +35,50 @@
 | **JUGAAD P3 OCR** | **OcrEngine interface, OpenCV preprocessing, OcrRouter, PaddleOcrEngine (full ONNX)** | ✅ Done (Wave 4 + impl) |
 | **JUGAAD P4 Search** | **Inline FTS search bar + results in Vault screen** | ✅ Done (Wave 3) |
 | **E1 PipelineManager** | **WorkManager trigger→chain registry; CSV + document upload triggers** | ✅ Done (Wave 4) |
-| **E2 SteuerKlar** | **Native Kotlin tax checklist reading Drive folder** | 🔲 Planned |
+| **E2 SteuerKlar** | **Native Kotlin tax checklist reading Drive folder** | 🔲 Planned (Wave 6) |
 | **E** | **WorkManager pipeline full suite + SteuerKlar + Drive integration** | 🔄 E1 done, E2 planned |
 | **F4 Sparklines** | **3-cycle mini-chart + delta label on each category tile** | ✅ Already done (commit c612842 — `CategorySparkline`, `CategoryGridItem` 3-bar chart) |
-| **F** | **Tax preparation, receipt linking, tax tagging, spending trends** | 🔲 Planned (F1–F3 remaining) |
+| **F** | **Tax preparation, receipt linking, tax tagging, spending trends** | 🔲 Planned (F1–F3 Wave 6) |
+| **Wave 5 M/N/O** | **Vault automation bridge + Smart Alert deeplinks + Meals removed** | ✅ Done (2026-05-29) |
+| **Theme engine** | **6-theme dynamic system, DataStore persistence, Activity-level wiring** | ✅ Done (2026-05-29) |
+
+---
+
+## Wave 5 + Theme Engine (2026-05-29)
+
+### Wave 5M — Vault Automation Bridge
+| File | Change |
+|------|--------|
+| `vault/extraction/EntityType.kt` | Added `GROSS_SALARY` enum value |
+| `vault/classification/parsers/EmploymentLetterParser.kt` | Salary entity now emits `GROSS_SALARY` (was misusing `MONTHLY_COST`) |
+| `data/dao/RecurringBillDao.kt` | Added `getByMerchantPattern(pattern)` |
+| `vault/workers/VaultDocumentParserWorker.kt` | Step 2c bridge: RENTAL_CONTRACT+MONTHLY_COST → `RecurringBillEntity(isActive=false, source="VAULT")`; EMPLOYMENT_LETTER+GROSS_SALARY → upsert `SalarySourceEntity`; IDENTITY expiry → extra alerts at -90d and -180d |
+
+### Wave 5N — Smart Alert Deeplinks
+| File | Change |
+|------|--------|
+| `ui/viewmodels/ExpensesViewModel.kt` | `FinancialAlert` gets `destination: String`; all 5 alert types set routes |
+| `ui/v2/V2FinanceScreen.kt` | `SmartAlertChip` is now clickable; routes: subscription_hub / documents / tax_summary / config |
+| `ui/v2/V2AppNavHost.kt` | `V2FinanceScreen` call passes `onNavigate` callback |
+
+### Wave 5O — Meals Removed
+Removed `Screen.Meals` from `Screen.all`, `V2AppNavHost`, `AppNavHost`, and `HomeViewModel.modules`. `V2MealsScreen.kt` kept on disk but unreachable.
+
+### Theme Engine
+| File | Role |
+|------|------|
+| `ui/compose/theme/Theme.kt` | `JugaadThemeSelection` enum (6 values) + 6 `ColorScheme` objects + `JugaadTheme(themeSelection)` composable |
+| `ui/compose/theme/ThemePreferencesManager.kt` | DataStore read/write (`theme_prefs`) |
+| `ui/compose/theme/ThemeViewModel.kt` | `currentTheme: StateFlow` + `setTheme()` |
+| `ui/compose/theme/ThemeViewModelFactory.kt` | `ViewModelProvider.Factory` for no-Hilt instantiation |
+| `ui/compose/theme/ThemeSelector.kt` | Radio-button picker composable |
+| `ui/v2/V2ConfigHubScreen.kt` | `AppThemeCard` renders `ThemeSelector` in Config screen (item 11) |
+| `MainActivity.kt` | Owns `ThemeViewModel`, collects `currentTheme`, wraps `setContent` in `JugaadTheme` |
+| `ui/compose/AppNavHost.kt` | Removed per-screen `HouseholdPlatformTheme {}` overrides |
+| `ui/compose/theme/Color.kt` | Added `TextMutedDark` + `TextSecondaryDark` |
+| `ui/v2/components/BudgetGauge.kt` | Pacing-aware gauge color (spend fraction vs time fraction) |
+| `ui/v2/components/JugaadGlassCard.kt` | Standardized 40% alpha card wrapper |
+| `domain/utils/StringExtensions.kt` | `String.capitalizeWords()` |
 
 ---
 

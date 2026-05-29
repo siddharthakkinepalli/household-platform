@@ -25,7 +25,6 @@ import androidx.fragment.app.FragmentManager
 import androidx.navigation.compose.rememberNavController
 import com.household.app.data.OnboardingDataStore
 import com.household.app.domain.usecases.ApplyTransferCategoryMigrationUseCase
-import com.household.app.ui.compose.theme.HouseholdPlatformTheme
 import com.household.app.ui.v2.components.DeepBackground
 import com.household.app.ui.v2.components.EliteBottomNav
 import kotlinx.coroutines.launch
@@ -58,7 +57,6 @@ fun V2AppShell(
         }
     }
 
-    // Show nothing until we know the onboarding state (avoids flicker)
     if (showOnboarding == null) return
 
     if (showOnboarding == true) {
@@ -73,37 +71,37 @@ fun V2AppShell(
         return
     }
 
-    HouseholdPlatformTheme {
-        val navController = rememberNavController()
-        val currentRoute by remember {
-            derivedStateOf { navController.currentBackStackEntry?.destination?.route }
-        }
+    // Theme is owned by MainActivity (JugaadTheme wraps the full setContent block).
+    // V2AppShell only owns navigation + scaffold — no theme wrapper here.
+    val navController = rememberNavController()
+    val currentRoute by remember {
+        derivedStateOf { navController.currentBackStackEntry?.destination?.route }
+    }
 
-        BackHandler {
-            if (!navController.popBackStack()) onFinish()
-        }
+    BackHandler {
+        if (!navController.popBackStack()) onFinish()
+    }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            DeepBackground()
+    Box(modifier = Modifier.fillMaxSize()) {
+        DeepBackground()
 
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                bottomBar = {
-                    EliteBottomNav(
-                        navController = navController,
-                        currentRoute = currentRoute
-                    )
-                }
-            ) { padding ->
-                V2AppNavHost(
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            bottomBar = {
+                EliteBottomNav(
                     navController = navController,
-                    fragmentManager = fragmentManager,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
+                    currentRoute = currentRoute
                 )
             }
+        ) { padding ->
+            V2AppNavHost(
+                navController = navController,
+                fragmentManager = fragmentManager,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            )
         }
     }
 }

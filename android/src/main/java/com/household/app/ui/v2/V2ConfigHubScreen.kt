@@ -329,12 +329,17 @@ fun V2ConfigHubScreen(
                 DriveBackupCard()
             }
 
-            // 11 — Danger zone
+            // 11 — App theme
+            item {
+                AppThemeCard()
+            }
+
+            // 12 — Danger zone
             item {
                 DangerZoneCard(onIntent = viewModel::onIntent)
             }
 
-            // 12 — About
+            // 13 — About
             item {
                 AboutCard()
             }
@@ -1324,6 +1329,29 @@ private fun RecentImportsCard(audits: List<ImportAuditRecord>) {
                 }
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App theme selector
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun AppThemeCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val themeViewModel: com.household.app.ui.compose.theme.ThemeViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel {
+            com.household.app.ui.compose.theme.ThemeViewModel(
+                com.household.app.ui.compose.theme.ThemePreferencesManager(context)
+            )
+        }
+    val currentTheme by themeViewModel.currentTheme.collectAsState()
+
+    EliteGlassCard(glowColor = LumePurple.copy(alpha = 0.12f)) {
+        com.household.app.ui.compose.theme.ThemeSelector(
+            currentTheme = currentTheme,
+            onThemeSelected = { themeViewModel.setTheme(it) }
+        )
     }
 }
 

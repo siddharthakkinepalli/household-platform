@@ -31,6 +31,7 @@ enum class EntityType {
     STEUERNUMMER,
     STEUER_ID,
     MONTHLY_COST,
+    GROSS_SALARY,
 
     // Address / contact
     ADDRESS,

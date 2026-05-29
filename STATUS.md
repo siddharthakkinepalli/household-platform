@@ -1,10 +1,10 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-05-28 (JUGAAD OS audit — Wave 5 reprioritised)
+**Last updated:** 2026-05-29 (Wave 5 + Theme engine complete)
 **DB version:** 21  
-**Build status:** ✅ BUILD SUCCESSFUL (last commit 9bee292 CLAUDE.md)
+**Build status:** ✅ BUILD SUCCESSFUL (Wave 5 + theme engine — all clean)
 **APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`  
-**Next action:** Wave 5 — 3 parallel agents: (M) Vault automation bridge · (N) Smart Alert deeplinks · (O) Meals module build-or-cut
+**Next action:** Wave 6 — E2 SteuerKlar Drive write · F3 Receipt↔Wallet 📄 icon · F1 Tax Tagging
 
 ---
 
@@ -14,10 +14,10 @@
 
 | Issue | File | Problem | Fix required |
 |-------|------|---------|-------------|
-| Smart Alert Feed is read-only | `V2FinanceScreen.kt` | Alerts show info but tapping does nothing — no deeplink to resolution | Every alert chip needs a `DeepLink` destination |
-| SteuerKlar is a static checklist | `SteuerKlarScreen.kt` | "Mark Complete" doesn't write `TAXATION_COMPLETE.json` to Drive | E2: implement Drive write |
-| Meals module is a shell | `V2MealsScreen.kt` | ViewModel is empty, nothing writes to `meals_summary` table | Either build it properly or remove the nav tab |
-| Vault data drives no automation | `VaultDocumentParserWorker.kt` | Contract extracts `MONTHLY_COST`, employment letter extracts `GROSS_SALARY` — neither triggers any downstream action | Post-extraction hook: auto-propose recurring bill from contract, pre-seed salary from Arbeitsvertrag |
+| Smart Alert Feed is read-only | `V2FinanceScreen.kt` | ~~Alerts show info but tapping does nothing~~ | ✅ FIXED Wave 5N — every chip navigates |
+| SteuerKlar is a static checklist | `SteuerKlarScreen.kt` | "Mark Complete" doesn't write `TAXATION_COMPLETE.json` to Drive | E2: implement Drive write (Wave 6) |
+| Meals module is a shell | `V2MealsScreen.kt` | ~~ViewModel is empty~~ | ✅ FIXED Wave 5O — removed from nav rail |
+| Vault data drives no automation | `VaultDocumentParserWorker.kt` | ~~Contract/employment docs don't trigger downstream~~ | ✅ FIXED Wave 5M — automation bridge added |
 
 ### Product principles now active (JUGAAD OS)
 - Germany-first (no UPI, no India payments — SEPA/CSV is the payment layer)
@@ -872,6 +872,52 @@ See PLATFORM.md for full updated blueprint.
 - [x] JUGAAD P3: `OcrEngine` interface, `OpenCvPreprocessor`, `OcrRouter`, `PaddleOcrEngine` FULL — lazy ONNX session from assets, bitmap→float CHW tensor [1,3,48,W], greedy CTC decode, Latin+German charset; `OcrRouter.init(context)` prepends PaddleOcr before ML Kit; `VaultDocumentParserWorker` calls `OcrRouter.init()` at top of `doWork()`
 - [x] JUGAAD P4: Vault FTS Search UI — `VaultSearchBar` + `VaultSearchResults` + `SearchEmptyState` composables; `VaultSearchResult` data class + `onSearchQuery()` in VaultViewModel; FTS prefix matching with `*`
 - [x] E3: Document Expiry Timeline card — `DocumentExpiryTimelineCard` rewritten; glow=LumeCyan, "NEXT 90 DAYS", dot+title+days, CriticalRed ≤7d / LumeAmber ≤30d / LumeEmerald otherwise
+
+## Theme Engine — COMPLETE ✅ (2026-05-29)
+
+- [x] `JugaadThemeSelection` enum — 6 themes: LUMINESCENT_GLASS, JUGAAD_CHILLI, NORDIC_EINKAUF, MATRIX_PIPELINE, MONSOON_FOREST, TWILIGHT_CASHMERE
+- [x] All 6 `ColorScheme` objects defined in `Theme.kt`
+- [x] `JugaadTheme(themeSelection, content)` — parameterized composable; `HouseholdPlatformTheme` is a backward-compat alias
+- [x] `ThemePreferencesManager` — DataStore persistence (`theme_prefs`)
+- [x] `ThemeViewModel` + `ThemeViewModelFactory` — `currentTheme: StateFlow` + `setTheme()`
+- [x] `ThemeSelector` — Radio-button picker composable wired into ConfigHub as `AppThemeCard`
+- [x] `MainActivity` — owns `ThemeViewModel` via `viewModels {}`, collects state, wraps `setContent` in `JugaadTheme`
+- [x] `AppNavHost` — removed per-screen `HouseholdPlatformTheme {}` wrappers (were overriding user selection)
+- [x] `V2AppShell` — removed redundant theme wrapper (theme now owned at Activity level)
+- [x] `Color.kt` — added `TextMutedDark` (70% white) and `TextSecondaryDark` (80% white) for WCAG contrast on dark cards
+- [x] `BudgetGauge` — fixed inverted gradient; now uses pacing-aware solid color (spend vs time fraction → green/amber/red)
+- [x] `JugaadGlassCard` — new standardized card with strict 40% surface alpha + 15% primary border stroke
+- [x] `StringExtensions.kt` — `String.capitalizeWords()` util in `domain/utils/`
+
+## Wave 5 — COMPLETE ✅ (2026-05-29)
+
+### Wave 5M — Vault Automation Bridge ✅ DONE
+
+**Files modified:**
+- `vault/extraction/EntityType.kt` — added `GROSS_SALARY` enum value
+- `vault/classification/parsers/EmploymentLetterParser.kt` — salary entity now uses `EntityType.GROSS_SALARY` (was `MONTHLY_COST`)
+- `data/dao/RecurringBillDao.kt` — added `getByMerchantPattern(pattern)` query
+- `vault/workers/VaultDocumentParserWorker.kt` — Step 2c automation bridge:
+  - `RENTAL_CONTRACT` + `MONTHLY_COST` → inserts `RecurringBillEntity` (isActive=false, source="VAULT") if not already present
+  - `EMPLOYMENT_LETTER` + `GROSS_SALARY` → upserts `SalarySourceEntity` with ±20% range
+  - `IDENTITY` expiry → additional alerts at -90d and -180d (skips stale/past ones)
+
+### Wave 5N — Smart Alert Deeplinks ✅ DONE
+
+**Files modified:**
+- `ui/viewmodels/ExpensesViewModel.kt` — `FinancialAlert` gets `destination: String` field; all 5 alert types in `computeSmartAlerts()` set a destination route
+- `ui/v2/V2FinanceScreen.kt` — `SmartAlertFeed` + `SmartAlertChip` accept `onNavigate` callback; chips are clickable via `Modifier.clickable`
+- `ui/v2/V2AppNavHost.kt` — `V2FinanceScreen` call passes `onNavigate = { navController.navigate(it) }`
+
+Alert routing: new subscription/upcoming bill → `subscription_hub`; expiry → `documents`; tax-deductible → `tax_summary`; uncategorized → `config`
+
+### Wave 5O — Meals Module Removed ✅ DONE
+
+**Files modified:**
+- `ui/compose/navigation/Screen.kt` — `Meals` removed from `Screen.all` (object definition kept)
+- `ui/v2/V2AppNavHost.kt` — meals composable route removed
+- `ui/compose/AppNavHost.kt` — legacy nav host meals route removed
+- `ui/compose/state/HomeViewModel.kt` — Meals removed from modules list
 
 ---
 

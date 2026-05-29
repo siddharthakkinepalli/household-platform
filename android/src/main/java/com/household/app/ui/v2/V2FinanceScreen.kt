@@ -136,7 +136,8 @@ private data class CategoryBlockUi(
 @Composable
 fun V2FinanceScreen(
     viewModel: ExpensesViewModel = viewModel(),
-    onNavigateToTrips: () -> Unit = {}
+    onNavigateToTrips: () -> Unit = {},
+    onNavigate: (String) -> Unit = {}
 ) {
     // Refresh whenever this screen comes to the foreground (e.g. after a CSV import)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -320,7 +321,7 @@ fun V2FinanceScreen(
             }
 
             item {
-                SmartAlertFeed(smartAlerts)
+                SmartAlertFeed(smartAlerts, onNavigate = onNavigate)
             }
 
             item {
@@ -395,7 +396,7 @@ fun V2FinanceScreen(
 }
 
 @Composable
-private fun SmartAlertFeed(alerts: List<FinancialAlert>) {
+private fun SmartAlertFeed(alerts: List<FinancialAlert>, onNavigate: (String) -> Unit) {
     if (alerts.isEmpty()) return
     Column {
         Text(
@@ -410,14 +411,16 @@ private fun SmartAlertFeed(alerts: List<FinancialAlert>) {
             contentPadding = PaddingValues(end = 16.dp)
         ) {
             items(alerts) { alert ->
-                SmartAlertChip(alert)
+                SmartAlertChip(alert, onTap = {
+                    if (alert.destination.isNotEmpty()) onNavigate(alert.destination)
+                })
             }
         }
     }
 }
 
 @Composable
-private fun SmartAlertChip(alert: FinancialAlert) {
+private fun SmartAlertChip(alert: FinancialAlert, onTap: () -> Unit = {}) {
     val tint = when (alert.tintKey) {
         "amber"   -> LumeAmber
         "emerald" -> LumeEmerald
@@ -427,7 +430,9 @@ private fun SmartAlertChip(alert: FinancialAlert) {
         else      -> TextMain
     }
     Surface(
-        modifier = Modifier.width(172.dp),
+        modifier = Modifier
+            .width(172.dp)
+            .clickable(onClick = onTap),
         color = tint.copy(alpha = 0.08f),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, tint.copy(alpha = 0.24f))
