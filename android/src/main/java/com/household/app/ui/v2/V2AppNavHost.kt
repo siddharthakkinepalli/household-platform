@@ -22,6 +22,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.household.app.ui.compose.motion.Motion
 import com.household.app.ui.compose.navigation.Screen
+import com.jugaad.feature.astro.ui.AstroHomeScreen
+import com.jugaad.feature.astro.ui.BirthChartScreen
+import com.jugaad.feature.astro.ui.AstroProfileScreen
 
 @Composable
 fun V2AppNavHost(
@@ -242,6 +245,19 @@ fun V2AppNavHost(
 
         composable(route = Screen.TaxSummary.route) {
             TaxSummaryScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(route = Screen.Astro.route) {
+            AstroHomeScreen(
+                onNavigateToProfile = { navController.navigate(Screen.AstroProfile.route) }
+            )
+        }
+
+        composable(route = Screen.AstroProfile.route) {
+            AstroProfileScreen(
+                onBack = { navController.popBackStack() },
+                onSuccess = { navController.popBackStack() }
+            )
         }
     }
 }

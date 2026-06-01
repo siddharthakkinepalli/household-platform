@@ -41,6 +41,57 @@
 | **F** | **Tax preparation, receipt linking, tax tagging, spending trends** | 🔲 Planned (F1–F3 Wave 6) |
 | **Wave 5 M/N/O** | **Vault automation bridge + Smart Alert deeplinks + Meals removed** | ✅ Done (2026-05-29) |
 | **Theme engine** | **6-theme dynamic system, DataStore persistence, Activity-level wiring** | ✅ Done (2026-05-29) |
+| **OCR hardening** | **CamScanner watermark bypass, MRZ «artifact normalization, Aufenthaltstitel back-card** | ✅ Done (2026-05-29) |
+| **Astro Phase 1** | **Foundation: 6 modules, SQLCipher DB, Keystore AES-256-GCM, Hilt, ProGuard** | ✅ Done (2026-05-31) |
+| **Astro Phase 2** | **NDK JNI: EphemerisDispatcher, libswe C++ bridge, PlanetPosition DTO, sunrise/sunset** | 🔄 In progress |
+| **Astro Phase 3** | **Domain: BirthChart/DailyTransit use cases, AstroRepositoryImpl** | 🔲 Planned |
+| **Astro Phase 4** | **ONNX NPU: LocalInferenceEngine on Dispatchers.Default, AstroInferenceModel** | 🔲 Planned |
+| **Astro Phase 5** | **Compose UI, Glance widget, AlarmManager, WorkManager daily refresh** | 🔲 Planned |
+| **Astro Phase 6** | **Security hardening: ProGuard audit, key rotation, memory safety** | 🔲 Planned |
+
+---
+
+## JUGAAD Astro Sub-System — 6-Phase Architecture (2026-05-31)
+
+### Spec
+- Vedic astrology engine, offline-first, $0 API cost
+- Swiss Ephemeris JNI (libswe) + ONNX NPU inference (NNAPI)
+- Sidereal Lahiri ayanamsha, Whole Sign houses, True Node Rahu/Ketu
+- Longitude accuracy < 1 arcminute vs NASA JPL DE440
+- Sunrise/sunset with elevation: h = -0.8333° - (0.0347° × √elevation_m), < 30s variance
+
+### Module Graph
+```
+:feature:astro ──► :core:security (AES-256-GCM Keystore, PII logger)
+               ──► :core:time     (JulianDay, Vedic calendar)
+               ──► :core:ephemeris (Swiss Ephemeris NDK JNI)
+               ──► :core:ai-runtime (ONNX Runtime 1.17.3)
+:widget:astro-home ──► :feature:astro (api)
+```
+
+### Phase 1 — Foundation ✅ (2026-05-31)
+Files created: 24 files across 6 modules. Key components:
+- `KeystoreManager` — AES-256-GCM non-exportable key, alias `jugaad_astro_master_key_v1`
+- `AstroKeyProvider` — 32-byte passphrase, Keystore-wrapped, `fill(0)` after use
+- `AstroLogger` — PII regex scrubbing (lat/lon/DOB/names), SHA-256 frame anonymization, R8 debug strip
+- `AstroDatabase` — Room + SQLCipher `SupportFactory`, passphrase zero-filled in 3 instructions
+- `UserProfileEntity` — encryptedBirthPayload (AES-GCM), birthPayloadIv, nameHash (SHA-256)
+- `DailyTransitCacheEntity` — planetId 0–8 (Sun→Ketu), transitDateJd, expiresAt, retrograde
+- `ClosedLoopFeedbackEntity` — predictionId UUID, userRating 1–5, modelConfidence Float, CASCADE FK
+
+### Phase 2 — Ephemeris NDK JNI 🔄 (in progress)
+Target deliverables:
+- `EphemerisDispatcher` — `newSingleThreadContext("ephemeris")`, all JNI calls serialized through it
+- `sweph_bridge.cpp` — JNI bridge: swe_set_ephe_path, swe_calc_ut, swe_houses, swe_rise_trans
+- `PlanetPosition.kt` — canonical DTO: planetId, longitudeDeg, latitudeDeg, speedDegPerDay, retrograde, nakshatraId, pada, signId
+- `EphemerisEngine.kt` — Kotlin interface over JNI, lifecycle: initialize() → compute() → release()
+- `JulianDayConverter.kt` — ZonedDateTime ↔ Julian Day Number (UT1 corrected)
+- `VedicCalendar.kt` — tithi, yoga, karana from Sun/Moon longitudes
+
+### Three Execution Traps
+1. **Phase 2→3 Data Class Drift** — `PlanetPosition` fields are canonical. Begin Phase 3 prompt with exact Phase 2 files.
+2. **SQLCipher Hook** — `Room.databaseBuilder().openHelperFactory(SupportFactory(passphrase))` is non-negotiable. Already implemented.
+3. **ONNX NPU Latency** — Phase 4 `OrtSession` creation MUST be inside `withContext(Dispatchers.Default)`.
 
 ---
 

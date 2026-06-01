@@ -18,8 +18,10 @@ import com.household.app.domain.utils.MerchantNameCleaner
 import com.household.app.ui.compose.navigation.Screen
 import com.household.app.ui.compose.theme.DocsColor
 import com.household.app.ui.compose.theme.FamilyColor
+import com.household.app.ui.compose.theme.LumeAmber
 import com.household.app.ui.compose.theme.LumeEmerald
 import com.household.app.ui.compose.theme.WalletColor
+import androidx.compose.material.icons.rounded.AutoAwesome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +49,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         // Meals module removed — stub with no real data flow (JUGAAD OS: no half-built tabs)
         Module("docs",    "Documents", Icons.Rounded.FolderOpen,           DocsColor,    "Vault & receipts",  Screen.Docs.route),
         Module("family",  "Family",    Icons.Rounded.Group,                FamilyColor,  "Family hub",        Screen.Family.route),
-        Module("pantry",  "Pantry",    Icons.Rounded.ShoppingCart,         LumeEmerald,  "Stock & consume",   Screen.Pantry.route)
+        Module("pantry",  "Pantry",    Icons.Rounded.ShoppingCart,         LumeEmerald,  "Stock & consume",   Screen.Pantry.route),
+        Module("astro",   "Astro",     Icons.Rounded.AutoAwesome,         LumeAmber,    "Vedic insights",    Screen.Astro.route)
     )
 
     init {

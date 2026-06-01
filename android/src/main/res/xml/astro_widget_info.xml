@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    AppWidget metadata for AstroHomeWidget.
+    Minimum: 2×2 cells (roughly 110×110dp on mdpi).
+    Target:  4×2 cells for the full Rahu Kaal progress bar layout.
+    updatePeriodMillis=0 disables the system auto-update — all updates come from
+    TransitRefreshWorker via AstroWidgetUpdater (prevents unnecessary battery drain).
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/astro_widget_description" />

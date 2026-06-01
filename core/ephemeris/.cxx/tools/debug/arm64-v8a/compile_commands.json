@@ -1,0 +1,52 @@
+[
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -fno-limit-debug-info  -fPIC -std=gnu++17 -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\sweph_bridge.cpp.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\sweph_bridge.cpp",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\sweph_bridge.cpp"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swedate.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swedate.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swedate.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swehouse.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swehouse.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swehouse.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swejpl.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swejpl.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swejpl.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swemmoon.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swemmoon.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swemmoon.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swemplan.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swemplan.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swemplan.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\sweph.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\sweph.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\sweph.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swephlib.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swephlib.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swephlib.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swecl.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swecl.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swecl.c"
+},
+{
+  "directory": "C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a",
+  "command": "C:\\Users\\siak271766\\AppData\\Local\\Android\\Sdk\\ndk\\28.2.13676358\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android26 --sysroot=C:/Users/siak271766/AppData/Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dsweph_bridge_EXPORTS -IC:/Projects/household-platform/core/ephemeris/src/main/cpp/swe -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\sweph_bridge.dir\\src\\main\\cpp\\swe\\swehel.c.o -c C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swehel.c",
+  "file": "C:\\Projects\\household-platform\\core\\ephemeris\\src\\main\\cpp\\swe\\swehel.c"
+}
+]

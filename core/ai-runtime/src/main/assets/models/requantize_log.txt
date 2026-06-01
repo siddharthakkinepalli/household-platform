@@ -1,0 +1,31 @@
+[0] Tokenizer assets present -- skip
+
+[1] Exporting ONNX with enforced tie_word_embeddings  (~10-20 min)
+   Loading model ...
+`torch_dtype` is deprecated! Use `dtype` instead!
+   Weight tying enforced: True
+   Running ONNX export ...
+Traceback (most recent call last):
+  File "C:\Projects\household-platform\core\ai-runtime\src\main\assets\models\requantize_int4.py", line 214, in <module>
+    model_onnx  = export_tied(WORK_DIR)
+  File "C:\Projects\household-platform\core\ai-runtime\src\main\assets\models\requantize_int4.py", line 84, in export_tied
+    main_export(
+    ~~~~~~~~~~~^
+        model_name_or_path=MODEL_ID,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        model=model,          # pass pre-loaded model so tying is preserved
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\siak271766\AppData\Roaming\Python\Python314\site-packages\optimum\exporters\onnx\__main__.py", line 399, in main_export
+    onnx_export_from_model(
+    ~~~~~~~~~~~~~~~~~~~~~~^
+        model=model,
+        ^^^^^^^^^^^^
+    ...<18 lines>...
+        **kwargs_shapes,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: optimum.exporters.onnx.convert.onnx_export_from_model() got multiple values for keyword argument 'model'

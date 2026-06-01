@@ -1,0 +1,3 @@
+C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a/CMakeFiles/sweph_bridge.dir
+C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Projects/household-platform/core/ephemeris/.cxx/Debug/6k551p6u/arm64-v8a/CMakeFiles/rebuild_cache.dir

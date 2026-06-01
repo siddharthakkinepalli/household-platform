@@ -28,3 +28,11 @@ include(":modules:expenses")
 
 // Include app module
 include(":android")
+
+// Astro sub-system modules
+include(":core:security")
+include(":core:time")
+include(":core:ephemeris")
+include(":core:ai-runtime")
+include(":feature:astro")
+include(":widget:astro-home")

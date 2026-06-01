@@ -99,6 +99,38 @@ New util: `String.capitalizeWords()` in `domain/utils/StringExtensions.kt`.
 
 ---
 
+## Astro sub-system — 6-phase build (active — Phase 1 committed 2026-06-01)
+
+Vedic astrology engine docking into JUGAAD. Offline, $0 API cost, Swiss Ephemeris JNI + ONNX NPU.
+
+| Phase | Status | Deliverable |
+|-------|--------|-------------|
+| **Phase 1** | ✅ Committed | Gradle modules (6 new), SQLCipher DB, Android Keystore, Hilt wiring, ProGuard rules, AstroLogger, security utils, widget receivers, profile screen scaffolding, rule engine stubs |
+| **Phase 2** | 🔲 Next | EphemerisDispatcher, libswe JNI bridge, PlanetPosition DTO |
+| **Phase 3** | 🔲 Pending | Domain use cases, BirthChart, AstroRepositoryImpl |
+| **Phase 4** | 🔲 Pending | ONNX LocalInferenceEngine on Dispatchers.Default |
+| **Phase 5** | 🔲 Pending | Compose UI, Glance widget, AlarmManager |
+| **Phase 6** | 🔲 Pending | Security hardening, ProGuard audit, key rotation |
+
+**Critical rules across all phases:**
+- `PlanetPosition` field names are canonical — never drift between phases. Always feed prior-phase files into next-phase context.
+- `AstroKeyProvider.acquirePassphrase()` → caller MUST `fill(0)` immediately after `SupportFactory` construction.
+- Phase 4 `OrtSession` creation MUST be inside `withContext(Dispatchers.Default)` — NNAPI NPU binding blocks ~200–500ms.
+- Birth data (lat/lon/DOB) NEVER plaintext in any log or unencrypted field — use `AstroLogger.sanitize()`.
+- Full context: see memory file `astro_module.md` — read it at the start of every astro phase.
+
+**Astro module locations:**
+| Module | Directory | Package |
+|--------|-----------|---------|
+| `:core:security` | `core/security/` | `com.jugaad.core.security` |
+| `:core:time` | `core/time/` | `com.jugaad.core.time` |
+| `:core:ephemeris` | `core/ephemeris/` | `com.jugaad.core.ephemeris` |
+| `:core:ai-runtime` | `core/ai-runtime/` | `com.jugaad.core.airuntime` |
+| `:feature:astro` | `feature/astro/` | `com.jugaad.feature.astro` |
+| `:widget:astro-home` | `widget/astro-home/` | `com.jugaad.widget.astrohome` |
+
+---
+
 ## Wave 6 — next work (3 parallel agents, launch immediately)
 
 | Agent | Task | What it delivers |

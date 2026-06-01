@@ -1,0 +1,24 @@
+# ninja log v5
+5	3383	8020020849003970	CMakeFiles/sweph_bridge.dir/src/main/cpp/sweph_bridge.cpp.o	426c2d6f38456857
+59	1949	8020021479315792	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swedate.c.o	4aae9ca63ba9b30e
+1195	2126	8020021482017405	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swemmoon.c.o	c1987f853561b4aa
+1252	2300	8020021483924137	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swejpl.c.o	6f996f27c930e028
+1329	2500	8020021485757756	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swemplan.c.o	b760b9be0dbb9de9
+1131	2505	8020021485757756	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swehouse.c.o	963a24e03073542f
+1437	3019	8020021491220540	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swephlib.c.o	afb911b9ee1e595c
+1803	3097	8020021492072890	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swehel.c.o	40710a0904762aae
+1543	3290	8020021493891860	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swecl.c.o	d135659d1686f645
+1655	3750	8020021498564163	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/sweph.c.o	6572914107ff1c8
+3751	4716	8020021507750005	../../../../build/intermediates/cxx/Debug/6k551p6u/obj/arm64-v8a/libsweph_bridge.so	f3e8d78df48d4e85
+1	147	0	clean	976c242319541400
+188	2611	8020183375742039	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swedate.c.o	4aae9ca63ba9b30e
+611	2766	8020183377079714	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swemmoon.c.o	c1987f853561b4aa
+316	2857	8020183378002333	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swejpl.c.o	6f996f27c930e028
+509	3019	8020183379551855	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swemplan.c.o	b760b9be0dbb9de9
+401	3495	8020183384519346	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swehouse.c.o	963a24e03073542f
+862	3863	8020183388063685	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swephlib.c.o	afb911b9ee1e595c
+1410	3960	8020183389349332	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swehel.c.o	40710a0904762aae
+1036	4165	8020183391279884	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/swecl.c.o	d135659d1686f645
+725	4808	8020183397674901	CMakeFiles/sweph_bridge.dir/src/main/cpp/swe/sweph.c.o	6572914107ff1c8
+62	6434	8020183413840819	CMakeFiles/sweph_bridge.dir/src/main/cpp/sweph_bridge.cpp.o	426c2d6f38456857
+6435	8185	8020183431030476	../../../../build/intermediates/cxx/Debug/6k551p6u/obj/arm64-v8a/libsweph_bridge.so	f3e8d78df48d4e85

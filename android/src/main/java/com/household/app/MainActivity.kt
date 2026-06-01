@@ -13,12 +13,14 @@ import com.household.app.ui.compose.theme.JugaadTheme
 import com.household.app.ui.compose.theme.ThemePreferencesManager
 import com.household.app.ui.compose.theme.ThemeViewModel
 import com.household.app.ui.compose.theme.ThemeViewModelFactory
+import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * MainActivity — entry point.
  * Owns the theme lifecycle: instantiates ThemeViewModel, collects the persisted
  * JugaadThemeSelection from DataStore, and wraps the entire app in JugaadTheme.
  */
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private val themeViewModel: ThemeViewModel by viewModels {

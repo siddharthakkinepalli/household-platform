@@ -1,10 +1,10 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-05-29 (OCR pipeline hardening — passport + residence permit extraction fixed)
-**DB version:** 21  
-**Build status:** ✅ BUILD SUCCESSFUL  
-**APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`  
-**Next action:** Wave 6 — E2 SteuerKlar Drive write · F3 Receipt↔Wallet 📄 icon · F1 Tax Tagging
+**Last updated:** 2026-06-01 (Astro Phase 1 foundation committed — security modules, widget scaffolding, rule engine)
+**DB version:** 21 (main app) · Astro v1 (separate SQLCipher `astro_encrypted.db`)
+**Build status:** ✅ BUILD SUCCESSFUL
+**APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`
+**Next action:** Astro Phase 2 — EphemerisDispatcher JNI bridge, libswe integration, PlanetPosition DTO
 
 ---
 
@@ -872,6 +872,14 @@ See PLATFORM.md for full updated blueprint.
 - [x] JUGAAD P3: `OcrEngine` interface, `OpenCvPreprocessor`, `OcrRouter`, `PaddleOcrEngine` FULL — lazy ONNX session from assets, bitmap→float CHW tensor [1,3,48,W], greedy CTC decode, Latin+German charset; `OcrRouter.init(context)` prepends PaddleOcr before ML Kit; `VaultDocumentParserWorker` calls `OcrRouter.init()` at top of `doWork()`
 - [x] JUGAAD P4: Vault FTS Search UI — `VaultSearchBar` + `VaultSearchResults` + `SearchEmptyState` composables; `VaultSearchResult` data class + `onSearchQuery()` in VaultViewModel; FTS prefix matching with `*`
 - [x] E3: Document Expiry Timeline card — `DocumentExpiryTimelineCard` rewritten; glow=LumeCyan, "NEXT 90 DAYS", dot+title+days, CriticalRed ≤7d / LumeAmber ≤30d / LumeEmerald otherwise
+- [x] **Astro Phase 1** — Foundation: `:core:security` `:core:time` `:core:ephemeris` `:core:ai-runtime` `:feature:astro` `:widget:astro-home` modules; SQLCipher-encrypted Room DB (astro_encrypted.db); Android Keystore AES-256-GCM passphrase; AstroLogger PII-safe structured logging; @HiltAndroidApp; 3 Room entities + 3 DAOs; ProGuard rules
+- [x] **Astro Phase 2** — NDK JNI: EphemerisDispatcher (single-thread, std::mutex), sweph_bridge.cpp (5 JNI functions), PlanetPosition canonical DTO, HouseData, SunriseSunset, JulianDayConverter (Meeus), VedicCalendar (panchanga)
+- [x] **Astro Phase 3** — Domain: GrahaYuddha+ShadbalaSummary+ContextPayload+DailyPanchang+DailyTransit+BirthChart models; AstroDataProcessor (detectGrahaYuddha, computeShadbala, buildContextPayload, buildContextPayloadNoLagna, reconstructFromCache, toCacheEntities); ComputeBirthChartUseCase+GetDailyTransitUseCase+SubmitFeedbackUseCase; AstroRepositoryImpl; AstroModule @Binds; AstroKeyProvider.decryptBirthPayload()
+- [x] **Astro Phase 4** — ONNX NPU: InferenceResult DTO, ModelConfig, BpeTokenizer (loads vocab.json+merges.txt from assets), TensorBufferPool (ArrayBlockingQueue), LocalInferenceEngine (OrtSession on Dispatchers.Default, NNAPI→CPU fallback, temperature=0.2, top-p=0.9, cooperative cancellation), AstroPromptBuilder (XML tag boundaries), AstroInferenceModel (full pipeline), AiRuntimeModule @Singleton
+- [x] **Astro Phase 5** — UI+System: AstroUiState (immutable), AstroPreferencesManager (DataStore), AstroDashboardViewModel (@HiltViewModel, collectAsStateWithLifecycle), AstroHomeScreen (Panchanga+RahuKaal+PlanetGrid+AI prediction+feedback), BirthChartScreen (natal positions+Shadbala bars), AstroNotificationManager (max 3/24h, coalesce), TransitRefreshWorker (@HiltWorker, ephemeris-only, NO inference), AstroBackgroundScheduler (AlarmManager exact→setWindow fallback+WorkManager 24h DEVICE_IDLE), TransitRefreshReceiver (BOOT_COMPLETED), AstroHomeWidget (Glance 1.0, cache-read-only <100ms), AstroWidgetReceiver, HouseholdApp+HiltWorkerFactory+Configuration.Provider
+- [ ] **Astro Phase 4** — ONNX NPU: LocalInferenceEngine on Dispatchers.Default, AstroInferenceModel
+- [ ] **Astro Phase 5** — UI: Compose screens, Glance widget, AlarmManager, WorkManager daily refresh
+- [ ] **Astro Phase 6** — Security hardening: ProGuard audit, key rotation, memory safety, encrypted backup
 
 ## OCR Pipeline Hardening — COMPLETE ✅ (2026-05-29)
 

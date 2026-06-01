@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- AlarmManager exact alarm permission (user-grantable; graceful fallback if denied) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- USE_EXACT_ALARM is the unrestricted form available to declared-use apps on API 33+ -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Required to re-schedule alarms after device reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- For notification vibration -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- POST_NOTIFICATIONS runtime permission (Android 13+) already handled in host app -->
+
+    <application>
+        <!-- TransitRefreshWorker registered via HiltWorkerFactory (host app's Application) -->
+
+        <!-- Boot receiver — re-schedules daily AlarmManager alarm after reboot -->
+        <receiver
+            android:name=".background.TransitRefreshReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.jugaad.astro.ACTION_DAILY_REFRESH" />
+                <action android:name="com.jugaad.astro.ACTION_RAHU_KAAL" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

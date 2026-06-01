@@ -5,6 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.dagger.hilt.android")
 }
 
 ksp {
@@ -71,12 +72,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -92,10 +93,25 @@ android {
     }
 }
 
+ksp {
+    arg("room.generateKotlin", "true")
+}
+
 dependencies {
+    // Hilt
+    implementation("com.google.dagger:hilt-android:2.59.2")
+    ksp("com.google.dagger:hilt-android-compiler:2.59.2")
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
+
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     // Household modules
     implementation(project(":libs:household-core"))
     implementation(project(":modules:expenses"))
+    implementation(project(":feature:astro"))
+    implementation(project(":widget:astro-home"))
 
     // Core AndroidX
     implementation("androidx.core:core-ktx:1.12.0")
@@ -186,6 +202,13 @@ dependencies {
     // QR / barcode scanning via camera
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
+    // SQLCipher (Encrypted Database)
+    api("net.zetetic:android-database-sqlcipher:4.5.4")
+
+    // Jetpack Glance (Widgets)
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
@@ -197,10 +220,10 @@ dependencies {
 // Work around JDK image transform issues on this environment by disabling Javac tasks.
 // Room KSP is configured above to generate Kotlin sources, so these tasks are not required.
 afterEvaluate {
-    tasks.named("compileDebugJavaWithJavac").configure {
-        enabled = false
-    }
-    tasks.named("compileReleaseJavaWithJavac").configure {
-        enabled = false
-    }
+//    tasks.named("compileDebugJavaWithJavac").configure {
+//        enabled = false
+//    }
+//    tasks.named("compileReleaseJavaWithJavac").configure {
+//        enabled = false
+//    }
 }

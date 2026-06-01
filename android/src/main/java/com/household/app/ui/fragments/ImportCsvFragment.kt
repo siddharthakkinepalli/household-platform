@@ -15,11 +15,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.household.app.R
+import com.household.app.ai.AiEntryPoint
 import com.household.app.data.WalletDataLoader
 import com.household.app.data.WalletUserDataStore
 import com.household.app.data.config.CsvParserService
 import com.household.app.data.config.ImportParseResult
 import com.household.app.data.config.ParsedTransactionCandidate
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -104,14 +106,43 @@ class ImportCsvFragment : Fragment() {
         when (val result = csvParserService.parse(csvText, fileName, fileHash, startingId)) {
             is ImportParseResult.Success -> {
                 val summary = result.summary
-                val walletTransactions = summary.transactions.map { it.toWalletTransaction() }
+
+                // Step 1 — show rule-based results immediately
+                var candidates = summary.transactions
+                textDetectedBank.text = "Detected bank: ${summary.detectedBank}"
+                renderPreview(candidates.map { it.toWalletTransaction() })
+
+                // Step 2 — AI re-categorize "Other" / "Uncategorized" rows
+                val uncategorized = candidates.filter { it.category in setOf("Other", "Uncategorized") }
+                if (uncategorized.isNotEmpty()) {
+                    textImportStatus.text = "Enhancing ${uncategorized.size} uncategorized rows with AI…"
+                    val categorizer = EntryPointAccessors
+                        .fromApplication(requireContext().applicationContext, AiEntryPoint::class.java)
+                        .expenseCategorizer()
+
+                    val upgraded = candidates.map { tx ->
+                        if (tx.category !in setOf("Other", "Uncategorized")) return@map tx
+                        val ai = runCatching {
+                            categorizer.categorize(tx.title, tx.amount)
+                        }.getOrNull()
+                        if (ai != null && ai.confidence >= 0.70f) tx.copy(category = ai.category, note = ai.budgetCategory)
+                        else tx
+                    }
+                    candidates = upgraded
+                }
+
+                val walletTransactions = candidates.map { it.toWalletTransaction() }
+                val aiCount = candidates.count { orig ->
+                    summary.transactions.any { it.id == orig.id && it.category != orig.category }
+                }
                 preview = ImportPreview(
                     detectedBank = summary.detectedBank,
                     parsed = walletTransactions,
                     skippedRows = summary.skippedCount
                 )
-                textDetectedBank.text = "Detected bank: ${summary.detectedBank}"
-                textImportStatus.text = "Ready to import ${walletTransactions.size} transactions (${summary.skippedCount} skipped, ${summary.warningCount} uncategorized)."
+                val aiNote = if (aiCount > 0) ", $aiCount AI-enhanced" else ""
+                textImportStatus.text = "Ready to import ${walletTransactions.size} transactions " +
+                    "(${summary.skippedCount} skipped${aiNote})."
                 buttonImportCsv.isEnabled = walletTransactions.isNotEmpty()
                 renderPreview(walletTransactions)
             }

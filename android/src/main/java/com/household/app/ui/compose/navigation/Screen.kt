@@ -2,6 +2,7 @@ package com.household.app.ui.compose.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Cottage
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -53,9 +54,11 @@ sealed class Screen(
     object SubscriptionHub : Screen("subscription_hub", Icons.Rounded.Tune, "Subscription Hub")
     object TaxSummary : Screen("tax_summary", Icons.Rounded.Tune, "Tax Summary")
     object Trips : Screen("trips", Icons.Rounded.Tune, "Trips")
+    object Astro : Screen("astro", Icons.Rounded.AutoAwesome, "Astro")
+    object AstroProfile : Screen("astro/profile", Icons.Rounded.AutoAwesome, "Astro Profile")
 
     companion object {
         /** Ordered list used to build primary rail items and NavHost destinations. */
-        val all: List<Screen> = listOf(Home, Wallet, Docs, Family, Config)
+        val all: List<Screen> = listOf(Home, Wallet, Docs, Family, Config, Astro)
     }
 }

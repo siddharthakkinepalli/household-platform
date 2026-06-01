@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -142,6 +143,9 @@ import com.household.app.ui.v2.components.VaultMoveToFolderSheet
 import com.household.app.ui.viewmodels.VaultSearchResult
 import com.household.app.ui.viewmodels.VaultUiState
 import com.household.app.ui.viewmodels.VaultViewModel
+import com.household.app.ai.AiDocumentResult
+import com.household.app.ai.AiEntryPoint
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
@@ -793,6 +797,8 @@ private fun DocumentDetailSheet(
     }
 
     var extractedEntities by remember { mutableStateOf<List<com.household.app.data.entities.VaultDocumentEntityRecord>>(emptyList()) }
+    var aiResult       by remember { mutableStateOf<AiDocumentResult?>(null) }
+    var aiLoading      by remember { mutableStateOf(false) }
 
     LaunchedEffect(entry.id) {
         extractedEntities = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -801,6 +807,9 @@ private fun DocumentDetailSheet(
             }.getOrDefault(emptyList())
         }
     }
+
+    val needsAiEnhancement = extractedEntities.isEmpty() ||
+        extractedEntities.all { it.confidence < 0.30f }
 
     val category = runCatching { VaultCategory.valueOf(entry.category) }.getOrDefault(VaultCategory.OTHER)
     val isReceipt = category == VaultCategory.RECEIPT
@@ -896,6 +905,52 @@ private fun DocumentDetailSheet(
             }
 
             ExtractedInfoSection(extractedEntities)
+
+            // AI enhance button — only shown when rule parsers gave low confidence
+            if (needsAiEnhancement && aiResult == null) {
+                Button(
+                    onClick = {
+                        if (!aiLoading) {
+                            aiLoading = true
+                            scope.launch {
+                                val ep = EntryPointAccessors.fromApplication(
+                                    context.applicationContext,
+                                    AiEntryPoint::class.java
+                                )
+                                aiResult = ep.documentEnhancer().enhance(entry.rawOcrContent)
+                                aiLoading = false
+                            }
+                        }
+                    },
+                    enabled = !aiLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LumeCyan.copy(alpha = 0.12f),
+                        disabledContainerColor = LumeCyan.copy(alpha = 0.06f)
+                    ),
+                    contentPadding = PaddingValues(12.dp)
+                ) {
+                    if (aiLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = LumeCyan
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Analysing with AI…", color = LumeCyan)
+                    } else {
+                        Icon(Icons.Rounded.AutoAwesome, null,
+                            tint = LumeCyan, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Enhance with AI", color = LumeCyan)
+                    }
+                }
+            }
+
+            // AI result card
+            aiResult?.let { result ->
+                AiDocumentResultCard(result)
+            }
 
             Spacer(Modifier.height(4.dp))
 
@@ -1183,6 +1238,57 @@ private fun categoryColor(category: VaultCategory): Color = when (category) {
     VaultCategory.INSURANCE    -> Color(0xFFFB7185)
     VaultCategory.MEDICAL      -> Color(0xFF4ADE80)
     VaultCategory.OTHER        -> LumeWhite.copy(alpha = 0.5f)
+}
+
+// ── AI Document Result Card ───────────────────────────────────────────────────
+
+@Composable
+private fun AiDocumentResultCard(result: AiDocumentResult) {
+    EliteGlassCard(glowColor = LumeCyan.copy(alpha = 0.12f)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Rounded.AutoAwesome, null,
+                    tint = LumeCyan, modifier = Modifier.size(14.dp))
+                Text(
+                    "AI Extracted Fields",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LumeCyan,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            val fields = listOfNotNull(
+                result.docType?.let { "Document Type" to it },
+                result.name?.let { "Name" to it },
+                result.documentNumber?.let { "Number" to it },
+                result.issueDate?.let { "Issued" to it },
+                result.expiryDate?.let { "Expires" to it },
+                result.issuingAuthority?.let { "Authority" to it },
+                result.country?.let { "Country" to it }
+            )
+            fields.forEach { (label, value) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted,
+                        modifier = Modifier.width(100.dp))
+                    Text(value,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMain,
+                        modifier = Modifier.weight(1f))
+                }
+            }
+            if (fields.isEmpty()) {
+                Text("Model could not extract structured fields from this document.",
+                    style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            }
+        }
+    }
 }
 
 // ── Extracted Info Section ────────────────────────────────────────────────────
