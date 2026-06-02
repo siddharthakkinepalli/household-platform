@@ -63,6 +63,7 @@ import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -256,6 +257,12 @@ fun V2DocumentVaultScreen(
                 SubscriptionHubShortcutCard(onClick = onNavigateToSubscriptionHub)
             }
 
+            DocumentAiStatusBanner(
+                status = viewModel.modelStatus.collectAsState().value,
+                onRetry = viewModel::retryModelLoad,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+
             VaultSearchBar(
                 query = searchQuery,
                 onQueryChange = viewModel::onSearchQuery,
@@ -264,7 +271,10 @@ fun V2DocumentVaultScreen(
             if (searchResults.isNotEmpty()) {
                 VaultSearchResults(
                     results = searchResults,
-                    onResultClick = { viewModel.onSearchQuery("") },
+                    onResultClick = { documentId ->
+                        viewModel.getEntryById(documentId)?.let { selectedEntry = it }
+                        viewModel.onSearchQuery("")
+                    },
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
@@ -1397,6 +1407,59 @@ private fun ExtractedInfoSection(entities: List<com.household.app.data.entities.
 }
 
 // ── Vault Search ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun DocumentAiStatusBanner(
+    status: VaultViewModel.ModelStatus,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when (status) {
+        is VaultViewModel.ModelStatus.Idle -> Unit
+        is VaultViewModel.ModelStatus.Downloading -> {
+            Column(modifier.fillMaxWidth()) {
+                Text(
+                    "Downloading document AI model… ${status.progressPct}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LumeAmber
+                )
+                LinearProgressIndicator(
+                    progress = { status.progressPct / 100f },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    color = LumeAmber
+                )
+            }
+        }
+        is VaultViewModel.ModelStatus.Loading -> {
+            Text(
+                "Loading document AI model…",
+                style = MaterialTheme.typography.labelSmall,
+                color = LumeCyan,
+                modifier = modifier
+            )
+        }
+        is VaultViewModel.ModelStatus.Ready -> Unit
+        is VaultViewModel.ModelStatus.Failed -> {
+            Row(
+                modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Document AI unavailable",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = CriticalRed
+                )
+                Text(
+                    "Retry",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LumeCyan,
+                    modifier = Modifier.clickable { onRetry() }
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun VaultSearchBar(

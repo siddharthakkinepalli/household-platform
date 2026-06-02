@@ -30,9 +30,14 @@ import com.household.app.domain.models.vault.VisionTextPayload
 import com.household.app.domain.services.ReceiptItemParser
 import com.household.app.domain.usecases.GetPaperclipCandidatesUseCase
 import com.household.app.domain.usecases.LinkReceiptToExpenseUseCase
+import com.household.app.di.DocumentAiEntryPoint
+import com.jugaad.core.documentai.DocumentInferenceModel
+import com.jugaad.core.llmruntime.LlamaEngine
+import com.jugaad.core.llmruntime.ModelDownloadManager
 import com.household.app.vault.DriveDataStore
 import com.household.app.vault.DriveSyncWorker
 import com.household.app.vault.workers.PipelineManager
+import dagger.hilt.android.EntryPointAccessors
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
@@ -91,6 +96,17 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     private val receiptResolutionService by lazy { ReceiptResolutionService(appContext) }
     private var pendingVisionText: VisionTextPayload? = null
     private var pendingImagePath: String = ""
+
+    sealed interface ModelStatus {
+        data object Idle : ModelStatus
+        data class Downloading(val progressPct: Int) : ModelStatus
+        data object Loading : ModelStatus
+        data object Ready : ModelStatus
+        data class Failed(val reason: String) : ModelStatus
+    }
+
+    private val _modelStatus = MutableStateFlow<ModelStatus>(ModelStatus.Idle)
+    val modelStatus: StateFlow<ModelStatus> = _modelStatus.asStateFlow()
 
     private val _uiState = MutableStateFlow<VaultUiState>(VaultUiState.Idle)
     val uiState: StateFlow<VaultUiState> = _uiState.asStateFlow()
@@ -166,10 +182,44 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             vaultRepository.getVaultEntries().collect { _allEntries.value = it }
         }
+        viewModelScope.launch { initDocumentAi() }
     }
 
     fun navigateTo(target: VaultBrowseState) {
         _browseState.value = target
+    }
+
+    fun getEntryById(id: Long): VaultEntity? = _allEntries.value.find { it.id == id }
+
+    private suspend fun initDocumentAi() {
+        val ep = EntryPointAccessors.fromApplication(appContext, DocumentAiEntryPoint::class.java)
+        val dm = ep.modelDownloadManager()
+        val docModel = ep.documentInferenceModel()
+        when {
+            dm.isModelDownloaded() -> loadModel(docModel, dm)
+            else -> downloadThenLoad(dm, docModel)
+        }
+    }
+
+    private suspend fun loadModel(docModel: DocumentInferenceModel, dm: ModelDownloadManager) {
+        _modelStatus.value = ModelStatus.Loading
+        val ok = docModel.init(dm.getModelFile())
+        _modelStatus.value = if (ok) ModelStatus.Ready else ModelStatus.Failed("Model failed to initialize")
+    }
+
+    private suspend fun downloadThenLoad(dm: ModelDownloadManager, docModel: DocumentInferenceModel) {
+        _modelStatus.value = ModelStatus.Downloading(0)
+        dm.downloadModel(ModelDownloadManager.MODEL_DOWNLOAD_URL) { downloaded, total ->
+            if (total > 0) _modelStatus.value = ModelStatus.Downloading(((downloaded * 100) / total).toInt())
+        }.onSuccess {
+            loadModel(docModel, dm)
+        }.onFailure { e ->
+            _modelStatus.value = ModelStatus.Failed(e.message ?: "Download failed")
+        }
+    }
+
+    fun retryModelLoad() {
+        viewModelScope.launch { initDocumentAi() }
     }
 
     /** Opens Identity → member folder browser (from Family detail). */

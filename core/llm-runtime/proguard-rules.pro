@@ -1,0 +1,4 @@
+-keep class com.jugaad.core.llmruntime.jni.LlamaJni { *; }
+-keep class com.jugaad.core.llmruntime.LlamaEngine { *; }
+-keep class com.jugaad.core.llmruntime.ModelDownloadManager { *; }
+-dontwarn com.jugaad.core.llmruntime.**

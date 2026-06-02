@@ -51,4 +51,15 @@ class ExpensesCategoriesTest {
         val (category, _) = categorizer.categorizeTransaction("", 10.0)
         assertEquals("Other", category)
     }
+
+    @Test
+    fun `test categorizeTransactions list`() {
+        val transactions = listOf(
+            mapOf("description" to "REWE", "amount" to 10.0),
+            mapOf("description" to "ING-DiBa", "amount" to 50.0) // Excluded
+        )
+        val result = categorizer.categorizeTransactions(transactions)
+        assertEquals(1, result.size)
+        assertEquals("Food & Dining", result[0]["category"])
+    }
 }

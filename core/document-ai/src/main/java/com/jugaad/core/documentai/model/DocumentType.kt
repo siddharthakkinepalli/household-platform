@@ -1,0 +1,8 @@
+package com.jugaad.core.documentai.model
+
+enum class DocumentType {
+    RECEIPT, INVOICE, PAYSLIP, BANK_STATEMENT,
+    PASSPORT, DRIVING_LICENCE, AUFENTHALTSTITEL,
+    TAX_DOCUMENT, RENTAL_CONTRACT, UTILITY_BILL,
+    UNKNOWN
+}
