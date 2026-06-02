@@ -1,10 +1,10 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-06-01 (Astro Phase 1 foundation committed — security modules, widget scaffolding, rule engine)
+**Last updated:** 2026-06-03 (Gemma 4 document AI live — llama.cpp JNI, in-app download, extraction pipeline)
 **DB version:** 21 (main app) · Astro v1 (separate SQLCipher `astro_encrypted.db`)
 **Build status:** ✅ BUILD SUCCESSFUL
 **APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`
-**Next action:** Astro Phase 2 — EphemerisDispatcher JNI bridge, libswe integration, PlanetPosition DTO
+**Next action:** Chat Assistant — `:feature:assistant` module, HouseholdContextProvider, AssistantScreen (Gemini prompt ready)
 
 ---
 
@@ -872,6 +872,7 @@ See PLATFORM.md for full updated blueprint.
 - [x] JUGAAD P3: `OcrEngine` interface, `OpenCvPreprocessor`, `OcrRouter`, `PaddleOcrEngine` FULL — lazy ONNX session from assets, bitmap→float CHW tensor [1,3,48,W], greedy CTC decode, Latin+German charset; `OcrRouter.init(context)` prepends PaddleOcr before ML Kit; `VaultDocumentParserWorker` calls `OcrRouter.init()` at top of `doWork()`
 - [x] JUGAAD P4: Vault FTS Search UI — `VaultSearchBar` + `VaultSearchResults` + `SearchEmptyState` composables; `VaultSearchResult` data class + `onSearchQuery()` in VaultViewModel; FTS prefix matching with `*`
 - [x] E3: Document Expiry Timeline card — `DocumentExpiryTimelineCard` rewritten; glow=LumeCyan, "NEXT 90 DAYS", dot+title+days, CriticalRed ≤7d / LumeAmber ≤30d / LumeEmerald otherwise
+- [x] **Gemma 4 Document AI** — `:core:llm-runtime` (llama.cpp NDK JNI, LlamaEngine, ModelDownloadManager with WiFi progress download); `:core:document-ai` (DocumentInferenceModel, DocumentPromptBuilder per-type JSON schemas, LlmResponseParser flatten+arrays, ExtractionResult EMPTY sentinel); VaultViewModel ModelStatus sealed class + download banner; FTS search result tap opens document detail; 23 unit tests passing; commit ea28227
 - [x] **Astro Phase 1** — Foundation: `:core:security` `:core:time` `:core:ephemeris` `:core:ai-runtime` `:feature:astro` `:widget:astro-home` modules; SQLCipher-encrypted Room DB (astro_encrypted.db); Android Keystore AES-256-GCM passphrase; AstroLogger PII-safe structured logging; @HiltAndroidApp; 3 Room entities + 3 DAOs; ProGuard rules
 - [x] **Astro Phase 2** — NDK JNI: EphemerisDispatcher (single-thread, std::mutex), sweph_bridge.cpp (5 JNI functions), PlanetPosition canonical DTO, HouseData, SunriseSunset, JulianDayConverter (Meeus), VedicCalendar (panchanga)
 - [x] **Astro Phase 3** — Domain: GrahaYuddha+ShadbalaSummary+ContextPayload+DailyPanchang+DailyTransit+BirthChart models; AstroDataProcessor (detectGrahaYuddha, computeShadbala, buildContextPayload, buildContextPayloadNoLagna, reconstructFromCache, toCacheEntities); ComputeBirthChartUseCase+GetDailyTransitUseCase+SubmitFeedbackUseCase; AstroRepositoryImpl; AstroModule @Binds; AstroKeyProvider.decryptBirthPayload()

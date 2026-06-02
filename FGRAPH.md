@@ -298,7 +298,8 @@ onDocumentUploaded() → DocumentExpiryWorker
 | File Dedup | ✅ Live | `VaultRepositoryImpl` | SHA-256 — same file never reprocessed |
 | PaddleOCR Engine | ✅ Live | `PaddleOcrEngine` | ONNX Runtime; `en_PP-OCRv4_rec_mobile` (7.3MB); H=48 |
 | OpenCV Preprocessing | ✅ Live | `OpenCvPreprocessor` | Grayscale → medianBlur → adaptiveThreshold |
-| FTS Vault Search | ✅ Live | `V2DocumentVaultScreen` | Inline search bar; prefix matching; entity type + confidence |
+| FTS Vault Search | ✅ Live | `V2DocumentVaultScreen` | Inline search bar; prefix matching; tap result opens document detail |
+| **Gemma 4 Document AI** | ✅ Live | `:core:llm-runtime` + `:core:document-ai` | llama.cpp JNI (latest); Gemma 4 E2B Q4_K_M; in-app WiFi download; structured field extraction per document type |
 | Expiry Timeline (E3) | ✅ Live | `V2DocumentVaultScreen` | 90-day card; 🔴 ≤7d / 🟡 ≤30d / 🟢 otherwise |
 | Document Expiry Notifications | ✅ Live | `DocumentExpiryWorker` | Posts Android notifications; marks acknowledged |
 | Receipt OCR + Pantry | ✅ Live | `V2ScannerScreen` → `PantryStagingScreen` | Spatial line-item reconstruction → pantry items |
@@ -315,6 +316,7 @@ onDocumentUploaded() → DocumentExpiryWorker
 | InsightCard Swipe Dismiss | ✅ Live | `InsightCard` | SwipeToDismissBox EndToStart + tap-X |
 | Meal Planning | ✅ Live | `V2MealsScreen` | Weekly plans |
 | Plaid Bank Sync | 🔨 Building | `backend/plaid_routes.py` | Commerzbank / N26 via Plaid sandbox (backend only) |
+| Chat Assistant | 🔲 Planned | `:feature:assistant` | NL queries over household DB using LlamaEngine context provider pattern |
 | F1 Tax Tagging | 🔲 Planned | — | Long-press tx/doc → tax category tag |
 | F2 Tax Export | 🔲 Planned | — | Group tagged items → PDF/CSV |
 | JUGAAD P5 | 🔲 Planned | — | AES vault encryption, CameraX edge detection |
@@ -352,6 +354,8 @@ OcrRouter — try engines in order, return first non-blank result
 | Item | Location | Used by |
 |------|----------|---------|
 | ONNX model | `android/src/main/assets/paddle_ocr_v4_rec.onnx` | PaddleOcrEngine |
+| Gemma 4 model | `context.filesDir/models/gemma4_e2b_q4km.gguf` (downloaded at runtime, 3.2GB) | DocumentInferenceModel |
+| Gemma download URL | `ModelDownloadManager.MODEL_DOWNLOAD_URL` in `:core:llm-runtime` | ModelDownloadManager |
 | Google Drive scope | `DRIVE_FILE` (app files) + `DRIVE` (tax folder) | DriveSyncWorker, BankStatementDriveWorker |
 | Salary anchor day | `dashboard_prefs.salaryAnchorDay` | FiscalDateUtils, CSV import |
 | Category limits | `category_thresholds` DB table | Wallet category grid |
