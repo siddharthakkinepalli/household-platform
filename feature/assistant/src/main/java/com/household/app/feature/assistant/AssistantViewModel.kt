@@ -75,12 +75,16 @@ class AssistantViewModel @Inject constructor(
             if (!engine.isLoaded) {
                 when {
                     dm.isModelDownloaded(ModelDownloadManager.ModelVariant.FAST) -> {
-                        engine.loadModel(dm.getModelFile(ModelDownloadManager.ModelVariant.FAST).absolutePath)
-                        _modelTier.value = LlamaEngine.ModelTier.FAST
+                        engine.loadModel(
+                            dm.getModelFile(ModelDownloadManager.ModelVariant.FAST).absolutePath,
+                            LlamaEngine.ModelTier.FAST
+                        )
                     }
                     dm.isModelDownloaded(ModelDownloadManager.ModelVariant.DEEP) -> {
-                        engine.loadModel(dm.getModelFile().absolutePath)
-                        _modelTier.value = LlamaEngine.ModelTier.DEEP
+                        engine.loadModel(
+                            dm.getModelFile().absolutePath,
+                            LlamaEngine.ModelTier.DEEP
+                        )
                     }
                 }
             }
@@ -88,6 +92,9 @@ class AssistantViewModel @Inject constructor(
             val startTime = System.currentTimeMillis()
             while (System.currentTimeMillis() - startTime < 30000) {
                 if (engine.isLoaded) {
+                    // Sync tier from engine — engine is a singleton and may have been loaded
+                    // by a previous screen visit; default FAST would show wrong UI + wrong params
+                    _modelTier.value = engine.currentTier
                     _isEngineReady.value = true
                     val persisted = loadMessages()
                     if (persisted.isNotEmpty()) _messages.value = persisted

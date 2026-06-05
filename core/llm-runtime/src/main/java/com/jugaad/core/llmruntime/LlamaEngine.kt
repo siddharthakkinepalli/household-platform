@@ -44,11 +44,12 @@ class LlamaEngine @Inject constructor(
     private var modelPtr = 0L
     private var ctxPtr = 0L
     private val mutex = Mutex()
-    private var currentTier: ModelTier = ModelTier.FAST
+    var currentTier: ModelTier = ModelTier.FAST
+        private set
 
     val isLoaded: Boolean get() = modelPtr != 0L && ctxPtr != 0L
 
-    suspend fun loadModel(modelPath: String): Boolean = withContext(Dispatchers.Default) {
+    suspend fun loadModel(modelPath: String, tier: ModelTier = ModelTier.FAST): Boolean = withContext(Dispatchers.Default) {
         mutex.withLock {
             if (isLoaded) return@withLock true
 
@@ -62,6 +63,7 @@ class LlamaEngine @Inject constructor(
                 modelPtr = 0L
             }
 
+            if (isLoaded) currentTier = tier
             isLoaded
         }
     }
