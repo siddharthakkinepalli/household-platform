@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <chrono>
 #include <android/log.h>
 #include "llama.h"
 
@@ -45,8 +46,8 @@ Java_com_jugaad_core_llmruntime_jni_LlamaJni_nativeCreateContext(
 
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = nCtx;
-    ctx_params.n_threads = 6;
-    ctx_params.n_threads_batch = 6;
+    ctx_params.n_threads = 4;       // Prime + 3 Gold perf cores only — avoids LITTLE core spill
+    ctx_params.n_threads_batch = 8; // All cores for prompt ingestion burst
 
     llama_context* ctx = llama_new_context_with_model(model, ctx_params);
     if (!ctx) {
@@ -102,12 +103,9 @@ Java_com_jugaad_core_llmruntime_jni_LlamaJni_nativeGenerate(
         return env->NewStringUTF("");
     }
 
-    // Modern sampler chain (post-b3900 API)
+    // Near-greedy sampler: at temp=0.1 top_k/top_p add CPU cost with no quality benefit
     struct llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
-    llama_sampler_chain_add(sampler, llama_sampler_init_top_k(topK));
-    llama_sampler_chain_add(sampler, llama_sampler_init_top_p(topP, 1));
-    llama_sampler_chain_add(sampler, llama_sampler_init_penalties(64, repPenalty, 0.0f, 0.0f));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
     std::string result;
@@ -169,7 +167,8 @@ Java_com_jugaad_core_llmruntime_jni_LlamaJni_nativeGenerateStream(
     }
     tokens.resize(n_tokens);
 
-    // KV Cache Management (tag b3584 style)
+    auto t_start = std::chrono::steady_clock::now();
+
     llama_memory_clear(llama_get_memory(ctx), false);
 
     if (llama_decode(ctx, llama_batch_get_one(tokens.data(), tokens.size()))) {
@@ -177,17 +176,21 @@ Java_com_jugaad_core_llmruntime_jni_LlamaJni_nativeGenerateStream(
         return;
     }
 
+    auto t_ingest = std::chrono::steady_clock::now();
+    LOGI("TIMING promptDecodeMs=%ldms tokens=%d",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t_ingest - t_start).count(),
+        n_tokens);
+
+    // Near-greedy sampler: at temp=0.1 top_k/top_p add CPU cost with no quality benefit
     struct llama_sampler* sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(temperature));
-    llama_sampler_chain_add(sampler, llama_sampler_init_top_k(topK));
-    llama_sampler_chain_add(sampler, llama_sampler_init_top_p(topP, 1));
-    llama_sampler_chain_add(sampler, llama_sampler_init_penalties(64, repPenalty, 0.0f, 0.0f));
     llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
     g_stop_generation = false;
     int n_cur = n_tokens;
     const int n_max = n_cur + maxTokens;
     char piece[256];
+    bool first_token_logged = false;
 
     while (n_cur < n_max) {
         if (g_stop_generation) {
@@ -202,6 +205,12 @@ Java_com_jugaad_core_llmruntime_jni_LlamaJni_nativeGenerateStream(
 
         int n = llama_token_to_piece(llama_model_get_vocab(model), id, piece, sizeof(piece), 0, false);
         if (n > 0) {
+            if (!first_token_logged) {
+                first_token_logged = true;
+                LOGI("TIMING firstTokenMs=%ldms",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - t_start).count());
+            }
             jstring token_str = env->NewStringUTF(std::string(piece, n).c_str());
             env->CallObjectMethod(callback, invokeMethod, token_str);
             env->DeleteLocalRef(token_str);
@@ -210,6 +219,11 @@ Java_com_jugaad_core_llmruntime_jni_LlamaJni_nativeGenerateStream(
         n_cur++;
         if (llama_decode(ctx, llama_batch_get_one(&id, 1))) break;
     }
+
+    LOGI("TIMING samplingMs=%ldms generatedTokens=%d",
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t_ingest).count(),
+        n_cur - n_tokens);
 
     llama_sampler_free(sampler);
 }

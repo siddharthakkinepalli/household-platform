@@ -29,7 +29,7 @@ class LlamaEngine @Inject constructor(
     }
 
     object DeepParams {       // Gemma 4 E2B Q4_K_M
-        const val MAX_TOKENS  = 256
+        const val MAX_TOKENS  = 96   // ~3–4 sentences; 256 was generating needless padding
         const val TEMPERATURE = 0.1f
         const val TOP_P       = 0.9f
         const val TOP_K       = 40
@@ -37,8 +37,8 @@ class LlamaEngine @Inject constructor(
     }
 
     companion object {
-        const val N_CTX     = 2048
-        const val N_THREADS = 4   // informational only — C++ hardcodes 6 in context
+        const val N_CTX     = 768  // 300 system + 200 context + 50 history + 96 gen + headroom
+        const val N_THREADS = 4    // matches C++ n_threads — Prime + 3 Gold perf cores
     }
 
     private var modelPtr = 0L

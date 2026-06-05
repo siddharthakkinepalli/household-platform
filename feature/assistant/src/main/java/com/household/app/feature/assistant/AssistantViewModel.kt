@@ -61,14 +61,8 @@ class AssistantViewModel @Inject constructor(
     @Volatile private var isScreenVisible = false
 
     private val SYSTEM_PROMPT = """
-        You are JUGAAD, a private household finance assistant.
-        Rules:
-        - Answer only questions about household finances, documents, and expenses.
-        - Use ONLY the verified data provided. Do not invent numbers.
-        - Keep answers under 3 sentences. Be direct and practical.
-        - Currency is EUR. Location is Germany.
-        - Never reveal raw transaction details or personal data.
-        - If your answer relates to a specific screen, end with exactly one tag: [NAV:screen] where screen is one of: wallet, vault, subscriptions, documents, config. Omit if not relevant.
+        Finance AI. Rules: use only provided data, max 3 sentences, no preamble, EUR/Germany.
+        Optional tag at end: [NAV:wallet|vault|subscriptions|documents|config]
     """.trimIndent()
 
     init {
@@ -149,10 +143,11 @@ class AssistantViewModel @Inject constructor(
                     hhContextFetchedAt = System.currentTimeMillis()
                 }
 
+                // Suffix "Here:" forces the model to skip polite preamble and answer immediately
                 val prompt = if (historyBlock.isNotEmpty()) {
-                    "$SYSTEM_PROMPT\n\n$cachedHhContext\n\n$historyBlock\nUser: $userText\nJUGAAD:"
+                    "$SYSTEM_PROMPT\n\n$cachedHhContext\n\n${historyBlock}User: $userText\nJUGAAD: Here:"
                 } else {
-                    "$SYSTEM_PROMPT\n\n$cachedHhContext\n\nUser: $userText\nJUGAAD:"
+                    "$SYSTEM_PROMPT\n\n$cachedHhContext\n\nUser: $userText\nJUGAAD: Here:"
                 }
 
                 val t0 = System.currentTimeMillis()
