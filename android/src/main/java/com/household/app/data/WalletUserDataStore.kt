@@ -111,11 +111,8 @@ object WalletUserDataStore {
         if (transactions.isEmpty()) return@withContext
         val db = AppDatabase.getInstance(context)
         val dao = db.walletTransactionDao()
-        
-        val existing = dao.getAllTransactions()
-        val existingIds = existing.map { it.id }.toMutableSet()
-        
-        val newTransactions = transactions.filter { !existingIds.contains(it.id) }.map { tx ->
+
+        val entities = transactions.map { tx ->
             WalletTransactionEntity(
                 id = tx.id,
                 title = tx.title,
@@ -126,13 +123,20 @@ object WalletUserDataStore {
                 trip = tx.trip,
                 note = tx.note,
                 bankName = tx.bankName,
-                excluded = tx.excluded
+                excluded = tx.excluded,
+                contentHash = contentHashFor(tx)
             )
         }
-        
-        if (newTransactions.isNotEmpty()) {
-            dao.insertTransactions(newTransactions)
-        }
+        // IGNORE silently skips any row whose contentHash already exists in DB,
+        // preventing duplicates when the same CSV is uploaded more than once.
+        dao.insertTransactionsIgnore(entities)
+    }
+
+    private fun contentHashFor(tx: WalletDataLoader.WalletTransaction): String {
+        val key = "${tx.date}|${tx.title.trim()}|${"%.2f".format(tx.amount)}|${tx.bankName}"
+        return java.security.MessageDigest.getInstance("MD5")
+            .digest(key.toByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 
     suspend fun appendUserTrips(

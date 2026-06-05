@@ -209,9 +209,12 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun downloadThenLoad(dm: ModelDownloadManager, docModel: DocumentInferenceModel) {
         _modelStatus.value = ModelStatus.Downloading(0)
-        dm.downloadModel(ModelDownloadManager.MODEL_DOWNLOAD_URL) { downloaded, total ->
-            if (total > 0) _modelStatus.value = ModelStatus.Downloading(((downloaded * 100) / total).toInt())
-        }.onSuccess {
+        dm.downloadModel(
+            url = ModelDownloadManager.MODEL_DOWNLOAD_URL,
+            onProgress = { downloaded, total ->
+                if (total > 0) _modelStatus.value = ModelStatus.Downloading(((downloaded * 100) / total).toInt())
+            }
+        ).onSuccess {
             loadModel(docModel, dm)
         }.onFailure { e ->
             _modelStatus.value = ModelStatus.Failed(e.message ?: "Download failed")

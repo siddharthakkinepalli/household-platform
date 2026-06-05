@@ -1,10 +1,36 @@
 # Household Platform — Execution Status
 
-**Last updated:** 2026-06-03 (Gemma 4 document AI live — llama.cpp JNI, in-app download, extraction pipeline)
+**Last updated:** 2026-06-03 (Chat assistant wired, LLM inference debugging in progress)
 **DB version:** 21 (main app) · Astro v1 (separate SQLCipher `astro_encrypted.db`)
 **Build status:** ✅ BUILD SUCCESSFUL
 **APK:** `android/build/outputs/apk/debug/android-arm64-v8a-debug.apk`
-**Next action:** Chat Assistant — `:feature:assistant` module, HouseholdContextProvider, AssistantScreen (Gemini prompt ready)
+**Next action:** Fix Gemma 4 on-device inference lag in chat — see "🐛 ACTIVE BUG" section below
+
+---
+
+## 🐛 ACTIVE BUG — Chat LLM Inference Lag (2026-06-03)
+
+**Symptom:** Gemma 4 E2B (DEEP model) takes very long to respond in the chat screen. LFM2.5 (FAST model) shows "not downloaded yet" so only DEEP path is exercised.
+
+**Root causes found and fixed this session:**
+| Fixed | What | File |
+|-------|------|------|
+| ✅ | `LOGI("Token generated: %s", ...)` inside generation loop — system call per token | `core/llm-runtime/src/main/cpp/llama_bridge.cpp` |
+| ✅ | Swap blocked entire generation via mutex — swap now calls `nativeStopGeneration()` first | `LlamaEngine.kt` + `llama_bridge.cpp` |
+
+**Still slow after fixes:** Gemma 4 E2B Q4_K_M is 3.4 GB — even without logging, on-device CPU inference of a 2B param model is inherently slow on a phone.
+
+**Next debugging steps (do these first next session):**
+1. Add timing split between prompt-decode phase and sampling loop in `nativeGenerateStream` — log `promptDecodeMs` and `samplingMs` separately to logcat to see which phase dominates
+2. Try reducing `N_CTX` from 2048 → 512 (context window allocation affects memory bandwidth and KV cache init time)
+3. Try reducing `DeepParams.MAX_TOKENS` from 256 → 64 for chat use case — JUGAAD answers are supposed to be ≤3 sentences
+4. Check if LFM2.5 (FAST, 731 MB) can be downloaded to the device to test the fast path — this is the intended chat model; Gemma 4 is overkill for the 3-sentence chat use case
+5. Verify `n_threads=6` is being used by the context (currently hardcoded in C++ but `N_THREADS=4` in Kotlin companion — confirm the C++ value takes effect)
+
+**Key files for this bug:**
+- `core/llm-runtime/src/main/cpp/llama_bridge.cpp` — `nativeGenerateStream()` loop
+- `core/llm-runtime/src/main/java/com/jugaad/core/llmruntime/LlamaEngine.kt` — `generateStream()`, `FastParams`/`DeepParams`
+- `feature/assistant/src/main/java/com/household/app/feature/assistant/AssistantViewModel.kt` — `toggleTier()`, `sendMessage()`
 
 ---
 

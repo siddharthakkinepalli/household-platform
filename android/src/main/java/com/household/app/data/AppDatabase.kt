@@ -93,7 +93,7 @@ import com.household.app.data.entities.InventoryEventEntity
         VaultDocumentEntityRecord::class,
         VaultEntityFts::class
     ],
-    version = 21,
+    version = 23,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -523,6 +523,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_21_22 = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE wallet_transactions ADD COLUMN contentHash TEXT")
+                } catch (_: Exception) { /* already exists on fresh installs */ }
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_transactions_contentHash " +
+                    "ON wallet_transactions(contentHash)"
+                )
+            }
+        }
+
         private val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -606,6 +618,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Identity hash refresh
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -621,7 +639,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
-                        MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21
+                        MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
+                        MIGRATION_22_23
                     )
                     .build()
                 INSTANCE = instance

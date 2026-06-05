@@ -25,6 +25,7 @@ import com.household.app.ui.compose.navigation.Screen
 import com.jugaad.feature.astro.ui.AstroHomeScreen
 import com.jugaad.feature.astro.ui.BirthChartScreen
 import com.jugaad.feature.astro.ui.AstroProfileScreen
+import com.household.app.feature.assistant.AssistantScreen
 
 @Composable
 fun V2AppNavHost(
@@ -257,6 +258,22 @@ fun V2AppNavHost(
             AstroProfileScreen(
                 onBack = { navController.popBackStack() },
                 onSuccess = { navController.popBackStack() }
+            )
+        }
+
+        composable(route = Screen.Assistant.route) {
+            AssistantScreen(
+                onNavigate = { route ->
+                    val dest = when (route) {
+                        "wallet"        -> Screen.Wallet.route
+                        "vault"         -> Screen.Docs.route
+                        "subscriptions" -> Screen.SubscriptionHub.route
+                        "documents"     -> Screen.Documents.route
+                        "config"        -> Screen.Config.route
+                        else            -> return@AssistantScreen
+                    }
+                    navController.navigate(dest)
+                }
             )
         }
     }

@@ -7,6 +7,7 @@ import androidx.compose.material.icons.rounded.Cottage
 import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.QuestionAnswer
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Tune
@@ -56,9 +57,10 @@ sealed class Screen(
     object Trips : Screen("trips", Icons.Rounded.Tune, "Trips")
     object Astro : Screen("astro", Icons.Rounded.AutoAwesome, "Astro")
     object AstroProfile : Screen("astro/profile", Icons.Rounded.AutoAwesome, "Astro Profile")
+    object Assistant : Screen("assistant", Icons.Rounded.QuestionAnswer, "Assistant")
 
     companion object {
         /** Ordered list used to build primary rail items and NavHost destinations. */
-        val all: List<Screen> = listOf(Home, Wallet, Docs, Family, Config, Astro)
+        val all: List<Screen> = listOf(Home, Wallet, Docs, Family, Config, Astro, Assistant)
     }
 }

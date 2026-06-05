@@ -16,31 +16,51 @@ class ModelDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
+    enum class ModelVariant { FAST, DEEP }
+
     companion object {
-        const val MODEL_FILENAME = "gemma4_e2b_q4km.gguf"
         const val MODEL_SUBDIR = "models"
+
+        // DEEP — Gemma 4 E2B Q4_K_M (existing, ~3.4 GB)
+        const val MODEL_FILENAME     = "gemma4_e2b_q4km.gguf"
         const val MODEL_DOWNLOAD_URL =
             "https://huggingface.co/majentik/gemma-4-E2B-it-RotorQuant-GGUF-Q4_K_M/resolve/main/gemma-4-E2B-it-RotorQuant-Q4_K_M.gguf"
-        const val MODEL_SIZE_BYTES = 3_427_861_536L
+        const val MODEL_SIZE_BYTES   = 3_427_861_536L
+
+        // FAST — LFM2.5-1.2B-Instruct Q4_K_M (official LiquidAI GGUF, ~731 MB)
+        const val FAST_MODEL_FILENAME     = "lfm2_5_1b_q4km.gguf"
+        const val FAST_MODEL_DOWNLOAD_URL =
+            "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf"
+        const val FAST_MODEL_SIZE_BYTES   = 731_000_000L
     }
 
-    fun getModelFile(): File {
+    fun getModelFile(): File = getModelFile(ModelVariant.DEEP)
+
+    fun getModelFile(variant: ModelVariant): File {
         val dir = File(context.filesDir, MODEL_SUBDIR)
         if (!dir.exists()) dir.mkdirs()
-        return File(dir, MODEL_FILENAME)
+        return File(dir, if (variant == ModelVariant.FAST) FAST_MODEL_FILENAME else MODEL_FILENAME)
     }
 
-    fun isModelDownloaded(): Boolean {
-        val file = getModelFile()
-        return file.exists() && file.length() > MODEL_SIZE_BYTES / 2
+    fun isModelDownloaded(): Boolean = isModelDownloaded(ModelVariant.DEEP)
+
+    fun isModelDownloaded(variant: ModelVariant): Boolean {
+        val file = getModelFile(variant)
+        val minSize = if (variant == ModelVariant.FAST) FAST_MODEL_SIZE_BYTES / 2
+                      else MODEL_SIZE_BYTES / 2
+        return file.exists() && file.length() > minSize
     }
+
+    fun getDownloadUrl(variant: ModelVariant): String =
+        if (variant == ModelVariant.FAST) FAST_MODEL_DOWNLOAD_URL else MODEL_DOWNLOAD_URL
 
     suspend fun downloadModel(
         url: String,
-        onProgress: (Long, Long) -> Unit
+        onProgress: (Long, Long) -> Unit,
+        variant: ModelVariant = ModelVariant.DEEP
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
-            val targetFile = getModelFile()
+            val targetFile = getModelFile(variant)
             val tempFile = File(targetFile.parent, "${targetFile.name}.tmp")
             
             val connection = URL(url).openConnection() as HttpURLConnection

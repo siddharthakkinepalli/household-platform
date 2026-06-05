@@ -22,9 +22,9 @@ android {
     }
 
     aaptOptions {
-        // Tells the Android Asset Packaging Tool not to compress the model files
-        // This allows ONNX to memory-map the file directly from disk
         noCompress("ort", "json", "txt")
+        // Exclude the large ONNX model from the APK — Phase 4 loads it from internal storage at runtime
+        ignoreAssetsPattern = "!astro_inference.onnx"
     }
 }
 

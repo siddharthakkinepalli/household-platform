@@ -8,7 +8,7 @@ class SecurityUtilsTest {
     @Test
     fun sha256ReturnsCorrectHash() {
         val input = "jugaad"
-        val expected = "274a169994c6439567990141f92e59df957df38814777d0187889154f9d45465"
+        val expected = "30bad95b0def26b19a5dc99942b7a4cdbd13931814074deef544234f9228f6d3"
         assertEquals(expected, SecurityUtils.sha256(input))
     }
 

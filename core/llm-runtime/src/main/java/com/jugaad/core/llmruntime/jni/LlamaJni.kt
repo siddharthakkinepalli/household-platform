@@ -13,8 +13,23 @@ internal object LlamaJni {
         prompt: String,
         maxTokens: Int,
         temperature: Float,
-        topP: Float
+        topP: Float,
+        topK: Int,
+        repPenalty: Float
     ): String
+
+    external fun nativeGenerateStream(
+        ctxPtr: Long,
+        modelPtr: Long,
+        prompt: String,
+        maxTokens: Int,
+        temperature: Float,
+        topP: Float,
+        topK: Int,
+        repPenalty: Float,
+        callback: (String) -> Unit
+    )
     external fun nativeReleaseContext(ctxPtr: Long)
     external fun nativeFreeModel(modelPtr: Long)
+    external fun nativeStopGeneration()
 }

@@ -114,6 +114,7 @@ dependencies {
     implementation(project(":widget:astro-home"))
     implementation(project(":core:document-ai"))
     implementation(project(":core:llm-runtime"))
+    implementation(project(":feature:assistant"))
 
     // Core AndroidX
     implementation("androidx.core:core-ktx:1.12.0")

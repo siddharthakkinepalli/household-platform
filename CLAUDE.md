@@ -131,6 +131,24 @@ Vedic astrology engine docking into JUGAAD. Offline, $0 API cost, Swiss Ephemeri
 
 ---
 
+## 🐛 Active Bug — fix this before Wave 6
+
+**Chat LLM inference is too slow.** Gemma 4 E2B (3.4 GB) is the only downloaded model; LFM2.5 FAST is not on the device.
+
+**Already fixed this session (do NOT redo):**
+- Removed per-token `LOGI` from `llama_bridge.cpp` — was a system call per token
+- `LlamaEngine.swap()` now calls `nativeStopGeneration()` before waiting on mutex
+
+**Next agent should do (in order):**
+1. Add timing split in `nativeGenerateStream` — log `promptDecodeMs` vs `samplingMs` separately so we know which phase dominates
+2. Reduce `N_CTX` 2048 → 512 and `DeepParams.MAX_TOKENS` 256 → 64 (chat answers ≤3 sentences)
+3. Confirm threads: Kotlin `N_THREADS=4` but C++ hardcodes `n_threads_batch=6` — verify which value the context actually uses
+4. Once timing data is known, decide whether to reduce model size or tune params
+
+Key files: `core/llm-runtime/src/main/cpp/llama_bridge.cpp` · `core/llm-runtime/src/main/java/com/jugaad/core/llmruntime/LlamaEngine.kt`
+
+---
+
 ## Wave 6 — next work (3 parallel agents, launch immediately)
 
 | Agent | Task | What it delivers |
