@@ -16,7 +16,7 @@ class ModelDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    enum class ModelVariant { FAST, DEEP }
+    enum class ModelVariant { DEEP }
 
     companion object {
         const val MODEL_SUBDIR = "models"
@@ -27,11 +27,8 @@ class ModelDownloadManager @Inject constructor(
             "https://huggingface.co/majentik/gemma-4-E2B-it-RotorQuant-GGUF-Q4_K_M/resolve/main/gemma-4-E2B-it-RotorQuant-Q4_K_M.gguf"
         const val MODEL_SIZE_BYTES   = 3_427_861_536L
 
-        // FAST — LFM2.5-1.2B-Instruct Q4_K_M (official LiquidAI GGUF, ~731 MB)
-        const val FAST_MODEL_FILENAME     = "lfm2_5_1b_q4km.gguf"
-        const val FAST_MODEL_DOWNLOAD_URL =
-            "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf"
-        const val FAST_MODEL_SIZE_BYTES   = 731_000_000L
+        // Legacy file name from removed FAST/LFM2.5 path; kept for cleanup only.
+        const val LEGACY_FAST_MODEL_FILENAME = "lfm2_5_1b_q4km.gguf"
     }
 
     fun getModelFile(): File = getModelFile(ModelVariant.DEEP)
@@ -39,20 +36,18 @@ class ModelDownloadManager @Inject constructor(
     fun getModelFile(variant: ModelVariant): File {
         val dir = File(context.filesDir, MODEL_SUBDIR)
         if (!dir.exists()) dir.mkdirs()
-        return File(dir, if (variant == ModelVariant.FAST) FAST_MODEL_FILENAME else MODEL_FILENAME)
+        return File(dir, MODEL_FILENAME)
     }
 
     fun isModelDownloaded(): Boolean = isModelDownloaded(ModelVariant.DEEP)
 
     fun isModelDownloaded(variant: ModelVariant): Boolean {
         val file = getModelFile(variant)
-        val minSize = if (variant == ModelVariant.FAST) FAST_MODEL_SIZE_BYTES / 2
-                      else MODEL_SIZE_BYTES / 2
+        val minSize = MODEL_SIZE_BYTES / 2
         return file.exists() && file.length() > minSize
     }
 
-    fun getDownloadUrl(variant: ModelVariant): String =
-        if (variant == ModelVariant.FAST) FAST_MODEL_DOWNLOAD_URL else MODEL_DOWNLOAD_URL
+    fun getDownloadUrl(variant: ModelVariant): String = MODEL_DOWNLOAD_URL
 
     suspend fun downloadModel(
         url: String,
@@ -92,5 +87,10 @@ class ModelDownloadManager @Inject constructor(
                 throw Exception("Failed to rename temp file to target file")
             }
         }
+    }
+
+    fun deleteLegacyFastModelIfPresent(): Boolean {
+        val legacy = File(File(context.filesDir, MODEL_SUBDIR), LEGACY_FAST_MODEL_FILENAME)
+        return legacy.exists() && legacy.delete()
     }
 }

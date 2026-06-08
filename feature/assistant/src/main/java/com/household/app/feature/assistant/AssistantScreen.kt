@@ -37,8 +37,8 @@ fun AssistantScreen(
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val isEngineReady by viewModel.isEngineReady.collectAsStateWithLifecycle()
-    val modelTier by viewModel.modelTier.collectAsStateWithLifecycle()
     val isSwapping by viewModel.isSwapping.collectAsStateWithLifecycle()
+    val inferenceBackend by viewModel.inferenceBackend.collectAsStateWithLifecycle()
     val pending by viewModel.pendingNavigation.collectAsStateWithLifecycle()
     val scrollState = rememberLazyListState()
 
@@ -87,27 +87,52 @@ fun AssistantScreen(
                         style = TextStyle(fontSize = 11.sp, letterSpacing = 1.sp))
                 }
             } else {
-                val (label, chipColor) = when (modelTier) {
-                    LlamaEngine.ModelTier.FAST -> "⚡ Fast  LFM2.5" to LumeCyan
-                    LlamaEngine.ModelTier.DEEP -> "🧠 Deep  Gemma 4" to LumeAmber
+                val (backendLabel, backendColor) = when (inferenceBackend) {
+                    AssistantViewModel.InferenceBackend.LOCAL -> "Backend: Local" to LumeAmber
+                    AssistantViewModel.InferenceBackend.OLLAMA -> "Backend: Ollama" to LumeCyan
                 }
-                Row(
-                    modifier = Modifier.clickable { viewModel.toggleTier() },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        label,
+                        backendLabel,
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(chipColor.copy(alpha = 0.15f))
+                            .background(backendColor.copy(alpha = 0.15f))
+                            .clickable { viewModel.toggleInferenceBackend() }
                             .padding(horizontal = 10.dp, vertical = 3.dp),
-                        color = chipColor,
+                        color = backendColor,
                         style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.5.sp)
                     )
                     Spacer(Modifier.width(6.dp))
                     Text("tap to switch", color = TextMuted,
                         style = TextStyle(fontSize = 10.sp, letterSpacing = 0.5.sp))
+                }
+
+                Spacer(Modifier.height(6.dp))
+
+                if (inferenceBackend == AssistantViewModel.InferenceBackend.LOCAL) {
+                    Text(
+                        "🧠 Local model: Gemma 4",
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(LumeAmber.copy(alpha = 0.15f))
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
+                        color = LumeAmber,
+                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp)
+                    )
+                } else {
+                    Text(
+                        "Remote model is selected by Ollama",
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(LumeCyan.copy(alpha = 0.15f))
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
+                        color = LumeCyan,
+                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp)
+                    )
                 }
             }
         }
@@ -181,7 +206,8 @@ fun SuggestedChips(onChipClick: (String) -> Unit) {
         "Monthly spend?" to "What did I spend this month?",
         "Upcoming bills?" to "What bills are due soon?",
         "Subscriptions?" to "Show my active subscriptions",
-        "Expiring docs?" to "What documents are expiring soon?"
+        "Expiring docs?" to "What documents are expiring soon?",
+        "Ollama test" to "/ollama test"
     )
 
     LazyRow(

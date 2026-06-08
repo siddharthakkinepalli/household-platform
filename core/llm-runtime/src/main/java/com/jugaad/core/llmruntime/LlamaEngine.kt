@@ -18,15 +18,7 @@ class LlamaEngine @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    enum class ModelTier { FAST, DEEP }
-
-    object FastParams {       // LFM2.5-1.2B-Instruct Q4_K_M
-        const val MAX_TOKENS  = 128
-        const val TEMPERATURE = 0.1f
-        const val TOP_P       = 0.9f
-        const val TOP_K       = 50
-        const val REP_PENALTY = 1.05f
-    }
+    enum class ModelTier { DEEP }
 
     object DeepParams {       // Gemma 4 E2B Q4_K_M
         const val MAX_TOKENS  = 96   // ~3–4 sentences; 256 was generating needless padding
@@ -44,12 +36,12 @@ class LlamaEngine @Inject constructor(
     private var modelPtr = 0L
     private var ctxPtr = 0L
     private val mutex = Mutex()
-    var currentTier: ModelTier = ModelTier.FAST
+    var currentTier: ModelTier = ModelTier.DEEP
         private set
 
     val isLoaded: Boolean get() = modelPtr != 0L && ctxPtr != 0L
 
-    suspend fun loadModel(modelPath: String, tier: ModelTier = ModelTier.FAST): Boolean = withContext(Dispatchers.Default) {
+    suspend fun loadModel(modelPath: String, tier: ModelTier = ModelTier.DEEP): Boolean = withContext(Dispatchers.Default) {
         mutex.withLock {
             if (isLoaded) return@withLock true
 
@@ -105,7 +97,7 @@ class LlamaEngine @Inject constructor(
             }
         }
 
-    suspend fun generate(prompt: String, tier: ModelTier = ModelTier.FAST): String = withContext(Dispatchers.Default) {
+    suspend fun generate(prompt: String, tier: ModelTier = ModelTier.DEEP): String = withContext(Dispatchers.Default) {
         mutex.withLock {
             if (!isLoaded) return@withLock ""
             val t0 = System.currentTimeMillis()
@@ -116,7 +108,7 @@ class LlamaEngine @Inject constructor(
         }
     }
 
-    fun generateStream(prompt: String, tier: ModelTier = ModelTier.FAST): Flow<String> = callbackFlow {
+    fun generateStream(prompt: String, tier: ModelTier = ModelTier.DEEP): Flow<String> = callbackFlow {
         withContext(Dispatchers.Default) {
             mutex.withLock {
                 if (!isLoaded) {
@@ -134,9 +126,6 @@ class LlamaEngine @Inject constructor(
     }
 
     private fun getGenerationParams(tier: ModelTier): GenerationParams = when (tier) {
-        ModelTier.FAST -> GenerationParams(
-            FastParams.MAX_TOKENS, FastParams.TEMPERATURE, FastParams.TOP_P, FastParams.TOP_K, FastParams.REP_PENALTY
-        )
         ModelTier.DEEP -> GenerationParams(
             DeepParams.MAX_TOKENS, DeepParams.TEMPERATURE, DeepParams.TOP_P, DeepParams.TOP_K, DeepParams.REP_PENALTY
         )

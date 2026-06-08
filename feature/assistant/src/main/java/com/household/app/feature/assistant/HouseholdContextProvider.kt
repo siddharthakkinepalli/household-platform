@@ -1,6 +1,7 @@
 package com.household.app.feature.assistant
 
 import android.content.Context
+import android.database.Cursor
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SimpleSQLiteQuery
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -16,6 +17,11 @@ class HouseholdContextProvider @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
+    companion object {
+        // Keep this large for LAN Ollama use; local on-device models may still truncate by context window.
+        private const val MAX_FULL_DB_CHARS = 1_500_000
+    }
+
     private fun getDatabase(): RoomDatabase? {
         return try {
             val clazz = Class.forName("com.household.app.data.AppDatabase")
@@ -26,9 +32,13 @@ class HouseholdContextProvider @Inject constructor(
         }
     }
 
-    suspend fun buildContext(userQuery: String): String = withContext(Dispatchers.IO) {
+    suspend fun buildContext(userQuery: String, includeFullDb: Boolean = false): String = withContext(Dispatchers.IO) {
         try {
             val db = getDatabase() ?: return@withContext ""
+
+            if (includeFullDb) {
+                return@withContext buildFullDatabaseContext(db)
+            }
             
             // 1. Month spend and top 3 categories
             val now = LocalDate.now()
@@ -124,5 +134,161 @@ class HouseholdContextProvider @Inject constructor(
         } catch (e: Exception) {
             ""
         }
+    }
+
+    suspend fun executeReadOnlySql(
+        query: String,
+        maxRows: Int = 200,
+        maxChars: Int = 120_000
+    ): String = withContext(Dispatchers.IO) {
+        try {
+            val db = getDatabase() ?: return@withContext "{\"error\":\"database_unavailable\"}"
+            val cursor = db.query(SimpleSQLiteQuery(query))
+            cursor.use {
+                val cols = cursor.columnNames
+                val sb = StringBuilder()
+                sb.append("{\"columns\":[")
+                cols.forEachIndexed { idx, col ->
+                    if (idx > 0) sb.append(",")
+                    sb.append("\"").append(escapeJson(col)).append("\"")
+                }
+                sb.append("],\"rows\":[")
+
+                var rowCount = 0
+                var firstRow = true
+                while (cursor.moveToNext() && rowCount < maxRows) {
+                    if (sb.length > maxChars) {
+                        break
+                    }
+                    if (!firstRow) sb.append(",")
+                    firstRow = false
+                    sb.append(rowToJson(cursor, cols))
+                    rowCount++
+                }
+                sb.append("],\"rowCount\":").append(rowCount)
+                if (!cursor.isAfterLast) {
+                    sb.append(",\"truncated\":true")
+                }
+                sb.append("}")
+                sb.toString()
+            }
+        } catch (e: Exception) {
+            val msg = e.message?.take(240) ?: "query_failed"
+            "{\"error\":\"${escapeJson(msg)}\"}"
+        }
+    }
+
+    private fun buildFullDatabaseContext(db: RoomDatabase): String {
+        val out = StringBuilder()
+        out.append("=== FULL_DB_EXPORT_JSON ===\n")
+        out.append("{\"tables\":{")
+
+        val tables = getUserTables(db)
+        var firstTable = true
+
+        for (table in tables) {
+            if (!firstTable) out.append(",")
+            firstTable = false
+
+            if (out.length > MAX_FULL_DB_CHARS) {
+                out.append("\"__truncated__\":{\"reason\":\"max_chars\",\"max\":")
+                out.append(MAX_FULL_DB_CHARS)
+                out.append("}")
+                break
+            }
+
+            val safeTable = escapeJson(table)
+            out.append("\"").append(safeTable).append("\":")
+            out.append(exportTable(db, table))
+        }
+
+        out.append("}}\n")
+        out.append("=== END_FULL_DB_EXPORT ===")
+        return out.toString()
+    }
+
+    private fun getUserTables(db: RoomDatabase): List<String> {
+        val result = mutableListOf<String>()
+        val cursor = db.query(
+            SimpleSQLiteQuery(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type='table'
+                  AND name NOT LIKE 'sqlite_%'
+                  AND name NOT LIKE 'room_%'
+                ORDER BY name
+                """.trimIndent()
+            )
+        )
+        try {
+            while (cursor.moveToNext()) {
+                result.add(cursor.getString(0))
+            }
+        } finally {
+            cursor.close()
+        }
+        return result
+    }
+
+    private fun exportTable(db: RoomDatabase, table: String): String {
+        val sql = "SELECT * FROM \"${table.replace("\"", "\"\"")}\""
+        val cursor = db.query(SimpleSQLiteQuery(sql))
+        return try {
+            val cols = cursor.columnNames
+            val sb = StringBuilder()
+            sb.append("{\"columns\":[")
+            cols.forEachIndexed { idx, c ->
+                if (idx > 0) sb.append(",")
+                sb.append("\"").append(escapeJson(c)).append("\"")
+            }
+            sb.append("],\"rows\":[")
+
+            var firstRow = true
+            while (cursor.moveToNext()) {
+                if (!firstRow) sb.append(",")
+                firstRow = false
+                sb.append(rowToJson(cursor, cols))
+            }
+
+            sb.append("]}")
+            sb.toString()
+        } finally {
+            cursor.close()
+        }
+    }
+
+    private fun rowToJson(cursor: Cursor, cols: Array<String>): String {
+        val sb = StringBuilder("{")
+        cols.forEachIndexed { idx, name ->
+            if (idx > 0) sb.append(",")
+            sb.append("\"").append(escapeJson(name)).append("\":")
+            sb.append(valueToJson(cursor, idx))
+        }
+        sb.append("}")
+        return sb.toString()
+    }
+
+    private fun valueToJson(cursor: Cursor, idx: Int): String {
+        return when (cursor.getType(idx)) {
+            Cursor.FIELD_TYPE_NULL -> "null"
+            Cursor.FIELD_TYPE_INTEGER -> cursor.getLong(idx).toString()
+            Cursor.FIELD_TYPE_FLOAT -> cursor.getDouble(idx).toString()
+            Cursor.FIELD_TYPE_STRING -> "\"${escapeJson(cursor.getString(idx) ?: "")}\""
+            Cursor.FIELD_TYPE_BLOB -> {
+                val b = cursor.getBlob(idx)
+                "\"<blob:${b?.size ?: 0} bytes>\""
+            }
+            else -> "\"\""
+        }
+    }
+
+    private fun escapeJson(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
     }
 }
